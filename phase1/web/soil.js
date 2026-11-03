@@ -14,7 +14,12 @@ const MAGIC_EXC = 0x32435845; // "EXC2"
 
 export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, layerStatic, panel, view }) {
   const params = new URLSearchParams(location.search);
-  const url = params.get("soil") ? `ws://${params.get("soil")}` : `ws://${location.hostname || "127.0.0.1"}:8765`;
+  const scheme = location.protocol === "https:" ? "wss" : "ws";
+  const url = params.get("soil") ? `${scheme}://${params.get("soil")}` : `ws://${location.hostname || "127.0.0.1"}:8765`;
+  // A static HTTPS host (e.g. the GitHub Pages demo) cannot open ws:// and has no GPU server behind it:
+  // stay offline unless ?soil=host:port names a server explicitly.
+  const tryConnect = Boolean(params.get("soil")) || location.protocol !== "https:";
+  const QUICK_START = "https://github.com/dtt-github/construction-site-simulation#quick-start";
 
   // ------------------------------------------------------------ panel (controls depend on the server kind)
   const box = document.createElement("fieldset");
@@ -23,7 +28,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     <legend>Excavation · Newton soil</legend>
     <div id="soil-status" class="hint">Connecting to ${url}…</div>
     <dl class="stats" id="soil-stats"></dl>
-    <div class="buttons">
+    <div class="buttons" id="soil-buttons" hidden>
       <button id="soil-auto">Auto dig cycle</button>
       <button id="soil-reset" class="secondary">Reset soil</button>
       <button id="soil-view" class="secondary">View pit</button>
@@ -33,6 +38,11 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   const statusEl = box.querySelector("#soil-status");
   const statsEl = box.querySelector("#soil-stats");
   const controlsEl = box.querySelector("#soil-controls");
+  const buttonsEl = box.querySelector("#soil-buttons");
+  const showOffline = (detail) => {
+    buttonsEl.hidden = controlsEl.hidden = true;
+    statusEl.innerHTML = `<strong>Soil server not connected.</strong> The excavator and soil need the GPU server (NVIDIA Newton); see the <a href="${QUICK_START}" target="_blank" rel="noopener">README quick start</a>. ${detail}`;
+  };
 
   let ws = null;
   let kind = null; // "bucket" | "excavator"
@@ -406,10 +416,20 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     stats.bytes += buf.byteLength;
   }
 
+  let failures = 0; // back off retries so a missing local server doesn't flood the console
   function connect() {
-    ws = new WebSocket(url);
+    try {
+      ws = new WebSocket(url);
+    } catch (err) {
+      showOffline(`Could not open ${url} (${err.message}).`);
+      return;
+    }
     ws.binaryType = "arraybuffer";
-    ws.onopen = () => (statusEl.textContent = `Connected to ${url}`);
+    ws.onopen = () => {
+      buttonsEl.hidden = controlsEl.hidden = false;
+      failures = 0;
+      statusEl.textContent = `Connected to ${url}`;
+    };
     ws.onmessage = (ev) => {
       if (typeof ev.data === "string") {
         const hello = JSON.parse(ev.data);
@@ -432,13 +452,14 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       }
     };
     ws.onclose = () => {
-      statusEl.textContent = `Soil server not reachable (${url}). Start phase2/excavator_server.py (or soil_server.py); retrying…`;
+      showOffline(`Start phase2/excavator_server.py (or soil_server.py) for ${url}; retrying…`);
       bucket.visible = false;
       for (const g of Object.values(arm.links)) g.visible = false;
-      setTimeout(connect, 2000);
+      setTimeout(connect, Math.min(30000, 2000 * 2 ** failures++));
     };
   }
-  connect();
+  if (tryConnect) connect();
+  else showOffline("The rest of the site runs fully in the browser.");
 
   // ------------------------------------------------------------ per render frame
   function update() {
