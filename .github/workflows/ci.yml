@@ -1,0 +1,32 @@
+# Fast checks that run without a GPU: asset registry, JS syntax, Python syntax.
+# Newton/Warp are not installed; py_compile only parses the files.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Asset registry and licenses
+        run: python3 assets/fetch_assets.py --check
+      - name: JavaScript syntax (ES modules)
+        run: |
+          for f in phase1/web/*.js; do
+            echo "node --check $f"
+            node --input-type=module --check < "$f"
+          done
+      - name: Python syntax
+        run: python -m py_compile phase2/*.py assets/*.py phase1/*.py

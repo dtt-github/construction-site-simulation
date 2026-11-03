@@ -1,0 +1,55 @@
+# Browser demo on GitHub Pages: the phase1 three.js + Jolt site, without the GPU soil server.
+# Third-party SimReady GLBs (CC BY 4.0) are not in git; they are downloaded at build time and
+# published with their attribution (site footer, NOTICE, assets/registry.json).
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "phase1/web/**"
+      - "assets/**"
+      - ".github/scripts/build_pages.sh"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache SimReady GLBs
+        uses: actions/cache@v4
+        with:
+          path: phase1/glb
+          key: simready-glb-${{ hashFiles('assets/registry.json') }}
+      - name: Build site
+        run: .github/scripts/build_pages.sh _site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
