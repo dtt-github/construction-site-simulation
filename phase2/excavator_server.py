@@ -297,6 +297,7 @@ def _bucket_outline():
 
 
 BUCKET_OUTLINE = _bucket_outline()
+CLEAR_POINTS = [v + np.array([0.0, y, 0.0]) for v in BUCKET_OUTLINE for y in (-BUCKET_W / 2, BUCKET_W / 2)]  # both sides
 
 # ------------------------------------------------------------------ kernels
 @wp.kernel
@@ -455,12 +456,10 @@ class ExcavatorSim:
         ("drag", 0, 5.6, 1.1 + DIG_Z, -100),
         ("drag-curl", 0, 4.7, 1.2 + DIG_Z, -145),  # keep dragging while curling: the 1.2 m mouth fills toward the top
         ("curl", 0, 4.6, 1.6 + DIG_Z, -180),
-        ("lift", 0, 5.0, 6.6, -165),
-        ("swing to truck", -90, 5.4, 6.6, -165),
+        ("swing to truck", -90, 5.4, 7.0, -165),  # lifts while swinging, as far as the clearance allows; aimed
+        # above what clears the truck, so the boom is still rising at full speed as the bucket gets there
         ("dump", -90, 5.4, 6.4, -40),
-        ("raise", -90, 5.4, 7.0, -110),  # clear the truck sides before swinging back
-        ("swing back", 0, 6.0, 6.6, -95),
-        ("lower", 0, 6.0, 2.6 + DIG_Z, -95),
+        ("swing back", 0, 6.0, 2.6 + DIG_Z, -95),  # lowers while swinging, once clear of the truck
     ]
 
     def __init__(self, voxel=0.08, ppc=2, density=1600.0, friction=0.75, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY):
@@ -660,6 +659,7 @@ class ExcavatorSim:
         self._z_cache = {}
         self.stage_time = 0.0
         self.auto_wait = 0.0
+        self.low_prev, self.low_rate, self.swing_held, self.arm_held = None, 0.0, 0.0, 0.0
         self.stage_name = "manual"
         self.sim_time = 0.0
         self.step_ms = 0.0
@@ -719,6 +719,8 @@ class ExcavatorSim:
         """Waypoint pin height. Dig stages cut to a level FIRST_CUT below the bed top and go a little
         deeper on each pass, like an operator would, but never so deep that the bucket would run into
         the hard floor on the way there."""
+        if wp_[0] in ("swing to truck", "dump"):
+            return wp_[3] + self._load_raise()
         if wp_[0] not in self.DIG_STAGES:
             return wp_[3]
         key = (wp_[0], self.passes)
@@ -738,7 +740,7 @@ class ExcavatorSim:
     # successive passes dig side-by-side lanes (swing offsets, deg) before cutting deeper, like an
     # operator working across the face; at 6-8 m reach 9 deg is about one bucket width
     LANES = (0.0, 9.0, -9.0, 17.0, -17.0)
-    LANE_STAGES = ("approach", "penetrate", "drag", "drag-curl", "curl", "lift")
+    LANE_STAGES = ("approach", "penetrate", "drag", "drag-curl", "curl")
 
     def set_trench(self, deepen=0.25):
         """Auto cycle digs a single lane and goes deeper every pass (a trench), down to the floor."""
@@ -748,11 +750,11 @@ class ExcavatorSim:
 
     def _stage_psi(self, wp_, start=False):
         """Waypoint swing angle (deg): dig-side stages shift to the current pass's lane; the final
-        'lower' stage already heads for the next pass's lane. As the start of the next segment (after
-        the pass count went up) 'lower' is in the current lane."""
+        'swing back' stage already heads for the next pass's lane. As the start of the next segment (after
+        the pass count went up) 'swing back' is in the current lane."""
         if wp_[0] in self.LANE_STAGES:
             return wp_[1] + self.LANES[self.passes % len(self.LANES)]
-        if wp_[0] == "lower":
+        if wp_[0] == "swing back":
             return wp_[1] + self.LANES[(self.passes + (0 if start else 1)) % len(self.LANES)]
         return wp_[1]
 
@@ -782,18 +784,95 @@ class ExcavatorSim:
         self.auto_s, self.stage_time, self.auto_wait = 0.0, 0.0, 0.0
         self.seg_from = self._pin_pose()
 
+    # clearance the auto cycle keeps while swinging (m): above the truck's sides and load, and above the
+    # soil and ground; the band along the truck's sides is CLEAR_BAND wide on each side of them
+    CLEAR_TRUCK, CLEAR_LOAD, CLEAR_GROUND, CLEAR_BAND = 0.25, 0.2, 0.3, 0.3
+    LOAD_PEAK = 1.5  # heap top over the load's mean depth (the truck heightmap also sees the sand in the bucket)
+    ARM_MARGIN = 0.15  # m: the arm may lower the bucket toward the clearance only to this much above it
+
+    def _load_top(self):
+        """Height of the heaped load in the truck, from its mass."""
+        return BED_FLOOR_Z + self.LOAD_PEAK * self.truck_kg / self.density / (BED_L * BED_W)
+
+    def _load_raise(self):
+        """How much higher (m) to carry and dump the bucket than planned, for a load heaped above the sides."""
+        return max(0.0, self._load_top() + self.CLEAR_LOAD - (BED_FLOOR_Z + BED_H + self.CLEAR_TRUCK))
+
+    def _clear_height(self, x, y):
+        """Height (m) the bucket must stay above at zone points (x, y)."""
+        m = self.CLEAR_BAND
+        x0, y0, x1, y1 = BED_LO[0], BED_LO[1], BED_LO[0] + BED_L, BED_LO[1] + BED_W
+        in_bed = (x > x0 - m) & (x < x1 + m) & (y > y0 - m) & (y < y1 + m)
+        inside = (x > x0 + m) & (x < x1 - m) & (y > y0 + m) & (y < y1 - m)
+        load = self._load_top() + self.CLEAR_LOAD
+        truck = np.where(inside, load, max(load, BED_FLOOR_Z + BED_H + self.CLEAR_TRUCK))
+        wall = (x < -ZONE_HALF[0] + m) | (y < -ZONE_HALF[1] + m)
+        ground = np.where(wall, WALL_HEIGHT, np.maximum(ground_height(x, y), BED_TOP)) + self.CLEAR_GROUND
+        return np.where(in_bed, truck, ground)
+
+    @staticmethod
+    def _bucket_local(q):
+        """Bucket bounding points relative to the swing joint, zone frame, with the house at swing 0."""
+        _, p2, b3 = chain(q)
+        h = np.array([p2 + pitch(v, b3) for v in CLEAR_POINTS])
+        return h * np.array([-1.0, -1.0, 1.0])
+
+    def _clearance(self, local, psi):
+        """Least height (m) of the bucket above what it must clear, with the house at each of the angles
+        `psi` (negative: it would hit something)."""
+        psi = np.atleast_1d(psi)
+        c, s = np.cos(psi)[:, None], np.sin(psi)[:, None]
+        x = SWING_POS[0] + c * local[:, 0] - s * local[:, 1]
+        y = SWING_POS[1] + s * local[:, 0] + c * local[:, 1]
+        return np.min(SWING_POS[2] + local[:, 2] - self._clear_height(x, y), axis=1)
+
+    def _sweep(self, direction, steps=8, ahead=0.07):
+        """House angles it passes through if it brakes from now, plus `ahead` rad more."""
+        v, brake = abs(self.qd[0]), SWING_TAU * self.relief / self.swing_inertia
+        t = np.linspace(0.0, v / brake, steps)
+        d = v * t - 0.5 * brake * t * t
+        return self.q[0] + direction * np.append(d, d[-1] + ahead)
+
+    def _swing_allowance(self, local, target, direction, rise_to_end):
+        """Fastest the house may swing toward `target` (rad/s): slow enough to stop before the first angle the
+        bucket does not clear yet, and to get there no sooner than the rising bucket clears it (an operator
+        feathering the swing while the boom comes up)."""
+        span = abs(target - self.q[0])
+        psi = self.q[0] + direction * np.linspace(0.0, span, max(2, int(span / 0.035) + 2))
+        m = self._clearance(local, psi)
+        bad = np.nonzero(m < 0.0)[0]
+        if not bad.size:
+            return math.inf
+        k = bad[0]
+        dist = max(abs(psi[k] - self.q[0]) - 0.07, 0.0)
+        v = math.sqrt(2.0 * SWING_TAU * self.relief / self.swing_inertia * dist)
+        deficit = -float(m[k:].min())
+        if self.low_rate > 0.02 and deficit <= rise_to_end + 0.02:
+            v = min(v, dist * self.low_rate / deficit)
+        return v
+
     SWING_INERTIA_GUESS = 55e3  # kg m2 about the swing axis, until measured (boom raised, bucket empty)
     SWING_STAGE_DEG = 20  # stages that turn the house further than this are swung like an operator does
 
-    def _swing_lever(self, target):
+    def _swing_lever(self, target, allow=None):
         """Operator swing: full lever, then neutral once the house would coast to the target on the
-        cross-over reliefs; small corrections once it has nearly stopped."""
+        cross-over reliefs; small corrections once it has nearly stopped. `allow(direction)` is the fastest
+        the bucket's clearance lets the house swing: the lever is eased to it, or neutral (brake) above it."""
         err, v = target - self.q[0], self.qd[0]
         brake = SWING_TAU * self.relief / self.swing_inertia
         stop = v * v / (2 * brake) * 1.1 + 0.02
         if abs(v) > 0.15:
-            return math.copysign(1.0, err) if (err * v < 0 or abs(err) > stop) else 0.0
-        return float(np.clip(4.0 * err / SWING_VMAX, -0.5, 0.5))
+            lever = math.copysign(1.0, err) if (err * v < 0 or abs(err) > stop) else 0.0
+        else:
+            lever = float(np.clip(4.0 * err / SWING_VMAX, -0.5, 0.5))
+        if allow is not None and lever * err > 0:
+            v_ok = allow(math.copysign(1.0, err))
+            if v_ok < SWING_VMAX:
+                self.swing_held += self.frame_dt
+                if abs(v) > v_ok + 0.05:
+                    return 0.0
+                lever = math.copysign(min(abs(lever) if abs(v) <= 0.15 else 1.0, v_ok / SWING_VMAX), lever)
+        return lever
 
     def _auto_control(self):
         """Track the cycle: move a target along the current segment only while the arm keeps up."""
@@ -822,32 +901,58 @@ class ExcavatorSim:
         q_start = ik(math.radians(pa), ra, za, math.radians(fa))
         dq = q_end - q_start
         v_dir = np.where(dq > 0, self.vmax_dir[1], self.vmax_dir[0])
-        seg_time = max(np.max(np.abs(dq) / (v_dir * speed)), 0.5)
         zb = self._stage_z(b) + ease_b
         pb = self._stage_psi(b)
-        mix = [pa + s * (pb - pa), ra + s * (b[2] - ra), za + s * (zb - za), fa + s * (b[4] - fa)]
-        q_goal = ik(math.radians(mix[0]), mix[1], mix[2], math.radians(mix[3]))  # straight bucket-pin path
         swinging = abs(pb - pa) > self.SWING_STAGE_DEG
+        # a swing stage moves the house and the arm at the same time, each at its own pace: the plan's clock
+        # is the arm's, and the house swings as fast as the bucket's clearance lets it
+        moving = slice(1, None) if swinging else slice(None)
+        seg_time = max(np.max(np.abs(dq[moving]) / (v_dir[moving] * speed)), 0.5)
+        seg_all = max(np.max(np.abs(dq) / (v_dir * speed)), 0.5)  # with the swing, for the stage timeout
+
+        def pose(s):
+            return ik(math.radians(pa + s * (pb - pa)), ra + s * (b[2] - ra), za + s * (zb - za), math.radians(fa + s * (b[4] - fa)))
+
+        q_goal = pose(s)  # straight bucket-pin path
+        held = False
         if swinging:
-            # the other joints follow the swing's progress instead of a clock
-            s = float(np.clip((math.degrees(self.q[0]) - pa) / (pb - pa), 0.0, 1.0))
-            mix = [pa + s * (pb - pa), ra + s * (b[2] - ra), za + s * (zb - za), fa + s * (b[4] - fa)]
-            q_goal = ik(math.radians(mix[0]), mix[1], mix[2], math.radians(mix[3]))
+            # the arm lowers the bucket toward what the house would sweep before it could stop only down to
+            # ARM_MARGIN above it, and backs up along its path if the bucket is closer than that (lifting is
+            # never held); the house swings as fast as the rising bucket's clearance allows
+            local = self._bucket_local(self.q)
+            low = float(local[:, 2].min())
+            self.low_rate += 0.3 * ((low - self.low_prev) / self.frame_dt - self.low_rate) if self.low_prev is not None else 0.0
+            self.low_prev = low
+            psi_now = self._sweep(math.copysign(1.0, self.qd[0]) if abs(self.qd[0]) > 0.05 else 0.0)
+            if s < 1.0:
+                m_now = float(self._clearance(local, psi_now).min())
+                m_next = float(self._clearance(self._bucket_local(pose(min(1.0, s + self.frame_dt / seg_time))), psi_now).min())
+                held = m_next < self.ARM_MARGIN and m_next < m_now
+                if held and m_now < 0.5 * self.ARM_MARGIN:
+                    s = max(0.0, s - self.frame_dt / seg_time)
+                    self.auto_s = s
+                    q_goal = pose(s)
+            rise_to_end = float(self._bucket_local(ik(0.0, b[2], zb, math.radians(b[4])))[:, 2].min()) - low
+
+            def allow(direction):
+                return self._swing_allowance(local, math.radians(pb), direction, rise_to_end)
+
         err = q_goal - self.q
         # lever: the opening the planned pace needs (feed-forward), corrected by the tracking error; in the
         # cut the lever follows the error only, so the bucket's progress is set by what the sand lets through
         # (only while the plan advances: a joint pushed ahead of a held plan would cancel its own correction)
-        ff = dq / seg_time / v_dir if s < 1.0 and not digging and self.auto_wait == 0.0 else 0.0
+        ff = dq / seg_time / v_dir if s < 1.0 and not digging and not held and self.auto_wait == 0.0 else 0.0
         self.levers = np.clip(ff + 4.0 * err / self.vmax, -speed, speed) * LEVER_SIGN
         if swinging:
-            self.levers[0] = self._swing_lever(math.radians(pb)) * speed * LEVER_SIGN[0]
+            self.levers[0] = self._swing_lever(math.radians(pb), allow) * speed * LEVER_SIGN[0]
             err[0] = 0.0
-            self.auto_s = s
         # stalled in the cut (arm or bucket at relief and falling behind): raise the dig path
         if digging and max(self.press[2], self.press[3]) >= self.EASE_PRESSURE * self.relief and np.max(np.abs(err)) > 0.05:
             self.ease = min(self.ease + self.EASE_RATE * self.frame_dt, self.EASE_MAX)
         # advance along the segment at the pace the slowest joint allows, but only if tracking is good
-        if np.max(np.abs(err)) < 0.12:
+        if held:  # waiting for the house to swing clear is not a stall
+            self.arm_held += self.frame_dt
+        elif np.max(np.abs(err)) < 0.12:
             self.auto_s = min(1.0, s + self.frame_dt / seg_time)
             self.auto_wait = 0.0
         else:
@@ -855,7 +960,7 @@ class ExcavatorSim:
         # a stalled arm (e.g. bucket on the hard floor) must not hang the cycle: give up on the stage
         # after 4 s of poor tracking, or when the stage takes far longer than planned (slow creep)
         self.stage_time += self.frame_dt
-        timed_out = self.auto_wait > self.STAGE_TIMEOUT or self.stage_time > 3.0 * seg_time + self.STAGE_TIMEOUT
+        timed_out = self.auto_wait > self.STAGE_TIMEOUT or self.stage_time > 3.0 * seg_all + self.STAGE_TIMEOUT
         if timed_out:
             self.skipped.append({"t": round(self.sim_time, 2), "stage": b[0], "max_err_rad": round(float(np.max(np.abs(err))), 3)})
             self.auto_wait = 0.0
@@ -864,6 +969,7 @@ class ExcavatorSim:
             self.auto_s = 0.0
             self.stage_time = 0.0
             self.seg_from = None
+            self.low_prev, self.low_rate = None, 0.0
             if self.auto_stage == 0:
                 self.passes += 1
                 self.ease = 0.0
@@ -1119,6 +1225,8 @@ class ExcavatorSim:
             "cyl_bar": [round(float(v) / 1e5 * (1 if h else -1)) for v, h in zip(self.cyl_p, self.cyl_head)],
             "swing_bar": round(float(self.tau[0]) / hyd.SWING_DISP / 1e5),  # signed by torque direction
             "swing_inertia": round(self.swing_inertia),
+            "swing_held_s": round(self.swing_held, 1),
+            "arm_held_s": round(self.arm_held, 1),
             "cyl_m": [round(float(v), 3) for v in self.cyl_L],
             "force_kN": [round(v / 1000, 1) for v in self.force],
             "fill_kg": round(self.fill_kg),

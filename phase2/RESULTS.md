@@ -621,7 +621,7 @@ Load depends on the iteration count at both step sizes, so the solver is not ful
 | Trench, per pass | 24.4–27.4 s | 19.1–22.8 s; 1034–1758 kg (12.1 t in all, unchanged) |
 | Trench at x = 0 | 1.72 m deep, 43–45° sides | 1.74 m, 42–46° |
 
-Throughput on the normal cycle goes from 146 to 174 t/h. The cycle is still slower than a skilled operator's 15–18 s for a 90° truck load: lift and swing do not overlap yet, and dig stages wait on tracking.
+Throughput on the normal cycle goes from 146 to 174 t/h. The cycle is still slower than a skilled operator's 15–18 s for a 90° truck load: lift and swing do not overlap yet, and dig stages wait on tracking. (Done: see "Lift and swing at the same time".)
 
 `stats()` adds `swing_bar` and the measured `swing_inertia`.
 
@@ -629,3 +629,50 @@ Throughput on the normal cycle goes from 146 to 174 t/h. The cycle is still slow
 - The port relief value (39.2 MPa) and the house inertia need ZX200 data.
 - The swing settles back 2° after braking: the servo pulls back to its reference. A blocked real motor rebounds less, about the oil's compressibility.
 - No swing parking brake, and no swing priority or flow-summation logic between the two pumps.
+
+## Lift and swing at the same time
+
+An operator starts swinging as soon as the bucket breaks out of the cut and lifts on the way to the truck; on the way back, they lower the bucket once it is clear of the truck. The auto cycle now does the same. The separate lift, raise and lower stages are gone; the cycle is approach → penetrate → drag → drag-curl → curl → swing to truck → dump → swing back.
+
+**Clearance.** The bucket's outline (shell and teeth, both side plates) has to stay above:
+- the truck's sides plus 25 cm, within 30 cm of them;
+- the heaped load plus 20 cm. The load height is estimated from the truck's load mass (1.5× its mean depth), because the truck heightmap also sees the sand in a bucket held over it;
+- the soil, ground or pit walls plus 30 cm.
+
+When the load heaps above the sides, the truck stages carry and dump the bucket that much higher.
+
+**In a swing stage, the house and the arm each move at their own pace:**
+- **The arm** follows the planned pin path on its own clock. It only lowers the bucket toward what the house would sweep before it could stop down to 15 cm above the clearance, and backs up along its path if it gets closer. Lifting is never held.
+- **The swing** is feathered. The house swings no faster than it can stop before the first angle the bucket does not clear yet. It also arrives no sooner than the rising bucket will clear it, judged from the bucket's measured rate of rise. Above that speed, the lever goes to neutral and the reliefs brake the house.
+- **The carry height** is 7.0 m instead of 6.6 m (pin height), so the boom is still rising at full speed as the bucket passes truck-side height. At 6.6 m, its slow final approach held the house about 1 s at the truck's edge.
+
+The first version deadlocked on the swing back: the arm lowered faster than the gate checked and hooked the open bucket on the far side of the truck. That led to the arm margin and the back-up step above.
+
+| Stage (s) | Before | Now |
+|---|---|---|
+| Lift + swing to truck | 2.35 + 2.18–2.38 | 3.9 |
+| Dump | 2.00 | 2.1 |
+| Raise + swing back + lower | 2.67 + 2.37 + about 1.5 | 2.9–3.2 |
+| Whole pass | 19.1–20.9 | 15.4–18.1 |
+
+| | Before | Now |
+|---|---|---|
+| Normal cycle, passes in 130 s (`bench_zone.py 130`, `logs/zone_bench_overlap.json`) | 6 (6290 kg) | **7 (6907 kg)**, 0 skips |
+| Normal cycle, per pass | mean 1049 kg | 1043, 908, 1053, 914, 1083, 1124, 784 kg (mean 987) |
+| Normal cycle, real-time factor | 1.286 | 1.166 |
+| Trench, 8 passes (`bench_trench.py 8`, `logs/trench_bench_overlap.json`) | 166.4 s | **131.4 s**, 0 skips |
+| Trench, delivered | 12.1 t | 11.8 t |
+| Trench at x = 0 | 1.74 m, 42–46° | 1.79 m, 45° |
+
+Throughput on the normal cycle goes from 174 to 191 t/h. Passes are now 15–18 s, the range of a skilled operator's 90° truck load.
+
+**Costs:**
+- **Load:** about 6 % less load per pass. The bucket accelerates sideways while it still lifts, and more sand slides off the heap.
+- **Speed:** the real-time factor drops because more of each pass is spent digging.
+
+`stats()` adds `swing_held_s` and `arm_held_s`: time the clearance has slowed the swing and held the arm.
+
+**Limits:**
+- The clearance treats the load as a flat top at 1.5× its mean depth, not its real shape.
+- The house inertia used for the stopping distance is one value, but the true inertia changes with arm pose.
+- The dump does not yet start before the swing has stopped, as it often does in practice.
