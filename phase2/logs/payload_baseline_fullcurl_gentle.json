@@ -1,0 +1,181 @@
+{
+ "variant": "baseline_fullcurl_gentle",
+ "cycle": [
+  [
+   "approach",
+   0,
+   6.0,
+   2.6,
+   -95
+  ],
+  [
+   "penetrate",
+   0,
+   7.9,
+   1.5,
+   -60
+  ],
+  [
+   "drag",
+   0,
+   5.6,
+   1.1,
+   -95
+  ],
+  [
+   "curl",
+   0,
+   5.2,
+   1.6,
+   -180
+  ],
+  [
+   "lift",
+   0,
+   5.0,
+   6.6,
+   -180,
+   0.6
+  ],
+  [
+   "swing to truck",
+   -90,
+   5.4,
+   6.6,
+   -180,
+   0.5
+  ],
+  [
+   "dump",
+   -90,
+   5.4,
+   6.4,
+   -40
+  ],
+  [
+   "raise",
+   -90,
+   5.4,
+   7.0,
+   -110
+  ],
+  [
+   "swing back",
+   0,
+   6.0,
+   6.6,
+   -95
+  ],
+  [
+   "lower",
+   0,
+   6.0,
+   2.6,
+   -95
+  ]
+ ],
+ "truck_kg": 832,
+ "peak_bucket_kg": 1094,
+ "rated_kg": 1376.0,
+ "cycle_s": 27.6,
+ "wall_s": 52.7,
+ "stages": [
+  {
+   "reached": "penetrate",
+   "t": 2.25,
+   "bucket_kg": 0,
+   "truck_kg": 0,
+   "pressure": [
+    0.0,
+    0.29,
+    0.64,
+    0.52
+   ]
+  },
+  {
+   "reached": "drag",
+   "t": 4.18,
+   "bucket_kg": 1093,
+   "truck_kg": 0,
+   "pressure": [
+    0.01,
+    0.18,
+    0.43,
+    0.17
+   ]
+  },
+  {
+   "reached": "curl",
+   "t": 6.98,
+   "bucket_kg": 885,
+   "truck_kg": 0,
+   "pressure": [
+    0.0,
+    0.34,
+    0.16,
+    0.07
+   ]
+  },
+  {
+   "reached": "lift",
+   "t": 11.85,
+   "bucket_kg": 793,
+   "truck_kg": 0,
+   "pressure": [
+    0.0,
+    0.25,
+    0.07,
+    0.09
+   ]
+  },
+  {
+   "reached": "swing to truck",
+   "t": 15.9,
+   "bucket_kg": 708,
+   "truck_kg": 22,
+   "pressure": [
+    1.0,
+    0.31,
+    0.15,
+    0.07
+   ]
+  },
+  {
+   "reached": "dump",
+   "t": 21.2,
+   "bucket_kg": 58,
+   "truck_kg": 832,
+   "pressure": [
+    0.0,
+    0.24,
+    0.12,
+    0.0
+   ]
+  },
+  {
+   "reached": "raise",
+   "t": 24.13,
+   "bucket_kg": 0,
+   "truck_kg": 832,
+   "pressure": [
+    0.0,
+    0.2,
+    0.13,
+    0.03
+   ]
+  },
+  {
+   "reached": "swing back",
+   "t": 27.57,
+   "bucket_kg": 0,
+   "truck_kg": 832,
+   "pressure": [
+    1.0,
+    0.27,
+    0.12,
+    0.04
+   ]
+  }
+ ],
+ "skipped_stages": []
+}

@@ -56,13 +56,15 @@ SWING_POS = np.array([7.0, 0.0, 3.35])  # swing bearing (upper structure pivot) 
 BOOM_FOOT = np.array([-0.5, 0.0, 0.75])  # boom foot pin in the house frame -> 4.1 m above the pit floor
 BASE = SWING_POS + BOOM_FOOT  # boom foot pin at swing angle 0
 L_BOOM, L_STICK = 5.7, 2.9
-BUCKET_D, BUCKET_H, BUCKET_W, PLATE = 0.9, 0.8, 1.2, 0.10  # depth along stick, mouth opening, width;
-# plates are thicker than real steel so the 8 cm MPM grid can't leak sand through them
-MASS = {"house": 8000.0, "boom": 1800.0, "stick": 900.0, "bucket": 700.0}
+BUCKET_D, BUCKET_H, BUCKET_W, PLATE = 1.0, 0.85, 1.3, 0.10  # outer depth along stick, mouth opening, width;
+# plates are thicker than real steel so the 8 cm MPM grid can't leak sand through them. Inside: 0.9 x 1.2 x 0.8 m
+# = 0.86 m3 struck (~1.38 t of sand at 1600 kg/m3), the rating of a 20 t excavator's general-purpose bucket
+BUCKET_RATED_KG = 0.86 * 1600.0
+MASS = {"house": 8000.0, "boom": 1800.0, "stick": 900.0, "bucket": 800.0}
 JOINTS = ["swing", "boom", "stick", "bucket"]
 LINKS = ["house", "boom", "stick", "bucket"]
 # limits (rad), max speed (rad/s), relief torque (N m), servo gains
-LIMITS = {"swing": (-3.0, 3.0), "boom": (-1.0, 1.2), "stick": (-2.7, -0.5), "bucket": (-2.1, 1.4)}
+LIMITS = {"swing": (-3.0, 3.0), "boom": (-1.0, 1.2), "stick": (-2.7, -0.5), "bucket": (-2.3, 1.4)}
 VMAX = {"swing": 0.8, "boom": 0.35, "stick": 0.5, "bucket": 0.9}
 TAU_MAX = {"swing": 65e3, "boom": 450e3, "stick": 160e3, "bucket": 120e3}
 KP = {"swing": 2.0e6, "boom": 3.0e7, "stick": 8.0e6, "bucket": 1.5e6}
@@ -160,10 +162,16 @@ def hydraulics_kernel(
     # ... but can't get further ahead of the joint than the relief torque can pull (stall, no windup)
     lag = tmax / kp[j]
     r = wp.clamp(r, q - lag, q + lag)
+    # the reference never leaves the stroke, even when load back-drives the joint past it
+    r = wp.clamp(r, q_lo[j], q_hi[j])
     q_ref[j] = r
     tau = wp.clamp(kp[j] * (r - q) + kd[j] * (v_cmd[j] - joint_qd[j]), -tmax, tmax)
-    joint_f[j] = tau
     pressure[j] = wp.abs(tau) / tau_max[j]
+    # cylinder end stop: beyond the stroke a stiff mechanical stop pushes back, not limited by the relief valve
+    over = wp.max(q - q_hi[j], 0.0) - wp.max(q_lo[j] - q, 0.0)
+    if over != 0.0:
+        tau = tau - 10.0 * kp[j] * over - kd[j] * joint_qd[j]
+    joint_f[j] = tau
 
 
 @wp.kernel
@@ -251,7 +259,8 @@ def bucket_fill_kernel(
 
 # ------------------------------------------------------------------ simulation
 class ExcavatorSim:
-    # auto cycle: (stage, swing deg, bucket-pin radius from the swing axis, pin height, bucket angle deg)
+    # auto cycle: (stage, swing deg, bucket-pin radius from the swing axis, pin height, bucket angle deg
+    # [, speed: fraction of full lever for moving into this stage])
     CYCLE = [
         ("approach", 0, 6.0, 2.6, -95),
         ("penetrate", 0, 7.9, 1.5, -60),
@@ -265,7 +274,7 @@ class ExcavatorSim:
         ("lower", 0, 6.0, 2.6, -95),
     ]
 
-    def __init__(self, voxel=0.08, ppc=2, density=1600.0, friction=0.75, iterations=30, fps=60.0):
+    def __init__(self, voxel=0.08, ppc=2, density=1600.0, friction=0.75, iterations=60, fps=60.0):
         wp.init()
         self.frame_dt = 1.0 / fps
         self.sim_dt = self.frame_dt / RIGID_SUBSTEPS
@@ -427,6 +436,9 @@ class ExcavatorSim:
         self.auto_stage = 0
         self.auto_s = 0.0
         self.passes = 0
+        self.skipped = []
+        self._z_cache = {}
+        self.stage_time = 0.0
         self.auto_wait = 0.0
         self.stage_name = "manual"
         self.sim_time = 0.0
@@ -460,17 +472,62 @@ class ExcavatorSim:
                 self.levers[k] = float(np.clip(v, -1.0, 1.0))
 
     DIG_STAGES = ("penetrate", "drag", "curl")
+    STAGE_TIMEOUT = 4.0  # s of poor tracking before the auto cycle skips a stage
     DEEPEN_PER_PASS, MAX_DEEPEN = 0.15, 0.45
 
+    FLOOR_CLEARANCE = 0.08  # m: deepened dig paths keep the bucket this far above the hard pit floor
+
+    @staticmethod
+    def _bucket_lowest(w_from, z_from, w_to, z_to, steps=9):
+        """Lowest corner of the bucket's outer box along the straight pin path between two waypoints."""
+        low = 1e9
+        for s in np.linspace(0.0, 1.0, steps):
+            psi = w_from[1] + s * (w_to[1] - w_from[1])
+            r = w_from[2] + s * (w_to[2] - w_from[2])
+            z = z_from + s * (z_to - z_from)
+            phi = w_from[4] + s * (w_to[4] - w_from[4])
+            q = ik(math.radians(psi), r, z, math.radians(phi))
+            _, pin, _ = fk(q)
+            a3 = q[1] + q[2] + q[3]
+            for x in (0.0, -BUCKET_D):
+                for zz in (0.0, -BUCKET_H):
+                    low = min(low, (pin + swing_vec(q[0], local_to_world(a3, np.array([x, 0.0, zz]))))[2])
+        return low
+
     def _stage_z(self, wp_):
-        """Waypoint pin height; dig stages go a little deeper on each pass, like an operator would."""
-        if wp_[0] in self.DIG_STAGES:
-            return wp_[3] - min(self.DEEPEN_PER_PASS * self.passes, self.MAX_DEEPEN)
-        return wp_[3]
+        """Waypoint pin height. Dig stages go a little deeper on each pass, like an operator would,
+        but never so deep that the bucket would run into the hard floor on the way there."""
+        if wp_[0] not in self.DIG_STAGES:
+            return wp_[3]
+        key = (wp_[0], self.passes)
+        if key not in self._z_cache:
+            i = next(k for k, w in enumerate(self.CYCLE) if w[0] == wp_[0])
+            prev = self.CYCLE[i - 1]
+            z_prev = self._stage_z(prev)
+            level = self.passes // len(self.LANES)  # deepen only after every lane has been dug
+            z = wp_[3] - min(self.DEEPEN_PER_PASS * level, self.MAX_DEEPEN)
+            while self._bucket_lowest(prev, z_prev, wp_, z) < self.FLOOR_CLEARANCE:
+                z += 0.01
+            self._z_cache[key] = z
+        return self._z_cache[key]
+
+    # successive passes dig side-by-side lanes (swing offsets, deg) before cutting deeper, like an
+    # operator working across the face; at 6-8 m reach 9 deg is about one bucket width
+    LANES = (0.0, 9.0, -9.0, 17.0, -17.0)
+    LANE_STAGES = ("approach", "penetrate", "drag", "drag-curl", "curl", "lift")
+
+    def _stage_psi(self, wp_):
+        """Waypoint swing angle (deg): dig-side stages shift to the current pass's lane; the final
+        'lower' stage already heads for the next pass's lane."""
+        if wp_[0] in self.LANE_STAGES:
+            return wp_[1] + self.LANES[self.passes % len(self.LANES)]
+        if wp_[0] == "lower":
+            return wp_[1] + self.LANES[(self.passes + 1) % len(self.LANES)]
+        return wp_[1]
 
     def _waypoint_q(self, wp_):
-        _, psi, r, _, phi = wp_
-        return ik(math.radians(psi), r, self._stage_z(wp_), math.radians(phi))
+        r, phi = wp_[2], wp_[4]
+        return ik(math.radians(self._stage_psi(wp_)), r, self._stage_z(wp_), math.radians(phi))
 
     def _auto_control(self):
         """Track the cycle: move a target along the current segment only while the arm keeps up."""
@@ -479,19 +536,32 @@ class ExcavatorSim:
         b = self.CYCLE[(self.auto_stage + 1) % n]
         self.stage_name = b[0]
         q_end = self._waypoint_q(b)
-        seg_time = max(np.max(np.abs(self._waypoint_q(a) - q_end) / self.vmax), 0.5)
+        speed = b[5] if len(b) > 5 else 1.0
+        seg_time = max(np.max(np.abs(self._waypoint_q(a) - q_end) / (self.vmax * speed)), 0.5)
         s = self.auto_s
         za, zb = self._stage_z(a), self._stage_z(b)
-        mix = [a[1] + s * (b[1] - a[1]), a[2] + s * (b[2] - a[2]), za + s * (zb - za), a[4] + s * (b[4] - a[4])]
+        pa, pb = self._stage_psi(a), self._stage_psi(b)
+        mix = [pa + s * (pb - pa), a[2] + s * (b[2] - a[2]), za + s * (zb - za), a[4] + s * (b[4] - a[4])]
         q_goal = ik(math.radians(mix[0]), mix[1], mix[2], math.radians(mix[3]))  # straight bucket-pin path
         err = q_goal - self.q
-        self.levers = np.clip(4.0 * err / self.vmax, -1.0, 1.0)
+        self.levers = np.clip(4.0 * err / self.vmax, -speed, speed)
         # advance along the segment at the pace the slowest joint allows, but only if tracking is good
         if np.max(np.abs(err)) < 0.12:
             self.auto_s = min(1.0, s + self.frame_dt / seg_time)
-        if self.auto_s >= 1.0 and np.max(np.abs(q_end - self.q)) < 0.06:
+            self.auto_wait = 0.0
+        else:
+            self.auto_wait += self.frame_dt
+        # a stalled arm (e.g. bucket on the hard floor) must not hang the cycle: give up on the stage
+        # after 4 s of poor tracking, or when the stage takes far longer than planned (slow creep)
+        self.stage_time += self.frame_dt
+        timed_out = self.auto_wait > self.STAGE_TIMEOUT or self.stage_time > 3.0 * seg_time + self.STAGE_TIMEOUT
+        if timed_out:
+            self.skipped.append({"t": round(self.sim_time, 2), "stage": b[0], "max_err_rad": round(float(np.max(np.abs(err))), 3)})
+            self.auto_wait = 0.0
+        if timed_out or (self.auto_s >= 1.0 and np.max(np.abs(q_end - self.q)) < 0.06):
             self.auto_stage = (self.auto_stage + 1) % n
             self.auto_s = 0.0
+            self.stage_time = 0.0
             if self.auto_stage == 0:
                 self.passes += 1
 
@@ -560,7 +630,8 @@ class ExcavatorSim:
         wp.launch(heightmap_kernel, dim=self.n_particles, inputs=[q, self.sand.particle_qd, SURFACE_MAX_SPEED, self.radius, float(BED_LO[0]), float(BED_LO[1]), TRUCK_CELL, TRUCK_NX, TRUCK_NY, self.truck_hm])
         self.fill_counter.zero_()
         D, H, W, T = BUCKET_D, BUCKET_H, BUCKET_W, PLATE
-        wp.launch(bucket_fill_kernel, dim=self.n_particles, inputs=[q, self.bucket_xform(), wp.vec3(-D + T, -W / 2 + T, -H), wp.vec3(0.0, W / 2 - T, 0.0), self.fill_counter])
+        # inside faces of the plates; the open mouth is at z = -H
+        wp.launch(bucket_fill_kernel, dim=self.n_particles, inputs=[q, self.bucket_xform(), wp.vec3(-D + T / 2, -W / 2 + T / 2, -H), wp.vec3(-T / 2, W / 2 - T / 2, -T / 2), self.fill_counter])
         self.hm_np = self.hm.numpy()
         n_moving = min(int(self.counter.numpy()[0]), MAX_SEND_PARTICLES)
         moving = self.moving.numpy()[:n_moving]
@@ -751,7 +822,7 @@ def main():
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--voxel", type=float, default=0.08)
-    ap.add_argument("--iterations", type=int, default=30)
+    ap.add_argument("--iterations", type=int, default=60, help="MPM solver iterations; 30 lets carried sand creep out of the bucket")
     ap.add_argument("--bench", type=float, default=None)
     ap.add_argument("--hold-test", action="store_true")
     ap.add_argument("--stall-test", action="store_true")
