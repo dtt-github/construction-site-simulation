@@ -974,3 +974,40 @@ McKyes for dry sand at 0.3 m gives 6.6 kN at 37° but 18.2 kN at 48.6°. The con
 - **The presets are effective values** for the operating setting (1/30 s, 150 iterations). There, the over-strong cone (tan φ) and the softening of the unconverged solve largely cancel. That is why the sand calibration of Phase 0 and the checks of Phase 2 hold at that setting, and why they drift when it changes.
 - **The two errors do not cancel in general.** The softening depends on the stressed region's size and on the number of sweeps, so it is scene-dependent: a deep cut is softened more than a shallow one. That may be part of the depth-trend error a uniform soil showed in validation 2 (not tested). For research use, this is the most important known limit of the soil model.
 - **The way out is a converged solve with the correct mapping.** At 2000 iterations the solve costs about 10× the excavator's per-step MPM time. That needs a better solver (a multigrid or preconditioned rheology solve) more than a smaller step. It is worth an issue for Newton's implicit MPM: the blade test here is a short reproducer, and the 150-iteration default convergence is not documented. Until then, `soil_calibrate.py --iterations 2000` gives converged reference runs to check the effective presets against.
+
+### Can the solve converge cheaply? No setting does
+
+The blade test at 1/30 s, against the 2000-iteration force (dry sand 23.2 kN, loam 66.4 kN). Logs: `logs/solver_options.json`, `logs/zone_bench_<iterations>it_dry-sand.json`.
+
+| Rheology solver | Loam, 150 iterations | Loam, 300 | Dry sand, 150 | Dry sand, 300 |
+|---|---|---|---|---|
+| `auto` (Gauss–Seidel), `gs-soa`, `gs-batched`: identical | 0.68 | 0.81 | 0.62 | 0.77 |
+| `jacobi` | 0.49 | 0.56 | 0.42 | 0.47 |
+| `jacobi` smoother, then Gauss–Seidel | 0.66 | 0.80 | 0.61 | 0.76 |
+| Krylov warm start (`cr`, `gmres` or `cg`), then Gauss–Seidel | 0.51–0.52 | 0.65 | 0.51–0.53 | 0.64–0.66 |
+| `cr`, `jacobi`, then Gauss–Seidel | 0.48 | 0.62 | 0.48 | 0.62 |
+
+- **No setting converges faster.** Plain Gauss–Seidel is the best option; the Krylov warm starts make it worse.
+- **Elasticity is not the problem.** A finite soil stiffness (Young's modulus 1e7 to 2e8 Pa instead of rigid) converges no faster (loam 0.66 at 150, 0.85–0.90 at 600). The slow part is the frictional yield and contact constraints, not the rigid volume constraint. Gauss–Seidel carries stress about one cell per sweep, and a stressed region 10–40 cells across needs hundreds of sweeps: the case multigrid exists for.
+- **The excavator** with more iterations (dry sand, 130 s, 1/30 s step):
+
+  | Iterations | Real-time factor | Frame mean / p95 | Mean per pass |
+  |---|---|---|---|
+  | 150 (default) | 1.18 | 14.0 / 31.7 ms | 1015 kg |
+  | 300 | 0.77 | 21.7 / 50.2 ms | 1044 kg |
+  | 600 | 0.46 | 36.6 / 87.6 ms | 1031 kg |
+
+  Bucket loads hardly change (within 3 %); the forces do. The default stays at 150, and `--iterations` sets more for offline runs.
+
+**Reproducer for Newton:** `repro_mpm_convergence.py` needs only newton and warp. It is the blade test with sand mapped correctly (`friction` 0.6). It prints the blade force for each solver setting:
+
+| MPM step | Iterations | Blade force |
+|---|---|---|
+| 1/30 s | 150 | 9.2 kN |
+| 1/30 s | 600 | 11.1 kN |
+| 1/30 s | 2000 | 11.5 kN |
+| 1/60 s | 150 | 11.2 kN |
+| 1/120 s | 150 | 12.1 kN |
+| 1/240 s | 150 | 12.6 kN |
+
+The small-step runs end up 10 % above the 2000-iteration value, so a little genuine time-step dependence remains once the solve converges. An issue for Newton's implicit MPM is drafted, with this reproducer, the option table and the yield-cone mapping. It asks about a multigrid or preconditioned rheology solve and a public convergence indicator.

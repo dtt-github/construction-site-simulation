@@ -1,0 +1,582 @@
+{
+ "solver_options_blade_1/30_depth0.3": [
+  {
+   "soil": "loam",
+   "solver": [
+    "auto"
+   ],
+   "iterations": 150,
+   "force_N": 45344,
+   "of_converged": 0.683,
+   "wall_s": 2.05
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "auto"
+   ],
+   "iterations": 300,
+   "force_N": 54046,
+   "of_converged": 0.814,
+   "wall_s": 1.89
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "gs-soa"
+   ],
+   "iterations": 150,
+   "force_N": 45344,
+   "of_converged": 0.683,
+   "wall_s": 1.23
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "gs-soa"
+   ],
+   "iterations": 300,
+   "force_N": 54046,
+   "of_converged": 0.814,
+   "wall_s": 1.86
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "gs-batched"
+   ],
+   "iterations": 150,
+   "force_N": 45344,
+   "of_converged": 0.683,
+   "wall_s": 1.26
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "gs-batched"
+   ],
+   "iterations": 300,
+   "force_N": 54046,
+   "of_converged": 0.814,
+   "wall_s": 1.67
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "jacobi"
+   ],
+   "iterations": 150,
+   "force_N": 32312,
+   "of_converged": 0.487,
+   "wall_s": 0.71
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "jacobi"
+   ],
+   "iterations": 300,
+   "force_N": 37482,
+   "of_converged": 0.565,
+   "wall_s": 0.86
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "cr",
+    "gs"
+   ],
+   "iterations": 150,
+   "force_N": 34220,
+   "of_converged": 0.516,
+   "wall_s": 1.56
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "cr",
+    "gs"
+   ],
+   "iterations": 300,
+   "force_N": 43357,
+   "of_converged": 0.653,
+   "wall_s": 2.27
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "gmres",
+    "gs"
+   ],
+   "iterations": 150,
+   "force_N": 34350,
+   "of_converged": 0.517,
+   "wall_s": 9.31
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "gmres",
+    "gs"
+   ],
+   "iterations": 300,
+   "force_N": 43475,
+   "of_converged": 0.655,
+   "wall_s": 3.41
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "cg",
+    "gs"
+   ],
+   "iterations": 150,
+   "force_N": 34105,
+   "of_converged": 0.514,
+   "wall_s": 3.95
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "cg",
+    "gs"
+   ],
+   "iterations": 300,
+   "force_N": 43286,
+   "of_converged": 0.652,
+   "wall_s": 2.44
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "jacobi",
+    "gs"
+   ],
+   "iterations": 150,
+   "force_N": 43739,
+   "of_converged": 0.659,
+   "wall_s": 1.27
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "jacobi",
+    "gs"
+   ],
+   "iterations": 300,
+   "force_N": 52884,
+   "of_converged": 0.797,
+   "wall_s": 1.94
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "cr",
+    "jacobi",
+    "gs"
+   ],
+   "iterations": 150,
+   "force_N": 32142,
+   "of_converged": 0.484,
+   "wall_s": 1.61
+  },
+  {
+   "soil": "loam",
+   "solver": [
+    "cr",
+    "jacobi",
+    "gs"
+   ],
+   "iterations": 300,
+   "force_N": 41214,
+   "of_converged": 0.621,
+   "wall_s": 2.38
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "auto"
+   ],
+   "iterations": 150,
+   "force_N": 14422,
+   "of_converged": 0.622,
+   "wall_s": 1.34
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "auto"
+   ],
+   "iterations": 300,
+   "force_N": 17911,
+   "of_converged": 0.773,
+   "wall_s": 2.28
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "gs-soa"
+   ],
+   "iterations": 150,
+   "force_N": 14422,
+   "of_converged": 0.622,
+   "wall_s": 1.5
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "gs-soa"
+   ],
+   "iterations": 300,
+   "force_N": 17911,
+   "of_converged": 0.773,
+   "wall_s": 2.26
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "gs-batched"
+   ],
+   "iterations": 150,
+   "force_N": 14422,
+   "of_converged": 0.622,
+   "wall_s": 1.26
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "gs-batched"
+   ],
+   "iterations": 300,
+   "force_N": 17911,
+   "of_converged": 0.773,
+   "wall_s": 1.98
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "jacobi"
+   ],
+   "iterations": 150,
+   "force_N": 9770,
+   "of_converged": 0.422,
+   "wall_s": 0.8
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "jacobi"
+   ],
+   "iterations": 300,
+   "force_N": 10857,
+   "of_converged": 0.469,
+   "wall_s": 0.89
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "cr",
+    "gs"
+   ],
+   "iterations": 150,
+   "force_N": 12267,
+   "of_converged": 0.529,
+   "wall_s": 1.68
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "cr",
+    "gs"
+   ],
+   "iterations": 300,
+   "force_N": 15122,
+   "of_converged": 0.653,
+   "wall_s": 2.58
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "gmres",
+    "gs"
+   ],
+   "iterations": 150,
+   "force_N": 12164,
+   "of_converged": 0.525,
+   "wall_s": 3.8
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "gmres",
+    "gs"
+   ],
+   "iterations": 300,
+   "force_N": 15217,
+   "of_converged": 0.657,
+   "wall_s": 3.57
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "cg",
+    "gs"
+   ],
+   "iterations": 150,
+   "force_N": 11890,
+   "of_converged": 0.513,
+   "wall_s": 1.78
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "cg",
+    "gs"
+   ],
+   "iterations": 300,
+   "force_N": 14893,
+   "of_converged": 0.643,
+   "wall_s": 2.88
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "jacobi",
+    "gs"
+   ],
+   "iterations": 150,
+   "force_N": 14248,
+   "of_converged": 0.615,
+   "wall_s": 1.55
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "jacobi",
+    "gs"
+   ],
+   "iterations": 300,
+   "force_N": 17536,
+   "of_converged": 0.757,
+   "wall_s": 2.38
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "cr",
+    "jacobi",
+    "gs"
+   ],
+   "iterations": 150,
+   "force_N": 11202,
+   "of_converged": 0.483,
+   "wall_s": 1.96
+  },
+  {
+   "soil": "dry-sand",
+   "solver": [
+    "cr",
+    "jacobi",
+    "gs"
+   ],
+   "iterations": 300,
+   "force_N": 14372,
+   "of_converged": 0.62,
+   "wall_s": 2.64
+  }
+ ],
+ "young_modulus_blade_1/30_depth0.3": [
+  {
+   "soil": "loam",
+   "young_modulus": 1000000000000000.0,
+   "iterations": 150,
+   "force_N": 45344,
+   "wall_s": 2.12
+  },
+  {
+   "soil": "loam",
+   "young_modulus": 1000000000000000.0,
+   "iterations": 600,
+   "force_N": 61494,
+   "wall_s": 3.27
+  },
+  {
+   "soil": "loam",
+   "young_modulus": 1000000000000000.0,
+   "iterations": 2000,
+   "force_N": 66377,
+   "wall_s": 9.7
+  },
+  {
+   "soil": "loam",
+   "young_modulus": 200000000.0,
+   "iterations": 150,
+   "force_N": 43968,
+   "wall_s": 3.46
+  },
+  {
+   "soil": "loam",
+   "young_modulus": 200000000.0,
+   "iterations": 600,
+   "force_N": 59645,
+   "wall_s": 3.82
+  },
+  {
+   "soil": "loam",
+   "young_modulus": 200000000.0,
+   "iterations": 2000,
+   "force_N": 65128,
+   "wall_s": 10.73
+  },
+  {
+   "soil": "loam",
+   "young_modulus": 50000000.0,
+   "iterations": 150,
+   "force_N": 44227,
+   "wall_s": 1.83
+  },
+  {
+   "soil": "loam",
+   "young_modulus": 50000000.0,
+   "iterations": 600,
+   "force_N": 58989,
+   "wall_s": 3.88
+  },
+  {
+   "soil": "loam",
+   "young_modulus": 50000000.0,
+   "iterations": 2000,
+   "force_N": 65529,
+   "wall_s": 10.72
+  },
+  {
+   "soil": "loam",
+   "young_modulus": 10000000.0,
+   "iterations": 150,
+   "force_N": 43607,
+   "wall_s": 1.7
+  },
+  {
+   "soil": "loam",
+   "young_modulus": 10000000.0,
+   "iterations": 600,
+   "force_N": 56758,
+   "wall_s": 3.85
+  },
+  {
+   "soil": "loam",
+   "young_modulus": 10000000.0,
+   "iterations": 2000,
+   "force_N": 64246,
+   "wall_s": 10.83
+  },
+  {
+   "soil": "dry-sand",
+   "young_modulus": 1000000000000000.0,
+   "iterations": 150,
+   "force_N": 14422,
+   "wall_s": 1.57
+  },
+  {
+   "soil": "dry-sand",
+   "young_modulus": 1000000000000000.0,
+   "iterations": 600,
+   "force_N": 20954,
+   "wall_s": 4.07
+  },
+  {
+   "soil": "dry-sand",
+   "young_modulus": 1000000000000000.0,
+   "iterations": 2000,
+   "force_N": 23169,
+   "wall_s": 11.72
+  },
+  {
+   "soil": "dry-sand",
+   "young_modulus": 200000000.0,
+   "iterations": 150,
+   "force_N": 13241,
+   "wall_s": 1.84
+  },
+  {
+   "soil": "dry-sand",
+   "young_modulus": 200000000.0,
+   "iterations": 600,
+   "force_N": 20673,
+   "wall_s": 4.65
+  },
+  {
+   "soil": "dry-sand",
+   "young_modulus": 200000000.0,
+   "iterations": 2000,
+   "force_N": 22765,
+   "wall_s": 12.81
+  },
+  {
+   "soil": "dry-sand",
+   "young_modulus": 50000000.0,
+   "iterations": 150,
+   "force_N": 13216,
+   "wall_s": 1.79
+  },
+  {
+   "soil": "dry-sand",
+   "young_modulus": 50000000.0,
+   "iterations": 600,
+   "force_N": 20118,
+   "wall_s": 4.59
+  },
+  {
+   "soil": "dry-sand",
+   "young_modulus": 50000000.0,
+   "iterations": 2000,
+   "force_N": 22437,
+   "wall_s": 12.89
+  },
+  {
+   "soil": "dry-sand",
+   "young_modulus": 10000000.0,
+   "iterations": 150,
+   "force_N": 12883,
+   "wall_s": 1.81
+  },
+  {
+   "soil": "dry-sand",
+   "young_modulus": 10000000.0,
+   "iterations": 600,
+   "force_N": 18968,
+   "wall_s": 4.56
+  },
+  {
+   "soil": "dry-sand",
+   "young_modulus": 10000000.0,
+   "iterations": 2000,
+   "force_N": 21540,
+   "wall_s": 12.63
+  }
+ ],
+ "converged_reference_N": {
+  "dry-sand": 23169,
+  "loam": 66377
+ },
+ "excavator_130s_dry-sand_1/30": {
+  "150": {
+   "realtime_factor": 1.183,
+   "frame_ms_mean": 14.01,
+   "frame_ms_p95": 31.74,
+   "mean_pass_kg": 1015
+  },
+  "300": {
+   "realtime_factor": 0.767,
+   "frame_ms_mean": 21.74,
+   "frame_ms_p95": 50.2,
+   "mean_pass_kg": 1044
+  },
+  "600": {
+   "realtime_factor": 0.457,
+   "frame_ms_mean": 36.59,
+   "frame_ms_p95": 87.58,
+   "mean_pass_kg": 1031
+  }
+ }
+}
