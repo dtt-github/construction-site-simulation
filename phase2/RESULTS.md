@@ -896,7 +896,7 @@ At native size the blade spans 3 cells, and the force is 2× too high. So the 8 
 
 - **Horizontal force:** predicted within −7 to +9 % at 1 km/h. The paper's own DEM, with more parameters calibrated, reached 2–6 %.
 - **Vertical force:** pulls the tool down, as measured, but is 13–49 % too small. The assumed blade length, which sets how much soil rides on the blade, matters most here.
-- **Speed effect:** too large. From 1 to 2.5 km/h the sim adds 9–17 % force, where the measurement adds 1–6 %.
+- **Speed effect:** too large. From 1 to 2.5 km/h the sim adds 9–19 % force, where the measurement adds 1–6 %.
 
 **The forces are not converged in the time step.** This is the main finding.
 
