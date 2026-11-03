@@ -821,5 +821,37 @@ The first check of the soil model against measurements, not just theory. Why the
   The rheology solve does not converge in tall columns at the large step. The tests above use the settled height as h0. In the excavator only the top 1–2 m of soil is particles, so the error is about 5 %.
 
 **What it means for the excavator:**
-- **Sim settings:** the MPM step of 1/30 s, chosen for speed in Phase 2, costs accuracy in fast flows, such as soil spilling off the bucket or out of the truck, and in packing. A 1/60 s step would recover about half the runout error (d_far −8 % at a = 2) at roughly twice the MPM cost.
+- **Sim settings:** the MPM step of 1/30 s, chosen for speed in Phase 2, costs accuracy in fast flows, such as soil spilling off the bucket or out of the truck, and in packing. See "Soil at 60 Hz: what it buys" below.
 - **Next physics step:** final pile shapes need a material with friction that differs between rest and flow, or rate-dependent μ(I).
+
+### Soil at 60 Hz: what it buys
+
+The same column tests and the 130 s excavator benchmark, with the soil stepped every frame (`--mpm-every 1`, `MPM_EVERY=1 ITERATIONS=… bench_zone.py`). Logs: `logs/soil_column_step.json`, `logs/zone_bench_mpm60_<iterations>it_<soil>.json`.
+
+**Column collapse** (farthest-particle runout error against the experiment; settlement of the 8 m column behind the gate):
+
+| Soil step | Iterations | Rods a ≈ 1 | Rods a ≈ 2 | Rods a ≈ 4 | Sand a ≈ 1 | Sand a ≈ 4 | 8 m column settles |
+|---|---|---|---|---|---|---|---|
+| 1/30 s (now) | 150 | −15 % | −20 % | −9 % | −14 % | −19 % | 18 % |
+| 1/60 s | 60 | −6 % | −8 % | −6 % | −9 % | −16 % | 9 % |
+| 1/60 s | 100 | −7 % | −5 % | −3 % | −9 % | −13 % | 6 % |
+| 1/60 s | 150 | −3 % | −8 % | −3 % | −13 % | −14 % | 5 % |
+
+Final heights do not change (rods a ≈ 4: 0.21–0.24 against 0.29–0.32 measured), as expected from a material limit.
+
+**Excavator, 130 s auto cycle:**
+
+| Soil step | Iterations | Soil | Real-time factor | Frame mean / dig / p95 | Mean per pass | Passes |
+|---|---|---|---|---|---|---|
+| 1/30 s (now) | 150 | Dry sand | 1.18 | 14.0 / 14.5 / 31.7 ms | 1015 kg | 7 |
+| 1/30 s (now) | 150 | Loam | 1.23 | 13.5 / 14.3 / 30.4 ms | 1242 kg | 7 |
+| 1/60 s | 60 | Dry sand | 1.01 | 16.5 / 17.1 / 22.9 ms | 1076 kg | 7 |
+| 1/60 s | 60 | Loam | 0.99 | 16.8 / 18.1 / 23.5 ms | 993 kg | 7 |
+| 1/60 s | 100 | Dry sand | 0.81 | 20.4 / 21.3 / 27.8 ms | 1197 kg | 7 |
+| 1/60 s | 100 | Loam | 0.78 | 21.3 / 22.6 / 28.6 ms | 1019 kg | 7 |
+
+**Verdict:**
+- **Accuracy:** a 1/60 s step with 60 iterations halves the runout error of fast flows (rods within −6 to −8 %) and halves self-weight settling. More iterations add little to runout.
+- **Cost:** frames cost 18–25 % more. That uses up the real-time margin (1.18 → 1.01), so hard digs would dip below real time in the live server. p95 falls, because every frame now carries the same load.
+- **Bucket loads move:** dry sand carries 6 % more, and loam's learned curl, tuned at 30 Hz, lands at 80 % of its typical payload.
+- **Decision:** the default stays at 1/30 s for the live server. Use `--mpm-every 1` for accuracy runs. Switching the default would first need a cheaper MPM step, so that 60 Hz keeps a margin, and a re-tuned cohesive curl.
