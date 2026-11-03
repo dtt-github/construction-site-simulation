@@ -39,7 +39,7 @@ Developed on an NVIDIA DGX Spark (GB10, Linux aarch64). Any recent NVIDIA GPU on
 
 ```bash
 # Python environment with Newton/Warp (see phase0/RESULTS.md for details)
-uv venv phase0/.venv-newton && uv pip install -p phase0/.venv-newton "newton[examples]" playwright websockets
+uv venv phase0/.venv-newton && uv pip install -p phase0/.venv-newton "newton[examples]" playwright websockets gymnasium
 # third-party assets that are not stored in git
 phase1/fetch_assets.sh
 python3 assets/fetch_assets.py
@@ -50,6 +50,26 @@ python3 -m http.server 8731 --bind 127.0.0.1 --directory phase1
 ```
 
 Open http://127.0.0.1:8731/web/index.html in Chrome. On Linux ARM, start Chrome with `--enable-unsafe-webgpu --enable-features=Vulkan`.
+
+## For researchers: Python API
+
+The excavator is a [Gymnasium](https://gymnasium.farama.org) environment ([phase2/excavator_env.py](phase2/excavator_env.py)). It uses the same simulator as the browser demo, without the browser:
+
+```python
+import excavator_env  # run from phase2/
+env = excavator_env.ExcavatorEnv(soil="loam", task="load-truck")
+obs, info = env.reset()
+obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
+```
+
+- **Actions:** the operator's four levers, each in [−1, 1]: swing (+ left), boom (+ raise), stick (+ out) and bucket (+ dump). They are held for one control step (10 Hz by default). The hydraulics and the soil decide how fast each joint actually moves.
+- **Observations:** joint angles and rates, the four hydraulic pressures, the bucket's cutting-edge position, the soil force on the bucket, the load in the bucket and in the truck, and the pit surface as an 86 × 96 heightmap on a 0.1 m grid.
+- **Tasks:** `load-truck` rewards tonnes added to the truck; `fill-bucket` rewards tonnes added to the bucket. You can also pass your own reward function.
+- **Soil:** dry sand, moist sand, loam or clay (`soil=…`, or `reset(options={"soil": …})`).
+- **Demonstrations:** with `autopilot=True`, the built-in operator model drives and `info["action"]` returns the levers it used. `record_demos.py` saves such episodes as `.npz` files for imitation learning.
+- **Speed:** about 1.1–1.2× real time per environment on a GB10, about 11 control steps per second.
+- **Determinism:** identical runs give identical results; Gymnasium's `env_checker` passes (`test_env.py`).
+- **Units:** SI throughout. The coordinate frame is documented in the module.
 
 ## Join
 
@@ -74,6 +94,7 @@ Only licenses that allow redistribution, modification and commercial use are acc
 
 - Operator models beyond the scripted cycle (learned or recorded operator inputs), and checking heaped bucket loads against field data
 - Converged soil solves: loads still depend on the MPM iteration count
+- Research APIs: the Gymnasium environment is done. Next: a ROS 2 bridge, and simulated sensors (depth camera or lidar, IMU)
 - Measured ZX200 masses, swing torque and pressure logs for validation
 - Measured pressure logs, port relief and house inertia to validate the hydraulics
 - Soil–steel adhesion, bulking of dug clods, and soil presets calibrated to measured sites and bucket loads
