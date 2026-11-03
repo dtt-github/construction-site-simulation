@@ -15,7 +15,7 @@ Initiated and maintained by **[DigitalTwin Technology GmbH](https://www.digitalt
 | Site | 128 m terrain with pad, haul road, stockpile and a 2.5 m excavation pit; 40+ physics props from NVIDIA SimReady (CC BY 4.0) with checked masses and colliders |
 | Real machines (open-licensed) | Hitachi ZX200 excavator, Hitachi IC120 crawler carrier, Komatsu D37PXi dozer (articulated, from the PWRI OPERA project, Apache-2.0); 35 m tower crane, cones, barrels and jersey barriers (Gazebo, CC0) |
 | Soil | 266k-particle MPM sand bed (Newton implicit MPM) on the GPU, two-way coupled to the machine |
-| Excavator | 4-joint machine (swing, boom, stick, bucket) with flow-limited, relief-capped hydraulic actuators that slow and stall under load; full dig–swing–load cycle into a dump truck |
+| Excavator | The real Hitachi ZX200 (OPERA URDF geometry and joint limits, curved bucket with teeth) as a 4-joint machine with flow-limited, relief-capped hydraulic actuators that slow and stall under load; full dig–swing–load cycle into a dump truck, 964 kg per pass (75 % of the 0.8 m³ bucket's rating) |
 | Browser client | Levers and keyboard control, cylinder pressure gauges, stall warnings, live truck load; 60 fps |
 | Validation | Bucket forces compared with the McKyes/Reece earthmoving equation; field data wanted (see below) |
 
@@ -68,8 +68,8 @@ Only licenses that allow redistribution, modification and commercial use are acc
 ## Roadmap
 
 - Real-time soil: a moving particle zone around the tool with a heightfield elsewhere
-- Fuller bucket loads and operator-realistic cycles (in progress)
-- Real machine geometry in the physics server (ZX200 kinematics instead of the simplified arm)
+- Fuller bucket loads and operator-realistic cycles; a deeper soil bed for full-depth cuts
+- Measured ZX200 masses, swing torque and pressure logs for validation
 - Excavator hydraulic cylinders and bucket linkage rigged (meshes are in the OPERA packages; joints are missing)
 - Cohesive and wet soils; calibration against lab and field data
 - Wheel loader, articulated dump truck, mobile and tower crane dynamics with ropes

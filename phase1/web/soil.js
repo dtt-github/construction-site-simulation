@@ -12,7 +12,7 @@ const P_HEADER_BYTES = 20;
 const MAGIC_SOIL = 0x4c494f53; // "SOIL"
 const MAGIC_EXC = 0x32435845; // "EXC2"
 
-export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic, panel, view }) {
+export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, layerStatic, panel, view }) {
   const params = new URLSearchParams(location.search);
   const url = params.get("soil") ? `ws://${params.get("soil")}` : `ws://${location.hostname || "127.0.0.1"}:8765`;
 
@@ -166,9 +166,10 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
   const steel = new THREE.MeshStandardMaterial({ color: "#5b5a56", metalness: 0.6, roughness: 0.5 });
   const dark = new THREE.MeshStandardMaterial({ color: "#2b2b2b", roughness: 0.9 });
   const glass = new THREE.MeshStandardMaterial({ color: "#2f4552", metalness: 0.2, roughness: 0.1, transparent: true, opacity: 0.75 });
-  const addBox = (group, size, center, mat) => {
+  const addBox = (group, size, center, mat, rotZ = 0) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
     m.position.set(...center);
+    m.rotation.z = rotZ;
     m.castShadow = true;
     m.receiveShadow = true;
     group.add(m);
@@ -187,19 +188,23 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
   bucket.visible = false;
   scene.add(bucket);
 
-  // excavator (excavator_server.py): links built from the hello geometry
-  const arm = { links: {}, base: null, truckSurface: null };
+  // excavator (excavator_server.py): links built from the hello geometry (boxes), replaced by the real
+  // machine's meshes when the server names a glTF model whose link frames match its physics links
+  const arm = { links: {}, base: null, truckSurface: null, tracks: null, model: false };
   function buildExcavator(geom) {
     for (const name of ["house", "boom", "stick", "bucket"]) {
       const g = new THREE.Group();
-      geom[name].forEach((b, i) => addBox(g, b.size, b.center, name === "bucket" ? steel : name === "house" && i === 2 ? glass : paint));
+      geom[name].forEach((b, i) => addBox(g, b.size, b.center, name === "bucket" ? steel : name === "house" && i === 2 ? glass : paint, b.rot_z ?? 0));
       g.visible = false;
       scene.add(g);
       arm.links[name] = g;
     }
     // undercarriage and dump truck (static, world coordinates)
     const base = new THREE.Group();
-    geom.tracks.forEach((b) => addBox(base, b.size, b.center, dark));
+    arm.tracks = new THREE.Group();
+    geom.tracks.forEach((b) => addBox(arm.tracks, b.size, b.center, dark));
+    base.add(arm.tracks);
+    if (geom.model && loader) loadMachineModel(geom.model);
     const truckPaint = new THREE.MeshStandardMaterial({ color: "#b5452f", metalness: 0.3, roughness: 0.6 });
     geom.truck_bed.forEach((b) => addBox(base, b.size, b.center, truckPaint));
     geom.truck_body.forEach((b, i) => addBox(base, b.size, b.center, i === 1 ? truckPaint : dark));
@@ -215,6 +220,48 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
     scene.add(base);
     arm.base = base;
     arm.capacity = geom.truck_capacity_kg;
+  }
+
+  async function loadMachineModel(model) {
+    let gltf;
+    try {
+      gltf = await loader.loadAsync(`../${model.file}`);
+    } catch (err) {
+      console.warn(`excavator: could not load ${model.file}, drawing boxes`, err);
+      return;
+    }
+    // a link's own meshes (not its child links), in its URDF frame (Z up) -> three.js (Y up)
+    const linkMeshes = (nodeName) => {
+      const node = gltf.scene.getObjectByName(nodeName);
+      if (!node) throw new Error(`node ${nodeName} missing in ${model.file}`);
+      const wrap = new THREE.Group();
+      wrap.rotation.x = -Math.PI / 2;
+      for (const child of node.children) {
+        if (child.name.endsWith("_link")) continue;
+        wrap.add(child.clone(true));
+      }
+      wrap.traverse((o) => {
+        if (o.isMesh) o.castShadow = o.receiveShadow = true;
+      });
+      return wrap;
+    };
+    try {
+      const parts = Object.fromEntries(Object.entries(model.links).map(([name, node]) => [name, linkMeshes(node)]));
+      const crawler = new THREE.Group();
+      crawler.position.set(...model.crawler.pos);
+      crawler.quaternion.set(...model.crawler.quat);
+      crawler.add(linkMeshes(model.crawler.node));
+      for (const [name, wrap] of Object.entries(parts)) {
+        const g = arm.links[name];
+        g.clear();
+        g.add(wrap);
+      }
+      arm.tracks.clear();
+      arm.tracks.add(crawler);
+      arm.model = true;
+    } catch (err) {
+      console.warn("excavator: model has unexpected structure, drawing boxes", err);
+    }
   }
 
   function makeSurface(nx, ny, x0, z0, cell, color = sandColor) {
@@ -481,7 +528,7 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
     rows.push(["Bucket load", `${f.fill.toFixed(0)} kg`]);
     if (f.kind === "excavator") rows.push(["Truck load", `${(f.truck / 1000).toFixed(2)} t of ${(f.capacity / 1000).toFixed(0)} t (${Math.round((100 * f.truck) / f.capacity)}%)`]);
     statsEl.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
-    window.__soil = { lastFrame: f, stats: { ...stats }, stalled };
+    window.__soil = { lastFrame: f, stats: { ...stats }, stalled, model: arm.model };
   }
 
   let reported = false;

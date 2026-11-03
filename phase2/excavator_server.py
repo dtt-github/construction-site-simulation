@@ -1,7 +1,8 @@
 """Phase 2b: a joint-driven excavator arm digging Newton MPM sand, streamed to the browser.
 
-Replaces the kinematic bucket of soil_server.py with a 3-joint backhoe arm (boom, stick, bucket)
-of a ~20 t excavator standing at the pit edge. Each joint is driven by a hydraulic-style actuator:
+Replaces the kinematic bucket of soil_server.py with a Hitachi ZX200 (20 t class) standing at the pit
+edge: swing, boom, stick and bucket with the geometry, joint frames and limits of the PWRI OPERA URDF and
+a curved bucket with teeth traced from its mesh. Each joint is driven by a hydraulic-style actuator:
 
   * flow limit     - the operator lever sets a joint speed; a reference angle moves at that speed
   * stiff servo    - PD torque pulls the joint to the reference (cylinders are nearly rigid)
@@ -51,20 +52,51 @@ from soil_server import (
 )
 
 # ------------------------------------------------------------------ machine (zone frame, Z up)
+# Hitachi ZX200 (20 t class) from the PWRI OPERA URDF (zx200_ros2, Apache-2.0): joint origins in the
+# parent link frame and the fixed pitch of each child frame. The physics links use the URDF link frames
+# (body_link, boom_link, arm_link, bucket_link), so the joint angles are the URDF ones and the browser
+# places the real ZX200 meshes (assets/machinery/opera_zx200.glb) directly at the streamed link poses.
+# URDF frames have the arm along +x; the upper structure is turned 180 deg so the arm faces the pit (-x).
 GROUND_Z = 2.35  # site ground next to the pit, zone frame
-SWING_POS = np.array([7.0, 0.0, 3.35])  # swing bearing (upper structure pivot) on the undercarriage
-BOOM_FOOT = np.array([-0.5, 0.0, 0.75])  # boom foot pin in the house frame -> 4.1 m above the pit floor
-BASE = SWING_POS + BOOM_FOOT  # boom foot pin at swing angle 0
-L_BOOM, L_STICK = 5.7, 2.9
-BUCKET_D, BUCKET_H, BUCKET_W, PLATE = 1.0, 0.85, 1.3, 0.10  # outer depth along stick, mouth opening, width;
-# plates are thicker than real steel so the 8 cm MPM grid can't leak sand through them. Inside: 0.9 x 1.2 x 0.8 m
-# = 0.86 m3 struck (~1.38 t of sand at 1600 kg/m3), the rating of a 20 t excavator's general-purpose bucket
-BUCKET_RATED_KG = 0.86 * 1600.0
-MASS = {"house": 8000.0, "boom": 1800.0, "stick": 900.0, "bucket": 800.0}
+SWING_POS = np.array([7.4, 0.0, GROUND_Z + 1.1206])  # swing joint, 1.12 m above the track bottom
+CRAWLER_SWING = np.array([0.10787, -0.034301, 1.1206])  # swing joint in the crawler frame
+CRAWLER_YAW = math.pi / 2  # tracks parallel to the pit edge (display only)
+BOOM_ORIGIN, BOOM_PITCH = np.array([0.05467, -0.040187, 0.72492]), math.radians(32.0357)
+STICK_ORIGIN, STICK_PITCH = np.array([4.83998, 0.010957, 3.00227]), math.radians(16.9707)
+BUCKET_ORIGIN, BUCKET_PITCH = np.array([1.91546, -0.023546, 2.17374]), math.radians(-9.20083)
+L_BOOM, L_STICK = float(np.hypot(STICK_ORIGIN[0], STICK_ORIGIN[2])), float(np.hypot(BUCKET_ORIGIN[0], BUCKET_ORIGIN[2]))  # 5.69, 2.90 m pin to pin
+
+# Bucket (bucket_link frame, x-z plane): inner shell profile traced from the OPERA bucket mesh, from the
+# top of the back (near the pin) round the bowl to the cutting lip; the mouth is the chord between the
+# ends. Inside width 1.06 m: 0.79 m3 struck, 0.91 m3 heaped (SAE J296). Five teeth reach 0.18 m past the
+# lip. Plates are 10 cm thick (outside the profile) so the 8 cm MPM grid can't leak sand through them.
+BUCKET_SHELL = np.array([
+    (0.02, 0.15), (-0.09, 0.18), (-0.15, 0.26), (-0.18, 0.46), (-0.24, 0.66), (-0.25, 0.77), (-0.23, 0.89),
+    (-0.17, 0.99), (-0.08, 1.06), (0.03, 1.11), (0.14, 1.13), (0.25, 1.12), (0.35, 1.08), (0.52, 1.01),
+    (0.68, 0.94), (0.88, 0.86), (1.075, 0.78),
+])
+BUCKET_W, PLATE = 1.06, 0.10
+TOOTH_Y, TOOTH_TIP = (-0.45, -0.22, 0.0, 0.22, 0.45), np.array([1.25, 0.83])
+BUCKET_EDGE = np.array([TOOTH_TIP[0], 0.0, TOOTH_TIP[1]])  # cutting edge (tooth tips), bucket frame
+_MOUTH = BUCKET_SHELL[-1] - BUCKET_SHELL[0]
+MOUTH_ANGLE = math.atan2(_MOUTH[1], _MOUTH[0])  # chord direction in the bucket frame
+# rating: Hitachi ZX200-6 standard bucket, 0.80 m3 ISO heaped, in sand at 1600 kg/m3
+BUCKET_RATED_KG = 0.80 * 1600.0
+
+# masses: ZX200-6 operating weight ~20 t; upper structure incl. 4.6 t counterweight, boom, arm and a
+# 0.8 m3 bucket estimated from published class figures. Centres of mass and inertias (link frames) are
+# from the area-weighted shells of the OPERA meshes, scaled to these masses (plate structures).
+MASS = {"house": 9800.0, "boom": 1450.0, "stick": 680.0, "bucket": 640.0}
+COM = {"house": (-0.48, 0.17, 0.79), "boom": (2.00, 0.01, 1.95), "stick": (0.34, -0.01, 0.73), "bucket": (0.29, -0.01, 0.72)}
+INERTIA = {"house": (10518.0, 17319.0, 20667.0), "boom": (1028.0, 3635.0, 2661.0), "stick": (304.0, 673.0, 383.0), "bucket": (131.0, 159.0, 183.0)}
 JOINTS = ["swing", "boom", "stick", "bucket"]
 LINKS = ["house", "boom", "stick", "bucket"]
-# limits (rad), max speed (rad/s), relief torque (N m), servo gains
-LIMITS = {"swing": (-3.0, 3.0), "boom": (-1.0, 1.2), "stick": (-2.7, -0.5), "bucket": (-2.3, 1.4)}
+GLB_NODES = {"house": "body_link", "boom": "boom_link", "stick": "arm_link", "bucket": "bucket_link"}
+# limits (rad, from the URDF), max speed (rad/s), relief torque (N m), servo gains. In URDF angles a
+# positive boom angle lowers the boom, positive stick folds it in and positive bucket curls, so the
+# operator levers (raise / out / dump positive) drive those three joints with the opposite sign.
+LIMITS = {"swing": (-3.0, 3.0), "boom": (-1.137, 1.0), "stick": (0.594, 2.687), "bucket": (-0.622, 2.372)}
+LEVER_SIGN = np.array([1.0, -1.0, -1.0, -1.0])
 VMAX = {"swing": 0.8, "boom": 0.35, "stick": 0.5, "bucket": 0.9}
 TAU_MAX = {"swing": 65e3, "boom": 450e3, "stick": 160e3, "bucket": 120e3}
 KP = {"swing": 2.0e6, "boom": 3.0e7, "stick": 8.0e6, "bucket": 1.5e6}
@@ -103,39 +135,115 @@ def swing_vec(psi, v):
     return np.array([v[0] * c - v[1] * s, v[0] * s + v[1] * c, v[2]])
 
 
-def fk(q):
-    """FK for q = [swing, boom, stick, bucket]: stick pin, bucket pin and cutting edge (zone frame).
-    The arm points outward (-x at swing 0); boom/stick/bucket angles are about the house +y axis and
-    positive angles raise the link; positive swing turns the arm toward -y (the operator's left)."""
-    psi = q[0]
-    a1 = q[1]
-    a2 = q[1] + q[2]
-    a3 = q[1] + q[2] + q[3]
-    foot = SWING_POS + swing_vec(psi, BOOM_FOOT)
-    p1 = foot + swing_vec(psi, L_BOOM * np.array([-math.cos(a1), 0, math.sin(a1)]))
-    p2 = p1 + swing_vec(psi, L_STICK * np.array([-math.cos(a2), 0, math.sin(a2)]))
-    edge = p2 + swing_vec(psi, local_to_world(a3, np.array([-BUCKET_D, 0, -BUCKET_H])))
-    return p1, p2, edge
-
-
-def local_to_world(a, v):
-    """Rotate a link-local vector by angle a about +y."""
-    c, s = math.cos(a), math.sin(a)
+def pitch(v, b):
+    """Rotate v about +y by b (URDF sense: positive turns +x toward -z)."""
+    c, s = math.cos(b), math.sin(b)
     return np.array([v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c])
 
 
-def ik(psi, r, z, phi):
-    """Joint angles [swing, boom, stick, bucket] that put the bucket pin at radius r (from the swing
-    axis, along the arm) and height z, with absolute bucket angle phi, at swing angle psi."""
-    dr, dz = r - (-BOOM_FOOT[0]), z - (SWING_POS[2] + BOOM_FOOT[2])
-    d = min(math.hypot(dr, dz), L_BOOM + L_STICK - 1e-3)
-    cos_q2 = (d * d - L_BOOM**2 - L_STICK**2) / (2 * L_BOOM * L_STICK)
-    q2 = -math.acos(max(-1.0, min(1.0, cos_q2)))  # elbow up, stick folded under the boom
-    target_ang = math.atan2(dz, dr)
-    q1 = target_ang - math.atan2(L_STICK * math.sin(q2), L_BOOM + L_STICK * math.cos(q2))
-    q3 = phi - q1 - q2
-    return np.array([psi, q1, q2, q3])
+def house_to_zone(psi, v):
+    """Point in the upper-structure (URDF body_link) frame -> zone frame. The house is turned 180 deg,
+    so at swing 0 the arm points along -x; positive swing turns it toward -y (the operator's left)."""
+    return SWING_POS + swing_vec(psi, np.array([-v[0], -v[1], v[2]]))
 
+
+def chain(q):
+    """House-frame stick pin, bucket pin and the bucket frame's total pitch for q = [swing, boom, stick, bucket]."""
+    b1 = BOOM_PITCH + q[1]
+    p1 = BOOM_ORIGIN + pitch(STICK_ORIGIN, b1)
+    b2 = b1 + STICK_PITCH + q[2]
+    p2 = p1 + pitch(BUCKET_ORIGIN, b2)
+    return p1, p2, b2 + BUCKET_PITCH + q[3]
+
+
+def bucket_point(q, v):
+    """Bucket-frame point (x, y, z) -> zone frame."""
+    _, p2, b3 = chain(q)
+    return house_to_zone(q[0], p2 + pitch(v, b3))
+
+
+def fk(q):
+    """Stick pin, bucket pin and cutting edge (tooth tips) in the zone frame."""
+    p1, p2, b3 = chain(q)
+    return house_to_zone(q[0], p1), house_to_zone(q[0], p2), house_to_zone(q[0], p2 + pitch(BUCKET_EDGE, b3))
+
+
+def link_xforms(q):
+    """World transforms of the house, boom, stick and bucket link frames."""
+    p1, p2, b3 = chain(q)
+    b1 = BOOM_PITCH + q[1]
+    b2 = b1 + STICK_PITCH + q[2]
+    yaw = rot_z(math.pi + q[0])
+    return [
+        wp.transform(wp.vec3(*SWING_POS), yaw),
+        wp.transform(wp.vec3(*house_to_zone(q[0], BOOM_ORIGIN)), yaw * rot_y(b1)),
+        wp.transform(wp.vec3(*house_to_zone(q[0], p1)), yaw * rot_y(b2)),
+        wp.transform(wp.vec3(*house_to_zone(q[0], p2)), yaw * rot_y(b3)),
+    ]
+
+
+def ik(psi, r, z, phi):
+    """Joint angles [swing, boom, stick, bucket] that put the bucket pin at radius r (from the swing axis,
+    along the arm) and height z, with the bucket mouth (back-to-lip chord) pointing at angle phi above
+    the outward horizontal; phi = -90 deg holds the mouth vertical with the lip down, as when digging."""
+    dr, dz = r - BOOM_ORIGIN[0], z - SWING_POS[2] - BOOM_ORIGIN[2]
+    d = min(math.hypot(dr, dz), L_BOOM + L_STICK - 1e-3)
+    g_boom = math.atan2(STICK_ORIGIN[2], STICK_ORIGIN[0])  # pin-to-pin direction in each link frame
+    g_stick = math.atan2(BUCKET_ORIGIN[2], BUCKET_ORIGIN[0])
+    delta = -math.acos(max(-1.0, min(1.0, (d * d - L_BOOM**2 - L_STICK**2) / (2 * L_BOOM * L_STICK))))  # stick below the boom line
+    a1 = math.atan2(dz, dr) - math.atan2(L_STICK * math.sin(delta), L_BOOM + L_STICK * math.cos(delta))  # boom elevation
+    b1 = g_boom - a1
+    b2 = g_stick - (a1 + delta)
+    b3 = MOUTH_ANGLE - phi
+    return np.array([psi, b1 - BOOM_PITCH, b2 - b1 - STICK_PITCH, b3 - b2 - BUCKET_PITCH])
+
+
+def bucket_plates():
+    """Collider boxes (centre, half extents, pitch) in the bucket frame: shell plates along the profile,
+    side plates (strips parallel to the mouth, so none reaches past it) and teeth."""
+    boxes = []
+    centroid = BUCKET_SHELL.mean(axis=0)
+    hw = BUCKET_W / 2
+    for a, b in zip(BUCKET_SHELL[:-1], BUCKET_SHELL[1:]):
+        d = b - a
+        n = np.array([-d[1], d[0]]) / np.linalg.norm(d)
+        mid = (a + b) / 2
+        if np.dot(mid - centroid, n) < 0:
+            n = -n
+        c = mid + n * PLATE / 2
+        boxes.append(((c[0], 0.0, c[1]), (np.linalg.norm(d) / 2 + PLATE / 2, hw + PLATE, PLATE / 2), math.atan2(-d[1], d[0])))
+    # sides: strips across the bowl in the mouth's (u, v) frame, from the mouth plane (v = 0) to the shell
+    eu = _MOUTH / np.linalg.norm(_MOUTH)
+    ev = np.array([-eu[1], eu[0]])
+    if np.dot(centroid - BUCKET_SHELL[0], ev) < 0:
+        ev = -ev
+    dense = np.concatenate([np.linspace(a, b, 12) for a, b in zip(BUCKET_SHELL[:-1], BUCKET_SHELL[1:])])
+    uv = np.stack([(dense - BUCKET_SHELL[0]) @ eu, (dense - BUCKET_SHELL[0]) @ ev], axis=1)
+    strip = 0.12
+    for u0 in np.arange(uv[:, 0].min(), uv[:, 0].max(), strip):
+        sel = (uv[:, 0] >= u0 - 0.02) & (uv[:, 0] <= u0 + strip + 0.02)
+        if not sel.any():
+            continue
+        vmax = uv[sel, 1].max() + PLATE
+        c = BUCKET_SHELL[0] + eu * (u0 + strip / 2) + ev * (vmax / 2)
+        for side in (-1, 1):
+            boxes.append(((c[0], side * (hw + PLATE / 2), c[1]), (strip / 2, PLATE / 2, vmax / 2), math.atan2(-eu[1], eu[0])))
+    lip = BUCKET_SHELL[-1]
+    t = TOOTH_TIP - lip
+    c = (lip + TOOTH_TIP) / 2
+    for y in TOOTH_Y:
+        boxes.append(((c[0], y, c[1]), (np.linalg.norm(t) / 2 + 0.03, 0.04, 0.04), math.atan2(-t[1], t[0])))
+    return boxes
+
+
+def _bucket_outline():
+    """Bucket-frame points that bound the bucket (outer shell and tooth tips), for clearance checks."""
+    centroid = BUCKET_SHELL.mean(axis=0)
+    pts = [p + (p - centroid) / np.linalg.norm(p - centroid) * PLATE for p in BUCKET_SHELL]
+    return [np.array([p[0], 0.0, p[1]]) for p in pts] + [BUCKET_EDGE]
+
+
+BUCKET_OUTLINE = _bucket_outline()
 
 # ------------------------------------------------------------------ kernels
 @wp.kernel
@@ -257,17 +365,44 @@ def bucket_fill_kernel(
         wp.atomic_add(counter, 0, 1)
 
 
+@wp.kernel
+def bucket_profile_fill_kernel(
+    q: wp.array[wp.vec3],
+    xf: wp.transform,
+    poly: wp.array[wp.vec2],
+    half_w: float,
+    counter: wp.array[int],
+):
+    """Grains inside the bucket: within the inner width and inside the profile polygon (x-z, closed by the mouth chord)."""
+    i = wp.tid()
+    p = wp.transform_point(wp.transform_inverse(xf), q[i])
+    if wp.abs(p[1]) > half_w:
+        return
+    n = poly.shape[0]
+    crossings = int(0)
+    for k in range(n):
+        a = poly[k]
+        b = poly[(k + 1) % n]
+        if (a[1] > p[2]) != (b[1] > p[2]):
+            x = a[0] + (p[2] - a[1]) * (b[0] - a[0]) / (b[1] - a[1])
+            if p[0] < x:
+                crossings += 1
+    if crossings % 2 == 1:
+        wp.atomic_add(counter, 0, 1)
+
+
 # ------------------------------------------------------------------ simulation
 class ExcavatorSim:
     # auto cycle: (stage, swing deg, bucket-pin radius from the swing axis, pin height, bucket angle deg
     # [, speed: fraction of full lever for moving into this stage])
     CYCLE = [
         ("approach", 0, 6.0, 2.6, -95),
-        ("penetrate", 0, 7.9, 1.5, -60),
-        ("drag", 0, 5.6, 1.1, -95),
-        ("curl", 0, 5.2, 1.6, -175),
-        ("lift", 0, 5.0, 6.6, -160),
-        ("swing to truck", -90, 5.4, 6.6, -160),
+        ("penetrate", 0, 7.6, 1.5, -60),  # near full reach of the ZX200 arm
+        ("drag", 0, 5.6, 1.1, -100),
+        ("drag-curl", 0, 4.7, 1.2, -145),  # keep dragging while curling: the 1.2 m mouth fills toward the top
+        ("curl", 0, 4.6, 1.6, -180),
+        ("lift", 0, 5.0, 6.6, -165),
+        ("swing to truck", -90, 5.4, 6.6, -165),
         ("dump", -90, 5.4, 6.4, -40),
         ("raise", -90, 5.4, 7.0, -110),  # clear the truck sides before swinging back
         ("swing back", 0, 6.0, 6.6, -95),
@@ -291,35 +426,40 @@ class ExcavatorSim:
 
         q0 = ik(0.0, 6.0, 2.6, math.radians(-95))
         self.q0 = q0
-        p1, p2, _ = fk(q0)
-        a1, a2, a3 = q0[1], q0[1] + q0[2], q0[1] + q0[2] + q0[3]
+        xf = link_xforms(q0)
 
-        # upper structure (house, counterweight, cab): swings on the undercarriage; no contacts
-        house = b.add_link(xform=wp.transform(wp.vec3(*SWING_POS)), mass=MASS["house"], com=wp.vec3(1.2, 0, 0.6), inertia=box_inertia(MASS["house"], 2.0, 1.3, 0.8))
-        self.house_boxes = [((0.9, 0, 0.55), (1.8, 1.3, 0.55)), ((2.6, 0, 0.6), (0.5, 1.3, 0.5)), ((-0.2, 0.75, 1.35), (0.65, 0.5, 0.75))]
-        for c, h in self.house_boxes:
-            b.add_shape_box(house, xform=wp.transform(wp.vec3(*c)), hx=h[0], hy=h[1], hz=h[2], cfg=no_contact)
-        boom = b.add_link(xform=wp.transform(wp.vec3(*BASE), rot_y(a1)), mass=MASS["boom"], com=wp.vec3(-L_BOOM / 2, 0, 0), inertia=box_inertia(MASS["boom"], L_BOOM / 2, 0.3, 0.35))
-        b.add_shape_box(boom, xform=wp.transform(wp.vec3(-L_BOOM / 2, 0, 0)), hx=L_BOOM / 2, hy=0.3, hz=0.35, cfg=no_contact)
-        stick = b.add_link(xform=wp.transform(wp.vec3(*p1), rot_y(a2)), mass=MASS["stick"], com=wp.vec3(-L_STICK / 2, 0, 0), inertia=box_inertia(MASS["stick"], L_STICK / 2, 0.2, 0.22))
-        b.add_shape_box(stick, xform=wp.transform(wp.vec3(-L_STICK / 2, 0, 0)), hx=L_STICK / 2, hy=0.2, hz=0.22, cfg=stick_cfg)
-        bucket = b.add_link(xform=wp.transform(wp.vec3(*p2), rot_y(a3)), mass=MASS["bucket"], com=wp.vec3(-BUCKET_D / 2, 0, -BUCKET_H / 2), inertia=box_inertia(MASS["bucket"], BUCKET_D / 2, BUCKET_W / 2, BUCKET_H / 2))
-        D, H, W, T = BUCKET_D, BUCKET_H, BUCKET_W, PLATE
-        self.bucket_boxes = [  # (center, half extents) in bucket frame: spine, floor, 2 sides, back
-            ((-D / 2, 0, 0), (D / 2, W / 2, T / 2)),
-            ((-D, 0, -H / 2), (T / 2, W / 2, H / 2)),
-            ((-D / 2, W / 2, -H / 2), (D / 2, T / 2, H / 2)),
-            ((-D / 2, -W / 2, -H / 2), (D / 2, T / 2, H / 2)),
-            ((0, 0, -H / 2), (T / 2, W / 2, H / 2)),  # closed back: only the mouth is open
-        ]
-        for c, h in self.bucket_boxes:
-            b.add_shape_box(bucket, xform=wp.transform(wp.vec3(*c)), hx=h[0], hy=h[1], hz=h[2], cfg=bucket_cfg)
+        def link(name, x):
+            I = INERTIA[name]
+            return b.add_link(xform=x, mass=MASS[name], com=wp.vec3(*COM[name]), inertia=wp.mat33(I[0], 0, 0, 0, I[1], 0, 0, 0, I[2]))
+
+        def along(v, hy, hz):
+            """Box from a link's origin to the next pin v (link frame): (centre, half extents, pitch)."""
+            return ((v[0] / 2, 0.0, v[2] / 2), (math.hypot(v[0], v[2]) / 2, hy, hz), -math.atan2(v[2], v[0]))
+
+        def add_boxes(body, boxes, cfg):
+            for c, h, a in boxes:
+                b.add_shape_box(body, xform=wp.transform(wp.vec3(*c), rot_y(a)), hx=h[0], hy=h[1], hz=h[2], cfg=cfg)
+
+        # upper structure (house, counterweight, cab) in the URDF body frame (arm along +x); no contacts.
+        # These boxes (and the boom one) are only drawn when the browser can't load the ZX200 model.
+        house = link("house", xf[0])
+        self.house_boxes = [((-0.6, 0.0, 0.55), (1.8, 1.3, 0.55), 0.0), ((-2.3, 0.0, 0.6), (0.55, 1.3, 0.5), 0.0), ((0.6, 0.75, 1.35), (0.55, 0.5, 0.75), 0.0)]
+        add_boxes(house, self.house_boxes, no_contact)
+        boom = link("boom", xf[1])
+        self.boom_boxes = [along(STICK_ORIGIN, 0.3, 0.35)]
+        add_boxes(boom, self.boom_boxes, no_contact)
+        stick = link("stick", xf[2])
+        self.stick_boxes = [along(BUCKET_ORIGIN, 0.2, 0.22)]
+        add_boxes(stick, self.stick_boxes, stick_cfg)
+        bucket = link("bucket", xf[3])
+        self.bucket_boxes = bucket_plates()
+        add_boxes(bucket, self.bucket_boxes, bucket_cfg)
 
         joint_kw = dict(axis=(0.0, 1.0, 0.0), armature=ARMATURE)
-        j0 = b.add_joint_revolute(-1, house, parent_xform=wp.transform(wp.vec3(*SWING_POS)), axis=(0.0, 0.0, 1.0), armature=ARMATURE, limit_lower=LIMITS["swing"][0], limit_upper=LIMITS["swing"][1])
-        j1 = b.add_joint_revolute(house, boom, parent_xform=wp.transform(wp.vec3(*BOOM_FOOT)), limit_lower=LIMITS["boom"][0], limit_upper=LIMITS["boom"][1], **joint_kw)
-        j2 = b.add_joint_revolute(boom, stick, parent_xform=wp.transform(wp.vec3(-L_BOOM, 0, 0)), limit_lower=LIMITS["stick"][0], limit_upper=LIMITS["stick"][1], **joint_kw)
-        j3 = b.add_joint_revolute(stick, bucket, parent_xform=wp.transform(wp.vec3(-L_STICK, 0, 0)), limit_lower=LIMITS["bucket"][0], limit_upper=LIMITS["bucket"][1], **joint_kw)
+        j0 = b.add_joint_revolute(-1, house, parent_xform=wp.transform(wp.vec3(*SWING_POS), rot_z(math.pi)), axis=(0.0, 0.0, 1.0), armature=ARMATURE, limit_lower=LIMITS["swing"][0], limit_upper=LIMITS["swing"][1])
+        j1 = b.add_joint_revolute(house, boom, parent_xform=wp.transform(wp.vec3(*BOOM_ORIGIN), rot_y(BOOM_PITCH)), limit_lower=LIMITS["boom"][0], limit_upper=LIMITS["boom"][1], **joint_kw)
+        j2 = b.add_joint_revolute(boom, stick, parent_xform=wp.transform(wp.vec3(*STICK_ORIGIN), rot_y(STICK_PITCH)), limit_lower=LIMITS["stick"][0], limit_upper=LIMITS["stick"][1], **joint_kw)
+        j3 = b.add_joint_revolute(stick, bucket, parent_xform=wp.transform(wp.vec3(*BUCKET_ORIGIN), rot_y(BUCKET_PITCH)), limit_lower=LIMITS["bucket"][0], limit_upper=LIMITS["bucket"][1], **joint_kw)
         b.add_articulation([j0, j1, j2, j3])
         for k in range(4):
             b.joint_q[k] = float(q0[k])
@@ -405,6 +545,7 @@ class ExcavatorSim:
         self.q_ref = wp.zeros(4, dtype=float)
         self.pressure = wp.zeros(4, dtype=float)
         self.truck_hm = wp.zeros(TRUCK_NX * TRUCK_NY, dtype=float)
+        self.bucket_poly = wp.array(BUCKET_SHELL.astype(np.float32), dtype=wp.vec2)
         self.truck_counter = wp.zeros(1, dtype=int)
 
         self.hm = wp.zeros(HM_NX * HM_NY, dtype=float)
@@ -471,7 +612,7 @@ class ExcavatorSim:
             if v is not None:
                 self.levers[k] = float(np.clip(v, -1.0, 1.0))
 
-    DIG_STAGES = ("penetrate", "drag", "curl")
+    DIG_STAGES = ("penetrate", "drag", "drag-curl", "curl")
     STAGE_TIMEOUT = 4.0  # s of poor tracking before the auto cycle skips a stage
     DEEPEN_PER_PASS, MAX_DEEPEN = 0.15, 0.45
 
@@ -487,11 +628,7 @@ class ExcavatorSim:
             z = z_from + s * (z_to - z_from)
             phi = w_from[4] + s * (w_to[4] - w_from[4])
             q = ik(math.radians(psi), r, z, math.radians(phi))
-            _, pin, _ = fk(q)
-            a3 = q[1] + q[2] + q[3]
-            for x in (0.0, -BUCKET_D):
-                for zz in (0.0, -BUCKET_H):
-                    low = min(low, (pin + swing_vec(q[0], local_to_world(a3, np.array([x, 0.0, zz]))))[2])
+            low = min(low, min(bucket_point(q, v)[2] for v in BUCKET_OUTLINE))
         return low
 
     def _stage_z(self, wp_):
@@ -544,7 +681,7 @@ class ExcavatorSim:
         mix = [pa + s * (pb - pa), a[2] + s * (b[2] - a[2]), za + s * (zb - za), a[4] + s * (b[4] - a[4])]
         q_goal = ik(math.radians(mix[0]), mix[1], mix[2], math.radians(mix[3]))  # straight bucket-pin path
         err = q_goal - self.q
-        self.levers = np.clip(4.0 * err / self.vmax, -speed, speed)
+        self.levers = np.clip(4.0 * err / self.vmax, -speed, speed) * LEVER_SIGN
         # advance along the segment at the pace the slowest joint allows, but only if tracking is good
         if np.max(np.abs(err)) < 0.12:
             self.auto_s = min(1.0, s + self.frame_dt / seg_time)
@@ -585,7 +722,7 @@ class ExcavatorSim:
     def step(self):
         if self.auto:
             self._auto_control()
-        self.v_cmd.assign((self.levers * self.vmax).astype(np.float32))
+        self.v_cmd.assign((self.levers * LEVER_SIGN * self.vmax).astype(np.float32))
 
         wp.synchronize()
         t0 = time.perf_counter()
@@ -629,9 +766,8 @@ class ExcavatorSim:
         self.truck_hm.fill_(BED_FLOOR_Z)
         wp.launch(heightmap_kernel, dim=self.n_particles, inputs=[q, self.sand.particle_qd, SURFACE_MAX_SPEED, self.radius, float(BED_LO[0]), float(BED_LO[1]), TRUCK_CELL, TRUCK_NX, TRUCK_NY, self.truck_hm])
         self.fill_counter.zero_()
-        D, H, W, T = BUCKET_D, BUCKET_H, BUCKET_W, PLATE
-        # inside faces of the plates; the open mouth is at z = -H
-        wp.launch(bucket_fill_kernel, dim=self.n_particles, inputs=[q, self.bucket_xform(), wp.vec3(-D + T / 2, -W / 2 + T / 2, -H), wp.vec3(-T / 2, W / 2 - T / 2, -T / 2), self.fill_counter])
+        # inside the shell profile, up to the mouth (struck load)
+        wp.launch(bucket_profile_fill_kernel, dim=self.n_particles, inputs=[q, self.bucket_xform(), self.bucket_poly, BUCKET_W / 2, self.fill_counter])
         self.hm_np = self.hm.numpy()
         n_moving = min(int(self.counter.numpy()[0]), MAX_SEND_PARTICLES)
         moving = self.moving.numpy()[:n_moving]
@@ -660,8 +796,9 @@ class ExcavatorSim:
 
     def geometry(self):
         """Link box geometry in three.js link-local coordinates, sent once in the hello message."""
-        def box(c, h):
-            return {"center": [c[0], c[2], -c[1]], "size": [2 * h[0], 2 * h[2], 2 * h[1]]}
+        def box(c, h, a=0.0):
+            # a: pitch about the link's y axis, which is three.js -z
+            return {"center": [float(c[0]), float(c[2]), -float(c[1])], "size": [2 * float(h[0]), 2 * float(h[2]), 2 * float(h[1])], "rot_z": -float(a)}
 
         def world_box(c, h):
             return {"center": list(self.to_three(c)), "size": [2 * h[0], 2 * h[2], 2 * h[1]]}
@@ -669,13 +806,19 @@ class ExcavatorSim:
         cx, cy = BED_CENTER
         g = GROUND_Z
         return {
-            "house": [box(c, h) for c, h in self.house_boxes] + [box((-0.5, 0, 0.75), (0.4, 0.45, 0.45))],
-            "boom": [box((-L_BOOM / 2, 0, 0), (L_BOOM / 2, 0.3, 0.35))],
-            "stick": [box((-L_STICK / 2, 0, 0), (L_STICK / 2, 0.2, 0.22))],
-            "bucket": [box(c, h) for c, h in self.bucket_boxes],
+            "house": [box(*bx) for bx in self.house_boxes],
+            "boom": [box(*bx) for bx in self.boom_boxes],
+            "stick": [box(*bx) for bx in self.stick_boxes],
+            "bucket": [box(*bx) for bx in self.bucket_boxes],
+            # the real machine: the browser puts each link's meshes from this glTF at the streamed link pose
+            "model": {
+                "file": "assets/machinery/opera_zx200.glb",
+                "links": GLB_NODES,
+                "crawler": {"node": "track_link", "pos": list(self.to_three(SWING_POS - swing_vec(CRAWLER_YAW, CRAWLER_SWING))), "quat": list(self.quat_to_three(rot_z(CRAWLER_YAW)))},
+            },
             # static parts in world (three.js) coordinates
-            "tracks": [world_box((SWING_POS[0] + 0.4, side * 1.2, g + 0.45), (2.3, 0.35, 0.45)) for side in (-1, 1)]
-            + [world_box((SWING_POS[0] + 0.4, 0, g + 0.75), (1.4, 0.9, 0.25))],
+            "tracks": [world_box((SWING_POS[0] + side * 1.2, 0, g + 0.45), (0.35, 2.3, 0.45)) for side in (-1, 1)]  # along y, as CRAWLER_YAW
+            + [world_box((SWING_POS[0], 0, g + 0.75), (0.9, 1.4, 0.25))],
             "truck_bed": [world_box(c, h) for c, h in self.truck_bed_boxes],
             "truck_body": [
                 world_box((cx + 0.9, cy, 3.6), (3.4, 0.5, 0.3)),  # chassis

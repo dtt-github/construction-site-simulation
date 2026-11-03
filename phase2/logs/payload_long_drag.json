@@ -1,0 +1,179 @@
+{
+ "variant": "long_drag",
+ "cycle": [
+  [
+   "approach",
+   0,
+   6.0,
+   2.6,
+   -95
+  ],
+  [
+   "penetrate",
+   0,
+   7.6,
+   1.5,
+   -60
+  ],
+  [
+   "drag",
+   0,
+   4.9,
+   1.61,
+   -100
+  ],
+  [
+   "curl",
+   0,
+   4.6,
+   1.6,
+   -175
+  ],
+  [
+   "lift",
+   0,
+   5.0,
+   6.6,
+   -160
+  ],
+  [
+   "swing to truck",
+   -90,
+   5.4,
+   6.6,
+   -160
+  ],
+  [
+   "dump",
+   -90,
+   5.4,
+   6.4,
+   -40
+  ],
+  [
+   "raise",
+   -90,
+   5.4,
+   7.0,
+   -110
+  ],
+  [
+   "swing back",
+   0,
+   6.0,
+   6.6,
+   -95
+  ],
+  [
+   "lower",
+   0,
+   6.0,
+   2.6,
+   -95
+  ]
+ ],
+ "truck_kg": 674,
+ "peak_bucket_kg": 742,
+ "rated_kg": 1280.0,
+ "cycle_s": 24.3,
+ "wall_s": 45.1,
+ "stages": [
+  {
+   "reached": "penetrate",
+   "t": 2.13,
+   "bucket_kg": 0,
+   "truck_kg": 0,
+   "pressure": [
+    0.01,
+    0.25,
+    0.31,
+    0.12
+   ]
+  },
+  {
+   "reached": "drag",
+   "t": 4.63,
+   "bucket_kg": 618,
+   "truck_kg": 0,
+   "pressure": [
+    0.02,
+    0.22,
+    0.28,
+    0.08
+   ]
+  },
+  {
+   "reached": "curl",
+   "t": 7.13,
+   "bucket_kg": 705,
+   "truck_kg": 0,
+   "pressure": [
+    0.0,
+    0.29,
+    0.14,
+    0.07
+   ]
+  },
+  {
+   "reached": "lift",
+   "t": 10.07,
+   "bucket_kg": 685,
+   "truck_kg": 0,
+   "pressure": [
+    0.0,
+    0.13,
+    0.06,
+    0.03
+   ]
+  },
+  {
+   "reached": "swing to truck",
+   "t": 13.47,
+   "bucket_kg": 607,
+   "truck_kg": 676,
+   "pressure": [
+    1.0,
+    0.25,
+    0.12,
+    0.05
+   ]
+  },
+  {
+   "reached": "dump",
+   "t": 18.02,
+   "bucket_kg": 0,
+   "truck_kg": 674,
+   "pressure": [
+    0.0,
+    0.18,
+    0.12,
+    0.04
+   ]
+  },
+  {
+   "reached": "raise",
+   "t": 20.92,
+   "bucket_kg": 0,
+   "truck_kg": 674,
+   "pressure": [
+    0.0,
+    0.16,
+    0.13,
+    0.02
+   ]
+  },
+  {
+   "reached": "swing back",
+   "t": 24.3,
+   "bucket_kg": 0,
+   "truck_kg": 674,
+   "pressure": [
+    1.0,
+    0.21,
+    0.12,
+    0.02
+   ]
+  }
+ ],
+ "skipped_stages": []
+}

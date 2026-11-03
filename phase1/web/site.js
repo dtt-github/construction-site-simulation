@@ -467,6 +467,7 @@ async function build() {
     soil = startSoil({
       THREE,
       scene,
+      loader,
       Jolt,
       jolt,
       bodyInterface,

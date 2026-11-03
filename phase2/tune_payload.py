@@ -25,89 +25,47 @@ TAIL = [
 ]
 
 VARIANTS = {
-    # the cycle before this round (shorter, shallower drag; bucket relaxes to -160 deg for the carry)
+    # ZX200 (OPERA model, curved bucket with teeth). The 0.5 m sand bed limits the cut to ~0.4 m, so the
+    # 1.23 m bucket mouth has to fill from a long or curling drag.
     "baseline": [
         ("approach", 0, 6.0, 2.6, -95),
-        ("penetrate", 0, 7.9, 1.5, -60),
+        ("penetrate", 0, 7.6, 1.5, -60),
         ("drag", 0, 5.6, 1.1, -95),
         ("curl", 0, 5.2, 1.6, -175),
         ("lift", 0, 5.0, 6.6, -160),
         ("swing to truck", -90, 5.4, 6.6, -160),
         *TAIL,
     ],
-    # longer and deeper drag, curl while still dragging, keep full curl through the carry
-    "long_drag_curl": [
-        ("approach", 0, 6.2, 2.6, -95),
-        ("penetrate", 0, 8.3, 1.3, -55),
-        ("drag", 0, 5.7, 1.0, -100),
-        ("drag-curl", 0, 4.9, 1.1, -140),
-        ("curl", 0, 4.8, 1.5, -180),
-        ("lift", 0, 5.0, 6.6, -180),
-        ("swing to truck", -90, 5.4, 6.6, -180),
-        *TAIL,
-    ],
-    # same, plus a gentler loaded lift and swing (half lever)
-    "long_drag_curl_gentle": [
-        ("approach", 0, 6.2, 2.6, -95),
-        ("penetrate", 0, 8.3, 1.3, -55),
-        ("drag", 0, 5.7, 1.0, -100),
-        ("drag-curl", 0, 4.9, 1.1, -140),
-        ("curl", 0, 4.8, 1.5, -180),
-        ("lift", 0, 5.0, 6.6, -180, 0.6),
-        ("swing to truck", -90, 5.4, 6.6, -180, 0.5),
-        *TAIL,
-    ],
-    # baseline path, but full curl through the carry and a gentle loaded swing (isolates the swing effect)
-    "baseline_fullcurl_gentle": [
+    # drag on toward the machine before curling (2.7 m cut instead of 2 m)
+    "long_drag": [
         ("approach", 0, 6.0, 2.6, -95),
-        ("penetrate", 0, 7.9, 1.5, -60),
-        ("drag", 0, 5.6, 1.1, -95),
-        ("curl", 0, 5.2, 1.6, -180),
-        ("lift", 0, 5.0, 6.6, -180, 0.6),
-        ("swing to truck", -90, 5.4, 6.6, -180, 0.5),
-        *TAIL,
-    ],
-    # baseline drag-then-curl, starting from the long drag's farther reach (longer cut, no curl while dragging)
-    "baseline_long": [
-        ("approach", 0, 6.2, 2.6, -95),
-        ("penetrate", 0, 8.3, 1.3, -55),
-        ("drag", 0, 5.6, 1.1, -95),
-        ("curl", 0, 5.2, 1.6, -175),
+        ("penetrate", 0, 7.6, 1.5, -60),
+        ("drag", 0, 4.9, 1.1, -100),
+        ("curl", 0, 4.6, 1.6, -175),
         ("lift", 0, 5.0, 6.6, -160),
         ("swing to truck", -90, 5.4, 6.6, -160),
         *TAIL,
     ],
-    # cut deeper and curl earlier while still dragging low, so the bucket fills toward the top
-    "deep_drag_early_curl": [
-        ("approach", 0, 6.2, 2.6, -95),
-        ("penetrate", 0, 8.3, 1.2, -55),
-        ("drag", 0, 6.6, 0.95, -105),
-        ("drag-curl", 0, 4.9, 1.0, -155),
-        ("curl", 0, 4.8, 1.5, -180),
-        ("lift", 0, 5.0, 6.6, -180),
-        ("swing to truck", -90, 5.4, 6.6, -180),
+    # drag, then curl while still dragging so the bowl fills toward the top
+    "drag_curl": [
+        ("approach", 0, 6.0, 2.6, -95),
+        ("penetrate", 0, 7.6, 1.5, -60),
+        ("drag", 0, 5.6, 1.1, -100),
+        ("drag-curl", 0, 4.7, 1.2, -145),
+        ("curl", 0, 4.6, 1.6, -180),
+        ("lift", 0, 5.0, 6.6, -165),
+        ("swing to truck", -90, 5.4, 6.6, -165),
         *TAIL,
     ],
-    # same, curling while dragging at a slower rate (more cutting per degree of curl)
-    "deep_drag_early_slow_curl": [
-        ("approach", 0, 6.2, 2.6, -95),
-        ("penetrate", 0, 8.3, 1.2, -55),
-        ("drag", 0, 6.6, 0.95, -105),
-        ("drag-curl", 0, 4.9, 1.0, -155, 0.6),
-        ("curl", 0, 4.8, 1.5, -180),
-        ("lift", 0, 5.0, 6.6, -180),
-        ("swing to truck", -90, 5.4, 6.6, -180),
-        *TAIL,
-    ],
-    # gentle, and a slower curl so the bucket fills before it closes
-    "long_drag_slow_curl_gentle": [
-        ("approach", 0, 6.2, 2.6, -95),
-        ("penetrate", 0, 8.3, 1.3, -55),
-        ("drag", 0, 5.7, 1.0, -100),
-        ("drag-curl", 0, 4.9, 1.1, -140, 0.6),
-        ("curl", 0, 4.8, 1.5, -180, 0.6),
-        ("lift", 0, 5.0, 6.6, -180, 0.6),
-        ("swing to truck", -90, 5.4, 6.6, -180, 0.5),
+    # long drag with a raked bucket (teeth leading toward the machine), then curl while dragging
+    "raked_drag_curl": [
+        ("approach", 0, 6.0, 2.6, -95),
+        ("penetrate", 0, 7.6, 1.4, -70),
+        ("drag", 0, 5.4, 1.1, -110),
+        ("drag-curl", 0, 4.6, 1.2, -150),
+        ("curl", 0, 4.5, 1.6, -180),
+        ("lift", 0, 5.0, 6.6, -165),
+        ("swing to truck", -90, 5.4, 6.6, -165),
         *TAIL,
     ],
 }
@@ -118,16 +76,12 @@ DIG = ("penetrate", "drag", "drag-curl", "curl")
 
 
 def lowest_point(w_from, w_to, steps=11):
-    """Lowest outer-box corner of the bucket along the straight pin path from w_from to w_to."""
+    """Lowest point of the bucket (shell and teeth) along the straight pin path from w_from to w_to."""
     low = 1e9
     for s in np.linspace(0, 1, steps):
         psi, r, z, phi = [w_from[k] + s * (w_to[k] - w_from[k]) for k in range(1, 5)]
         q = ex.ik(math.radians(psi), r, z, math.radians(phi))
-        _, pin, _ = ex.fk(q)
-        a3 = q[1] + q[2] + q[3]
-        for x in (0.0, -ex.BUCKET_D):
-            for zz in (0.0, -ex.BUCKET_H):
-                low = min(low, (pin + ex.swing_vec(q[0], ex.local_to_world(a3, np.array([x, 0.0, zz]))))[2])
+        low = min(low, min(ex.bucket_point(q, v)[2] for v in ex.BUCKET_OUTLINE))
     return low
 
 
@@ -209,7 +163,7 @@ def main():
         # bucket_at[stage] = interior load on arriving at that stage's waypoint
         rows.append((name, res["truck_kg"], res["peak_bucket_kg"], by_stage.get("curl"), by_stage.get("lift"), by_stage.get("swing to truck"), res["cycle_s"]))
         print(json.dumps({"variant": name, **{k: v for k, v in res.items() if k != "stages"}, "bucket_at": by_stage}), flush=True)
-    print("\n| variant | truck kg (pass) | % of 1.38 t | peak in bucket | after curl | after lift | after swing | cycle s |")
+    print(f"\n| variant | truck kg (pass) | % of {ex.BUCKET_RATED_KG / 1000:.2f} t | peak in bucket | after curl | after lift | after swing | cycle s |")
     print("|---|---|---|---|---|---|---|---|")
     for name, truck, peak, curl, lift, dump, cyc in rows:
         print(f"| {name} | {truck} | {100 * truck / ex.BUCKET_RATED_KG:.0f}% | {peak} | {curl} | {lift} | {dump} | {cyc} |")

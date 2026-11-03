@@ -1,0 +1,198 @@
+{
+ "variant": "drag_curl",
+ "cycle": [
+  [
+   "approach",
+   0,
+   6.0,
+   2.6,
+   -95
+  ],
+  [
+   "penetrate",
+   0,
+   7.6,
+   1.5,
+   -60
+  ],
+  [
+   "drag",
+   0,
+   5.6,
+   1.61,
+   -100
+  ],
+  [
+   "drag-curl",
+   0,
+   4.7,
+   1.32,
+   -145
+  ],
+  [
+   "curl",
+   0,
+   4.6,
+   1.6,
+   -180
+  ],
+  [
+   "lift",
+   0,
+   5.0,
+   6.6,
+   -165
+  ],
+  [
+   "swing to truck",
+   -90,
+   5.4,
+   6.6,
+   -165
+  ],
+  [
+   "dump",
+   -90,
+   5.4,
+   6.4,
+   -40
+  ],
+  [
+   "raise",
+   -90,
+   5.4,
+   7.0,
+   -110
+  ],
+  [
+   "swing back",
+   0,
+   6.0,
+   6.6,
+   -95
+  ],
+  [
+   "lower",
+   0,
+   6.0,
+   2.6,
+   -95
+  ]
+ ],
+ "truck_kg": 869,
+ "peak_bucket_kg": 955,
+ "rated_kg": 1280.0,
+ "cycle_s": 23.8,
+ "wall_s": 49.1,
+ "stages": [
+  {
+   "reached": "penetrate",
+   "t": 2.13,
+   "bucket_kg": 0,
+   "truck_kg": 0,
+   "pressure": [
+    0.01,
+    0.25,
+    0.31,
+    0.12
+   ]
+  },
+  {
+   "reached": "drag",
+   "t": 4.12,
+   "bucket_kg": 556,
+   "truck_kg": 0,
+   "pressure": [
+    0.01,
+    0.17,
+    0.38,
+    0.14
+   ]
+  },
+  {
+   "reached": "drag-curl",
+   "t": 5.12,
+   "bucket_kg": 776,
+   "truck_kg": 0,
+   "pressure": [
+    0.03,
+    0.11,
+    0.57,
+    0.23
+   ]
+  },
+  {
+   "reached": "curl",
+   "t": 6.38,
+   "bucket_kg": 907,
+   "truck_kg": 0,
+   "pressure": [
+    0.0,
+    0.3,
+    0.14,
+    0.08
+   ]
+  },
+  {
+   "reached": "lift",
+   "t": 9.32,
+   "bucket_kg": 892,
+   "truck_kg": 0,
+   "pressure": [
+    0.0,
+    0.13,
+    0.07,
+    0.04
+   ]
+  },
+  {
+   "reached": "swing to truck",
+   "t": 12.73,
+   "bucket_kg": 773,
+   "truck_kg": 851,
+   "pressure": [
+    1.0,
+    0.27,
+    0.13,
+    0.07
+   ]
+  },
+  {
+   "reached": "dump",
+   "t": 17.47,
+   "bucket_kg": 0,
+   "truck_kg": 869,
+   "pressure": [
+    0.0,
+    0.18,
+    0.12,
+    0.04
+   ]
+  },
+  {
+   "reached": "raise",
+   "t": 20.37,
+   "bucket_kg": 0,
+   "truck_kg": 869,
+   "pressure": [
+    0.0,
+    0.16,
+    0.13,
+    0.02
+   ]
+  },
+  {
+   "reached": "swing back",
+   "t": 23.75,
+   "bucket_kg": 0,
+   "truck_kg": 869,
+   "pressure": [
+    1.0,
+    0.21,
+    0.12,
+    0.02
+   ]
+  }
+ ],
+ "skipped_stages": []
+}

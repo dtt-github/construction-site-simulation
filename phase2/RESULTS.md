@@ -270,3 +270,61 @@ Browser (`test_excavator.py`, `logs/payload_browser_test.json`): truck 0 → 893
 - **The bucket fills to only ~1.08 t (79 %) during the drag.** The mouth faces the machine almost horizontally while dragging, so the upper part of the bucket stays empty. Real buckets have a curved shell and teeth that pull material in; this one is a box.
 - **About 200 kg spills during the curl.** The heap above the mouth slides off as the bucket rotates. Another 70–120 kg goes in the lift and swing.
 - **Next steps:** a curved-shell bucket collider (several plates approximating the profile) and teeth; a drag that follows the bucket's own path ("heel–toe" kinematics) rather than a straight pin line; and calibration against field fill factors (typically 90–110 % of rated for loose sand).
+
+# Phase 2e: the real Hitachi ZX200 in the physics server
+
+The soil server now simulates the same machine the browser shows: the Hitachi ZX200 (20 t class) from the PWRI OPERA project (Apache-2.0), replacing the generic 4-joint arm.
+
+![ZX200 lifting a load out of the pit](../assets/screenshots/zx200_digging.png)
+
+## What changed
+
+| Change | Detail |
+|---|---|
+| **URDF link frames** | Boom, stick and bucket joints use the OPERA URDF joint origins, fixed pitches and limits (boom −65°…+57°, stick 34°…154°, bucket −36°…136°). The physics links are the URDF frames (`body_link`, `boom_link`, `arm_link`, `bucket_link`), so joint angles are URDF angles. Pin to pin: boom 5.69 m, stick 2.90 m; the boom foot sits 0.055 m ahead of and 0.72 m above the swing joint, which is 1.12 m above the track bottom |
+| **Real machine in the browser** | The hello message names `assets/machinery/opera_zx200.glb`. `soil.js` clones each link's meshes and places them at the streamed link poses (boxes remain as a fallback). The crawler is drawn parallel to the pit edge |
+| **Curved bucket with teeth** | The inner shell profile is traced from the OPERA bucket mesh (17 points) and built from 16 shell plates, 22 side strips that stop at the mouth plane, and 5 teeth reaching 0.18 m past the lip. Inside width 1.06 m: 0.79 m³ struck, 0.91 m³ heaped (SAE J296) from the geometry. The bucket load counts grains inside the profile polygon (new `bucket_profile_fill_kernel`) |
+| **Rating** | ZX200-6 standard bucket, 0.80 m³ ISO heaped → **1.28 t** of sand at 1,600 kg/m³ (was 1.38 t for the old box bucket) |
+| **Masses** | Estimated from published 20 t class figures: upper structure 9,800 kg (with a 4.6 t counterweight), boom 1,450 kg, stick 680 kg, bucket 640 kg. Centres of mass and inertias come from the area-weighted mesh shells. **These are estimates; measured values are wanted** |
+| **Levers** | Unchanged for the operator (raise / out / dump positive). They are mapped onto URDF signs with `LEVER_SIGN` |
+| **Auto cycle** | Penetrate at 7.6 m instead of 7.9 m, because the real boom foot sits 0.45 m further back than the old one. New *drag-curl* stage: keep dragging while the bucket curls, so the 1.2 m mouth fills toward the top |
+| Machine position | Swing axis moved from x = 7.0 to 7.4 m (zone frame) so the tracks overhang the pit slope less |
+
+## Dig-path comparison (one pass, fresh bed; `python tune_payload.py`, `logs/payload_*.json`)
+
+| Variant | To truck | % of 1.28 t | Peak in bucket | After curl | After lift | After swing | Cycle |
+|---|---|---|---|---|---|---|---|
+| baseline (old path) | 543 kg | 42 % | 623 | 603 | 554 | 489 | 23.8 s |
+| long drag | 674 kg | 53 % | 742 | 705 | 685 | 607 | 24.3 s |
+| **drag + curl while dragging (adopted)** | **869 kg** | **68 %** | 955 | 907 | 892 | 773 | **23.8 s** |
+| raked drag + curl | 652 kg | 51 % | 726 | 693 | 669 | 593 | 29.1 s |
+
+On the real bucket the teeth are the lowest point at every attitude. The 0.5 m sand bed over a hard floor therefore limits the cut to about 0.4 m. A straight drag fills only the lower part of a 1.2 m mouth; curling while dragging fills the rest.
+
+## Multi-pass result (`python excavator_server.py --bench 130`, `logs/zx200_bench.json`)
+
+| Pass | Peak in bucket | Delivered | Truck total |
+|---|---|---|---|
+| 1 | 949 kg | 864 kg | 0.86 t |
+| 2 | 1,036 kg | 926 kg | 1.79 t |
+| 3 | 1,137 kg | 1,060 kg | 2.85 t |
+| 4 | 1,132 kg | 1,007 kg | 3.86 t |
+
+- **Payload:** mean **964 kg per pass, 75 % of the 1.28 t rating**. Phase 2d's box bucket averaged 874 kg (64 % of 1.38 t). The truck holds 4.9 t at 130 s, against 3.5 t at 108 s before.
+- **Cycle:** about 28 s. **Speed:** 0.43× real time headless (60 MPM iterations), unchanged.
+- **Hold test:** the arm holds its pose with 2 cm sag; the boom sits at 26 % of relief.
+
+Browser (`test_excavator.py`, `logs/zx200_browser_test.json`, screenshots `logs/load_*.png`, `logs/exc_*.png`):
+- The ZX200 model loads.
+- Site runs at 59–60 fps with no console errors.
+- First pass: 864 kg in the truck.
+- Manual swing moves.
+- Bucket on the floor: boom and stick flagged at relief.
+- At 40 % relief: the stick is flagged.
+
+## Limits and next steps
+
+- **Cylinders and linkage are not rigged.** The OPERA package has cylinder meshes, but no joints for them, so they aren't drawn. Relief torques are still per joint rather than computed from cylinder force through the linkage geometry.
+- **Masses are estimates.** Hitachi or ZX200 owners with weighed components or pressure logs can turn this into a validated model (see CONTRIBUTING).
+- **Shallow test bed:** a 0.5 m sand layer. A deeper bed (more particles, slower) would allow full-depth cuts and is needed to judge fill factors against field data (90–110 % for loose sand).
+- **Swing is still the old 65 kN·m relief value.** The real ZX200 swing torque should be checked.
