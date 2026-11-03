@@ -475,3 +475,45 @@ GitHub Pages has no GPU server, so `record_replay.py` records one auto pass head
 - The result is `assets/replay/zx200_cycle.bin.gz`: 27 s, 404 frames, 5.0 MB (10.2 MB uncompressed).
 
 When no server is connected, `soil.js` plays it in a loop through the normal frame path, so the cylinders, pressures, stall flags, pit, truck and grains all show as live. The levers are disabled. `?replay` forces it locally. In a local static-site test, the replay loaded in 3.8 s and played at 60 fps with no errors. Re-record after physics changes, so the demo matches the code.
+
+# Phase 2h: deep bed and trenching
+
+The pit (2.35 m deep, 1:1.5 sides) is now filled with 2 m of sand, up from a 0.5 m layer on its floor: about 1.5 million particles' worth, nearly all of it dormant.
+
+**Soil zone changes (`soil_zone.py`):**
+- **Partial wake.** A column becomes particles only from its top down to 5 cm below the bucket's bounding box. The level rises 1:1 with horizontal distance from the bucket. The soil underneath stays a dormant base under the active sand. Without this, a 2 m column would wake whole and the zone would need about 3× more particles.
+- **Avalanche wake.** Dormant soil more than 0.2 m above a neighbour wakes down to the 37° repose line, so trench faces slump instead of standing as rigid walls. Smaller steps are below MPM's 8 cm resolution, and waking them only churned.
+- **Minimum awake time.** A woken column stays awake for at least 0.5 s before it can sleep, so its sand can flow first. Without this, fresh, motionless particles went back to sleep at once and woke again on every update.
+- **Sleep margin** reduced from 0.8 m to 0.6 m. **Pool** raised to 150k (`--pool` sets it).
+
+**Display.** The pit heightmap now covers the filled sides as well (9.6 × 8.6 m).
+
+**Dig cycle.** The waypoints follow the bed top. Dig stages cut to 0.42 m below the top plus the deepening, which reproduces the first pass of the 0.5 m bed. `--trench` (`set_trench`) digs one lane and goes 0.25 m deeper every pass, down to the floor clearance.
+
+## Results
+
+**Normal cycle** (`bench_zone.py 130`, five lanes): 1.075× real time. Frames average 15.4 ms (17.0 ms while digging; p95 21.8 ms). Particles active while digging: 60k on average, 134k at most. Per pass: 1097, 1036, 1172, 979 kg, mean 1071 kg; the 0.5 m bed gave 1047 kg.
+
+**Trench** (`bench_trench.py 8`, `logs/trench_bench.json`), one lane, 8 passes in 266 s:
+
+| Pass | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| To the truck (kg) | 1099 | 1441 | 1712 | 1764 | 1885 | 1717 | 1412 | 1085 |
+| Frame (ms) | 14.7 | 15.2 | 17.2 | 17.2 | 17.5 | 18.7 | 20.8 | 20.8 |
+
+Cross-sections across the lane at the end:
+
+| Position | Depth | Width at half depth | Side slopes |
+|---|---|---|---|
+| x = 0 | 1.78 m | 2.4 m | 42° and 37° |
+| x = 1 m | 1.56 m | 2.3 m | 34° and 37° |
+| x = 2 m (shallower end of the drag) | 1.0 m | 2.3 m | 12° and 20° |
+
+Sand's angle of repose here is 37°, so the slumped trench walls come out at the angle they should.
+
+**Limits found:**
+- **Heaped loads.** Deep passes carry 1.7–1.9 t, 30–50 % over the rated 1.28 t, as cut faces slump into the bucket mouth during drag and curl.
+- **Stalls at relief.** From pass 3, drag-curl, curl and lift time out (16 skipped stages by pass 8) with 0.12–0.37 rad tracking errors. That is the hydraulics at relief under heaped loads plus overburden: the auto operator takes too big a bite. An operator would take shallower cuts as the trench deepens. The next step is an adaptive cycle.
+- **Speed in deep passes.** Deep passes wake up to 150k particles, and the run averages 0.92× real time. The 150k pool runs short at the deepest passes (469 times). A 220k pool removes that but makes no difference to loads or skips and is slower (0.87×; `logs/trench_bench_pool220k.json`), so 150k stays the default.
+
+**Browser** (`logs/deep_browser_test.json`): two loads (1102 kg and 1085 kg), 60 fps, no errors. Floor stall: boom and stick at −343 bar. At 40 % relief: the stick at 137 bar. The demo replay is re-recorded on the 2 m bed: 24.8 s, 4.5 MB.

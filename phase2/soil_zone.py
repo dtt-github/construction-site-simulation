@@ -18,6 +18,11 @@ rest and away from the bucket "sleep": their particles are counted back into the
                   and a floor under dormant soil. Where the mesh is inside the ground it does nothing:
                   Newton's MPM takes the most-penetrated collider.
 
+Waking is partial: a column becomes particles only from its top down to just below the bucket (rising
+1:1 away from it), and the soil underneath stays dormant as a base, so a deep bed costs little more than
+a shallow one. Dormant soil standing steeper than a 0.2 m drop to a neighbour wakes on its own
+(avalanche), so cut faces slump to the angle of repose instead of standing as rigid walls.
+
 Dormant columns are as rigid as the pit walls. That is the approximation: soil outside the zone does not
 fail, so the zone has to cover the bucket's failure wedge (WAKE_MARGIN).
 """
@@ -289,11 +294,15 @@ class SoilZones:
     """Dormant soil columns over a set of regions, with wake/sleep around the bucket."""
 
     WAKE_MARGIN = 0.5  # m around the bucket's footprint: columns here wake (the failure wedge)
-    SLEEP_MARGIN = 0.8  # m: columns outside this (and at rest) sleep; > WAKE_MARGIN for hysteresis
+    SLEEP_MARGIN = 0.6  # m: columns outside this (and at rest) sleep; > WAKE_MARGIN for hysteresis
     WAKE_DZ = 0.6  # m: only columns whose top is within this below the bucket's lowest point wake
+    WAKE_DEPTH = 0.05  # m below the bucket box (which has 0.1 m of plate margin): woken columns become particles down to here
+    MIN_AWAKE = 8  # updates (0.5 s): a woken column stays awake at least this long, so it can flow
     SLEEP_DZ = 0.9
     V_SLEEP = 0.04  # m/s: a column sleeps only if all its particles are slower than this
     LOST_Z = -0.5  # m: particles below this fell through the ground and are removed
+    REPOSE_SLOPE = 0.75  # tan of the angle of repose (sand friction 0.75, 37 deg)
+    AVALANCHE_DROP = 0.2  # m to a neighbour: faces this high slump (smaller steps are below MPM's 8 cm resolution)
 
     def __init__(self, regions, pool, particle_volume):
         """regions: list of (name, x0, y0, nx, ny, ground) with ground(x, y) -> ground height (numpy),
@@ -347,7 +356,7 @@ class SoilZones:
         self.mesh_points = wp.array(pts, dtype=wp.vec3)
         self.mesh = wp.Mesh(points=self.mesh_points, indices=wp.array(tris.ravel(), dtype=int), velocities=wp.zeros(len(pts), dtype=wp.vec3))
         self.rng = np.random.default_rng(1)
-        self.counters = {"woken": 0, "slept": 0, "lost": 0, "pool_short": 0}
+        self.counters = {"woken": 0, "slept": 0, "avalanche": 0, "lost": 0, "pool_short": 0}
 
     def region_mask(self, name):
         return self.col_region == self.names.index(name)
@@ -371,6 +380,8 @@ class SoilZones:
         self.state.particle_q.assign(self.park_np)
         self.state.particle_qd.zero_()
         self.active_np = np.zeros(self.pool, dtype=bool)
+        self.tick = 0
+        self.woken_tick = np.full(self.n_cols, -(10**9), dtype=np.int64)
         self.lost.zero_()
         self.counters = {k: 0 for k in self.counters}
         self._refit()
@@ -394,10 +405,18 @@ class SoilZones:
             & (top > lo[2] - dz)
         )
 
-    def _spawn_positions(self, cols):
+    def _lowest_neighbour(self, surface):
+        """Lowest of the 4 neighbours' surfaces, per column (within its region)."""
+        out = np.full(self.n_cols, np.inf)
+        for x0, y0, nx, ny, off in self.spec:
+            g = np.pad(surface[off : off + nx * ny].reshape(ny, nx), 1, constant_values=np.inf)
+            out[off : off + nx * ny] = np.minimum.reduce([g[:-2, 1:-1], g[2:, 1:-1], g[1:-1, :-2], g[1:-1, 2:]]).ravel()
+        return out
+
+    def _spawn_positions(self, cols, keep):
         pos = []
-        for col in cols:
-            k = np.arange(self.count_np[col])
+        for col, k0 in zip(cols, keep):
+            k = np.arange(k0, self.count_np[col])  # lattice slots above the dormant base
             m = k % PER_LAYER
             x = self.col_x[col] + ((m % 2) - 0.5) * SPACING
             y = self.col_y[col] + ((m // 2) - 0.5) * SPACING
@@ -421,7 +440,9 @@ class SoilZones:
         dormant_top = np.where(self.count_np > 0, self.col_floor + self.count_np * LAYER_PER_PARTICLE, -1.0e6)
         top = np.maximum(dormant_top, ztop)
 
-        sleep = (n > 0) & (vmax < self.V_SLEEP) & ~self._near(box, self.SLEEP_MARGIN, self.SLEEP_DZ, top)
+        self.tick += 1
+        rested = self.tick - self.woken_tick >= self.MIN_AWAKE
+        sleep = (n > 0) & rested & (vmax < self.V_SLEEP) & ~self._near(box, self.SLEEP_MARGIN, self.SLEEP_DZ, top)
         slept = int(sleep.sum())
         self.sleep.assign(sleep.astype(np.int32))
         self.freed_n.zero_()
@@ -437,19 +458,39 @@ class SoilZones:
             self.counters["slept"] += slept
         self.counters["lost"] = int(self.lost.numpy()[0])
 
-        wake = np.flatnonzero((self.count_np > 0) & self._near(box, self.WAKE_MARGIN, self.WAKE_DZ, dormant_top))
+        # wake: each column wakes from its top down to a level; the soil below stays dormant as a base
+        has = self.count_np > 0
+        dormant_top = np.where(has, self.col_floor + self.count_np * LAYER_PER_PARTICLE, -1.0e6)
+        level = np.full(self.n_cols, np.inf)
+        near = has & self._near(box, self.WAKE_MARGIN, self.WAKE_DZ, dormant_top)
+        # down to just below the bucket's lowest point under it, rising 1:1 away from it (the soil that
+        # fails ahead of and beside a cutting edge lies above a ~45 deg line from the edge)
+        lo, hi = box
+        dist = np.hypot(np.clip(lo[0] - self.col_x, 0, None) + np.clip(self.col_x - hi[0], 0, None), np.clip(lo[1] - self.col_y, 0, None) + np.clip(self.col_y - hi[1], 0, None))
+        level[near] = (lo[2] - self.WAKE_DEPTH + dist)[near]
+        # avalanche: dormant soil standing steeper than the angle of repose against a neighbour wakes
+        # down to where it would rest, so cut faces slump instead of standing as rigid walls
+        surface = np.maximum(np.where(has, dormant_top, self.col_floor), np.where(n > 0, ztop, -1.0e6))
+        low = self._lowest_neighbour(surface)
+        steep = has & (dormant_top - low > self.AVALANCHE_DROP)
+        level[steep] = np.minimum(level[steep], low[steep] + CELL * self.REPOSE_SLOPE)
+        keep = np.clip(np.floor((level - self.col_floor) / LAYER_PER_PARTICLE / PER_LAYER) * PER_LAYER, 0, None)
+        keep = np.where(np.isfinite(keep), keep, self.count_np).astype(np.int64)
+        keep = np.minimum(keep, self.count_np)
+        wake = np.flatnonzero(keep < self.count_np)
         woken = 0
         if len(wake):
             # nearest columns first, in case the pool runs short
             c = 0.5 * (np.array(box[0]) + np.array(box[1]))
             wake = wake[np.argsort(np.hypot(self.col_x[wake] - c[0], self.col_y[wake] - c[1]))]
             free = np.flatnonzero(~self.active_np)
-            fit = int(np.searchsorted(np.cumsum(self.count_np[wake]), len(free), side="right"))
+            fit = int(np.searchsorted(np.cumsum(self.count_np[wake] - keep[wake]), len(free), side="right"))
             if fit < len(wake):
                 self.counters["pool_short"] += 1
             wake = wake[:fit]
+            self.counters["avalanche"] += int(steep[wake].sum())
         if len(wake):
-            pos = self._spawn_positions(wake)
+            pos = self._spawn_positions(wake, keep[wake])
             slots = free[: len(pos)]
             self.active_np[slots] = True
             ext = st.mpm
@@ -457,7 +498,8 @@ class SoilZones:
                 spawn_kernel, dim=len(slots),
                 inputs=[wp.array(slots.astype(np.int32), dtype=int), wp.array(pos.astype(np.float32), dtype=wp.vec3), self.particle_volume, self.model.particle_flags, mm.particle_flags, mm.material_particle_flags, mm.material_particle_volume, st.particle_q, st.particle_qd, ext.particle_qd_grad, ext.particle_elastic_strain, ext.particle_Jp, ext.particle_stress, ext.particle_transform],
             )
-            self.count_np[wake] = 0
+            self.count_np[wake] = keep[wake]
+            self.woken_tick[wake] = self.tick
             self.count.assign(self.count_np.astype(np.int32))
             woken = len(wake)
             self.counters["woken"] += woken

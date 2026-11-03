@@ -46,16 +46,12 @@ import newton
 from newton.solvers import SolverImplicitMPM, SolverMuJoCo
 
 from soil_server import (
-    BED_DEPTH,
     G,
     HM_CELL,
-    HM_NX,
-    HM_NY,
     MAX_SEND_PARTICLES,
     MOVING_SPEED,
     PIT_CENTER_THREE,
     SURFACE_MAX_SPEED,
-    WALL_HEIGHT,
     ZONE_HALF,
     heightmap_kernel,
     mckyes_n_gamma,
@@ -130,8 +126,17 @@ ARMATURE = 200.0
 RIGID_SUBSTEPS = 4
 USE_MUJOCO_CPU = False  # GPU MuJoCo, with the rigid substeps recorded as one CUDA graph
 # moving soil zone (soil_zone.py): only soil near the bucket is MPM particles, the rest is dormant columns
-POOL = 120_000  # particle capacity; the whole 6 x 5 x 0.5 m bed would be 234k particles
+POOL = 150_000  # particle capacity; the 2 m fill is about 1.5 million particles
 ZONE_EVERY = 4  # frames between wake/sleep updates (15 Hz)
+
+# soil: the pit is filled with sand to BED_TOP (2 m on a 2.35 m deep pit with 1:1.5 sides), held by
+# walls on the -x / -y sides and by the sloped sides elsewhere. Resting sand is shown as a heightmap
+# over the pit and its filled sides.
+BED_TOP = 2.0
+WALL_HEIGHT = BED_TOP + 1.0
+HM_X0, HM_Y0 = -ZONE_HALF[0], -ZONE_HALF[1]
+HM_NX, HM_NY = 96, 86  # 0.1 m cells to x = 6.6, y = 6.1: past where the fill meets the sides
+DIG_Z = BED_TOP - 0.5  # the dig waypoints below were set for a 0.5 m bed
 
 
 def ground_height(x, y):
@@ -376,8 +381,8 @@ def stream_kernel(
     qd: wp.array[wp.vec3],
     flags: wp.array[wp.int32],
     min_speed: float,
-    zone_hx: float,
-    zone_hy: float,
+    hm_lo: wp.vec3,
+    hm_hi: wp.vec3,
     bed_lo: wp.vec3,
     bed_hi: wp.vec3,
     max_out: int,
@@ -390,7 +395,7 @@ def stream_kernel(
     if (flags[i] & int(newton.ParticleFlags.ACTIVE)) == 0:
         return
     p = q[i]
-    in_zone = wp.abs(p[0]) <= zone_hx and wp.abs(p[1]) <= zone_hy
+    in_zone = p[0] >= hm_lo[0] and p[0] <= hm_hi[0] and p[1] >= hm_lo[1] and p[1] <= hm_hi[1]
     in_bed = p[0] > bed_lo[0] and p[0] < bed_hi[0] and p[1] > bed_lo[1] and p[1] < bed_hi[1] and p[2] > bed_lo[2] - 0.1
     if wp.length(qd[i]) > min_speed or (not in_zone and not in_bed):
         slot = wp.atomic_add(counter, 0, 1)
@@ -443,20 +448,20 @@ class ExcavatorSim:
     # auto cycle: (stage, swing deg, bucket-pin radius from the swing axis, pin height, bucket angle deg
     # [, speed: fraction of full lever for moving into this stage])
     CYCLE = [
-        ("approach", 0, 6.0, 2.6, -95),
-        ("penetrate", 0, 7.6, 1.5, -60),  # near full reach of the ZX200 arm
-        ("drag", 0, 5.6, 1.1, -100),
-        ("drag-curl", 0, 4.7, 1.2, -145),  # keep dragging while curling: the 1.2 m mouth fills toward the top
-        ("curl", 0, 4.6, 1.6, -180),
+        ("approach", 0, 6.0, 2.6 + DIG_Z, -95),
+        ("penetrate", 0, 7.6, 1.5 + DIG_Z, -60),  # near full reach of the ZX200 arm
+        ("drag", 0, 5.6, 1.1 + DIG_Z, -100),
+        ("drag-curl", 0, 4.7, 1.2 + DIG_Z, -145),  # keep dragging while curling: the 1.2 m mouth fills toward the top
+        ("curl", 0, 4.6, 1.6 + DIG_Z, -180),
         ("lift", 0, 5.0, 6.6, -165),
         ("swing to truck", -90, 5.4, 6.6, -165),
         ("dump", -90, 5.4, 6.4, -40),
         ("raise", -90, 5.4, 7.0, -110),  # clear the truck sides before swinging back
         ("swing back", 0, 6.0, 6.6, -95),
-        ("lower", 0, 6.0, 2.6, -95),
+        ("lower", 0, 6.0, 2.6 + DIG_Z, -95),
     ]
 
-    def __init__(self, voxel=0.08, ppc=2, density=1600.0, friction=0.75, iterations=60, fps=60.0):
+    def __init__(self, voxel=0.08, ppc=2, density=1600.0, friction=0.75, iterations=60, fps=60.0, pool=POOL):
         wp.init()
         self.frame_dt = 1.0 / fps
         self.sim_dt = self.frame_dt / RIGID_SUBSTEPS
@@ -471,7 +476,7 @@ class ExcavatorSim:
         wall = newton.ModelBuilder.ShapeConfig(mu=0.6, has_shape_collision=False)  # holds sand only
         floor = newton.ModelBuilder.ShapeConfig(mu=0.6)  # hard ground under the sand: the bucket can hit it
 
-        q0 = ik(0.0, 6.0, 2.6, math.radians(-95))
+        q0 = ik(0.0, 6.0, 2.6 + DIG_Z, math.radians(-95))  # the approach pose, above the sand
         self.q0 = q0
         xf = link_xforms(q0)
 
@@ -555,10 +560,10 @@ class ExcavatorSim:
         SolverImplicitMPM.register_custom_attributes(sb)
         self.radius = SPACING / 2
         self.particle_mass = SPACING**3 * density
-        side = int(math.ceil(POOL ** (1 / 3)))
+        side = int(math.ceil(pool ** (1 / 3)))
         sb.add_particle_grid(
             pos=wp.vec3(0.0), rot=wp.quat_identity(), vel=wp.vec3(0.0),
-            dim_x=side, dim_y=side, dim_z=int(math.ceil(POOL / side**2)),
+            dim_x=side, dim_y=side, dim_z=int(math.ceil(pool / side**2)),
             cell_x=SPACING, cell_y=SPACING, cell_z=SPACING,
             mass=self.particle_mass, jitter=0.0, radius_mean=self.radius,
             custom_attributes={"mpm:friction": friction},
@@ -567,9 +572,12 @@ class ExcavatorSim:
         self.n_particles = self.sand_model.particle_count
         self.zones = SoilZones([TRUCK_REGION, GROUND_REGION], self.n_particles, SPACING**3)
         z = self.zones
-        in_pit = z.region_mask("ground") & (np.abs(z.col_x) < ZONE_HALF[0]) & (np.abs(z.col_y) < ZONE_HALF[1])
-        self.bed_counts = np.where(in_pit, int(round(BED_DEPTH / LAYER_PER_PARTICLE)), 0)
-        z.set_display(z.region_mask("ground") & ~in_pit)  # the pit and truck heightmaps show the rest
+        ground = z.region_mask("ground")
+        in_pit = ground & (z.col_x < 6.75) & (z.col_y < 6.25)
+        fill = np.floor((BED_TOP - z.col_floor) / LAYER_PER_PARTICLE / 4) * 4
+        self.bed_counts = np.where(in_pit & (fill > 0), fill, 0).astype(np.int64)
+        in_hm = (z.col_x < HM_X0 + HM_NX * HM_CELL) & (z.col_y < HM_Y0 + HM_NY * HM_CELL)
+        z.set_display(ground & ~in_hm)  # the pit and truck heightmaps show the rest
 
         cfg = SolverImplicitMPM.Config()
         cfg.voxel_size = voxel
@@ -681,9 +689,10 @@ class ExcavatorSim:
 
     DIG_STAGES = ("penetrate", "drag", "drag-curl", "curl")
     STAGE_TIMEOUT = 4.0  # s of poor tracking before the auto cycle skips a stage
-    DEEPEN_PER_PASS, MAX_DEEPEN = 0.15, 0.45
+    DEEPEN_PER_PASS, MAX_DEEPEN = 0.15, BED_TOP  # per level (all lanes dug); the floor clearance stops it
 
     FLOOR_CLEARANCE = 0.08  # m: deepened dig paths keep the bucket this far above the hard pit floor
+    FIRST_CUT = 0.42  # m below the bed top: the first pass's cut (as on the earlier 0.5 m bed)
 
     @staticmethod
     def _bucket_lowest(w_from, z_from, w_to, z_to, steps=9):
@@ -699,8 +708,9 @@ class ExcavatorSim:
         return low
 
     def _stage_z(self, wp_):
-        """Waypoint pin height. Dig stages go a little deeper on each pass, like an operator would,
-        but never so deep that the bucket would run into the hard floor on the way there."""
+        """Waypoint pin height. Dig stages cut to a level FIRST_CUT below the bed top and go a little
+        deeper on each pass, like an operator would, but never so deep that the bucket would run into
+        the hard floor on the way there."""
         if wp_[0] not in self.DIG_STAGES:
             return wp_[3]
         key = (wp_[0], self.passes)
@@ -709,8 +719,10 @@ class ExcavatorSim:
             prev = self.CYCLE[i - 1]
             z_prev = self._stage_z(prev)
             level = self.passes // len(self.LANES)  # deepen only after every lane has been dug
-            z = wp_[3] - min(self.DEEPEN_PER_PASS * level, self.MAX_DEEPEN)
-            while self._bucket_lowest(prev, z_prev, wp_, z) < self.FLOOR_CLEARANCE:
+            deepen = min(self.DEEPEN_PER_PASS * level, self.MAX_DEEPEN)
+            z = wp_[3] - deepen
+            lowest = max(self.FLOOR_CLEARANCE, BED_TOP - self.FIRST_CUT - deepen)
+            while self._bucket_lowest(prev, z_prev, wp_, z) < lowest:
                 z += 0.01
             self._z_cache[key] = z
         return self._z_cache[key]
@@ -719,6 +731,12 @@ class ExcavatorSim:
     # operator working across the face; at 6-8 m reach 9 deg is about one bucket width
     LANES = (0.0, 9.0, -9.0, 17.0, -17.0)
     LANE_STAGES = ("approach", "penetrate", "drag", "drag-curl", "curl", "lift")
+
+    def set_trench(self, deepen=0.25):
+        """Auto cycle digs a single lane and goes deeper every pass (a trench), down to the floor."""
+        self.LANES = (0.0,)
+        self.DEEPEN_PER_PASS = deepen
+        self._z_cache = {}
 
     def _stage_psi(self, wp_, start=False):
         """Waypoint swing angle (deg): dig-side stages shift to the current pass's lane; the final
@@ -885,10 +903,10 @@ class ExcavatorSim:
         self.force = sf[:3].astype(float)  # sand force on the bucket (world, zone frame)
         q = self.sand.particle_q
         self.hm.fill_(0.0)
-        wp.launch(heightmap_kernel, dim=self.n_particles, inputs=[q, self.sand.particle_qd, SURFACE_MAX_SPEED, self.radius, -ZONE_HALF[0], -ZONE_HALF[1], HM_CELL, HM_NX, HM_NY, self.hm])
+        wp.launch(heightmap_kernel, dim=self.n_particles, inputs=[q, self.sand.particle_qd, SURFACE_MAX_SPEED, self.radius, HM_X0, HM_Y0, HM_CELL, HM_NX, HM_NY, self.hm])
         self.counter.zero_()
-        self.zones.merge_heightmap(self.hm, -ZONE_HALF[0], -ZONE_HALF[1], HM_CELL, HM_NX, HM_NY)
-        wp.launch(stream_kernel, dim=self.n_particles, inputs=[q, self.sand.particle_qd, self.sand_model.particle_flags, MOVING_SPEED, ZONE_HALF[0] + 0.6, ZONE_HALF[1] + 0.6, wp.vec3(*BED_LO), wp.vec3(*BED_HI), MAX_SEND_PARTICLES, self.counter, self.moving])
+        self.zones.merge_heightmap(self.hm, HM_X0, HM_Y0, HM_CELL, HM_NX, HM_NY)
+        wp.launch(stream_kernel, dim=self.n_particles, inputs=[q, self.sand.particle_qd, self.sand_model.particle_flags, MOVING_SPEED, wp.vec3(HM_X0, HM_Y0, 0.0), wp.vec3(HM_X0 + HM_NX * HM_CELL, HM_Y0 + HM_NY * HM_CELL, 0.0), wp.vec3(*BED_LO), wp.vec3(*BED_HI), MAX_SEND_PARTICLES, self.counter, self.moving])
         self.zones.stream_dormant(MAX_SEND_PARTICLES, self.counter, self.moving)
         # truck: load inside the bed, and the surface of the resting load
         self.truck_counter.zero_()
@@ -906,11 +924,11 @@ class ExcavatorSim:
         self.truck_kg = float(self.truck_counter.numpy()[0] + self.zones.dormant_in("truck")) * self.particle_mass
         self.truck_hm_np = self.truck_hm.numpy()
         _, _, edge = fk(self.q)
-        ix = int((edge[0] + ZONE_HALF[0]) / HM_CELL)
-        iy = int((edge[1] + ZONE_HALF[1]) / HM_CELL)
+        ix = int((edge[0] - HM_X0) / HM_CELL)
+        iy = int((edge[1] - HM_Y0) / HM_CELL)
         ix_ahead = max(ix - 3, 0)  # the arm drags toward +x, so uncut ground is at lower x
         surface = float(self.hm_np[iy * HM_NX + ix_ahead]) if 0 <= ix < HM_NX and 0 <= iy < HM_NY else 0.0
-        surface = min(surface, BED_DEPTH)
+        surface = min(surface, BED_TOP)
         self.cut_depth = max(surface - edge[2], 0.0)
         self.fee_ref = self.density * G * self.cut_depth**2 * BUCKET_W * self.n_gamma
         return moving
@@ -983,7 +1001,7 @@ class ExcavatorSim:
         )
         ox, oy, oz = PIT_CENTER_THREE
         hm = np.clip((self.hm_np + 1.0) * 1000.0, 0, 65535).astype(np.uint16)
-        hm_header = struct.pack("<HHfff", HM_NX, HM_NY, ox - ZONE_HALF[0] + HM_CELL / 2, oz + ZONE_HALF[1] - HM_CELL / 2, HM_CELL)
+        hm_header = struct.pack("<HHfff", HM_NX, HM_NY, ox + HM_X0 + HM_CELL / 2, oz - HM_Y0 - HM_CELL / 2, HM_CELL)
         thm = np.clip((self.truck_hm_np + 1.0) * 1000.0, 0, 65535).astype(np.uint16)
         thm_header = struct.pack("<HHfff", TRUCK_NX, TRUCK_NY, ox + BED_LO[0] + TRUCK_CELL / 2, oz - BED_LO[1] - TRUCK_CELL / 2, TRUCK_CELL)
         lo = np.array([ox - 4.0, oy - 0.5, oz - 10.0], dtype=np.float32)  # covers the pit, machine and truck
@@ -1114,8 +1132,12 @@ def main():
     ap.add_argument("--hold-test", action="store_true")
     ap.add_argument("--stall-test", action="store_true")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--trench", action="store_true", help="auto cycle digs one lane, deeper each pass")
+    ap.add_argument("--pool", type=int, default=POOL, help="particle capacity of the soil zone")
     args = ap.parse_args()
-    sim = ExcavatorSim(voxel=args.voxel, iterations=args.iterations)
+    sim = ExcavatorSim(voxel=args.voxel, iterations=args.iterations, pool=args.pool)
+    if args.trench:
+        sim.set_trench()
     res = None
     if args.hold_test:
         res = run_headless(sim, 3.0, levers=(0, 0, 0, 0), auto=False)
