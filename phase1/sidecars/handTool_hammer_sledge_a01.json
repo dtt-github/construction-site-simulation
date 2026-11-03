@@ -1,0 +1,90 @@
+{
+ "source": "usd/handTool_hammer_sledge_a01/simready_usd/sm_handTool_hammer_sledge_a01_01.usd",
+ "variant": "PhysX",
+ "up_axis": "Z",
+ "meters_per_unit": 1.0,
+ "kilograms_per_unit": 1.0,
+ "default_prim": "/RootNode",
+ "labels": {
+  "semantics:labels:wikidata_class": "[hammer]",
+  "semantics:labels:wikidata_qcode": "[Q25294]"
+ },
+ "articulation_roots": [],
+ "bodies": [
+  {
+   "path": "/RootNode/Geometry/hammer_01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": 1.211174488067627,
+   "density": null,
+   "center_of_mass": [
+    0.000103,
+    -0.006099,
+    -1e-06
+   ],
+   "diagonal_inertia": [
+    0.001852,
+    0.021118,
+    0.022145
+   ],
+   "position": [
+    0.0,
+    0.0,
+    0.022739
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.184389,
+    -0.064805,
+    0.000103
+   ],
+   "bounds_max": [
+    0.210075,
+    0.07328,
+    0.045308
+   ],
+   "labels": {},
+   "effective_mass": 1.211174488067627,
+   "mass_source": "explicit"
+  }
+ ],
+ "colliders": [
+  {
+   "path": "/RootNode/Geometry/hammer_01_obj_00/hammer_01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/hammer_01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_m_opaque__rubber__new_black_a01",
+   "density": null,
+   "mesh_volume_m3": 0.00042933,
+   "hull_volume_m3": 0.00148715
+  }
+ ],
+ "joints": [],
+ "materials": {
+  "/RootNode/PhysicsMaterials/physics_mat_m_opaque__rubber__new_black_a01": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_m_opaque__rubber__new_black_a01",
+   "static_friction": 0.800000011920929,
+   "dynamic_friction": 0.800000011920929,
+   "restitution": 0.800000011920929,
+   "density": 1200.0
+  }
+ },
+ "summary": {
+  "bodies": 1,
+  "colliders": 1,
+  "joints": 0,
+  "drives": 0,
+  "total_mass_kg": 1.211,
+  "bodies_without_explicit_mass": 0,
+  "approximations": [
+   "sdf"
+  ]
+ }
+}

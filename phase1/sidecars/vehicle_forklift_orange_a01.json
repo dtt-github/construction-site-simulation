@@ -1,0 +1,1185 @@
+{
+ "source": "usd/vehicle_forklift_orange_a01/simready_usd/sm_vehicle_forklift_orange_a01_01.usd",
+ "variant": "PhysX",
+ "up_axis": "Z",
+ "meters_per_unit": 1.0,
+ "kilograms_per_unit": 1.0,
+ "default_prim": "/RootNode",
+ "labels": {
+  "semantic:wikidata_class:params:semanticData": "forklift",
+  "semantic:wikidata_class:params:semanticType": "wikidata_class",
+  "semantic:wikidata_qcode:params:semanticData": "Q41577",
+  "semantic:wikidata_qcode:params:semanticType": "wikidata_qcode",
+  "semantics:labels:wikidata_class": "[forklift]",
+  "semantics:labels:wikidata_qcode": "[Q41577]"
+ },
+ "articulation_roots": [],
+ "bodies": [
+  {
+   "path": "/RootNode/Geometry/sm_glass_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.002879,
+    -0.162898,
+    1.319554
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.251423,
+    -0.170207,
+    0.748073
+   ],
+   "bounds_max": [
+    0.257181,
+    -0.15559,
+    1.891036
+   ],
+   "labels": {},
+   "effective_mass": 3.6354,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_handle_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.152787,
+    -0.024231,
+    0.740405
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.180417,
+    -0.051861,
+    0.709478
+   ],
+   "bounds_max": [
+    -0.125157,
+    0.003398,
+    0.771332
+   ],
+   "labels": {},
+   "effective_mass": 0.1516,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_forkwheels1_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.002879,
+    -0.235779,
+    0.154638
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.237925,
+    -0.287246,
+    0.103171
+   ],
+   "bounds_max": [
+    0.243683,
+    -0.184312,
+    0.206105
+   ],
+   "labels": {},
+   "effective_mass": 4.0698,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_wheel4_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.201363,
+    -1.162821,
+    0.050688
+   ],
+   "orientation_wxyz": [
+    0.987421,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.25065,
+    -1.205863,
+    0.007645
+   ],
+   "bounds_max": [
+    -0.152076,
+    -1.119779,
+    0.09373
+   ],
+   "labels": {},
+   "effective_mass": 0.5521,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_ruddebase_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.243988,
+    0.176117,
+    0.364564
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.123708,
+    0.055999,
+    0.344858
+   ],
+   "bounds_max": [
+    0.364253,
+    0.329157,
+    0.417074
+   ],
+   "labels": {},
+   "effective_mass": 49.8841,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_fork_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.002879,
+    -0.231535,
+    0.003835
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.317504,
+    -1.534131,
+    0.02805
+   ],
+   "bounds_max": [
+    0.323261,
+    -0.182743,
+    0.414064
+   ],
+   "labels": {},
+   "effective_mass": 60.4752,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_wheel3_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.20751,
+    -1.1657,
+    0.050687
+   ],
+   "orientation_wxyz": [
+    0.987421,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.158223,
+    -1.208743,
+    0.007644
+   ],
+   "bounds_max": [
+    0.256796,
+    -1.122658,
+    0.093729
+   ],
+   "labels": {},
+   "effective_mass": 0.5521,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_button3_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.243999,
+    0.290015,
+    1.189353
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.22303,
+    0.286637,
+    1.175589
+   ],
+   "bounds_max": [
+    0.264968,
+    0.293392,
+    1.203118
+   ],
+   "labels": {},
+   "effective_mass": 0.0874,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_wheel2_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.22016,
+    0.01532,
+    0.090896
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.25988,
+    -0.06412,
+    0.011455
+   ],
+   "bounds_max": [
+    -0.180439,
+    0.094761,
+    0.170336
+   ],
+   "labels": {},
+   "effective_mass": 1.5532,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_body_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": 158.8184356689453,
+   "density": null,
+   "center_of_mass": [
+    0.005457,
+    -0.230555,
+    0.298394
+   ],
+   "diagonal_inertia": [
+    60.146744,
+    55.660419,
+    29.764107
+   ],
+   "position": [
+    0.0,
+    0.0,
+    0.003835
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.411302,
+    -1.285119,
+    0.019694
+   ],
+   "bounds_max": [
+    0.411302,
+    0.34013,
+    1.965111
+   ],
+   "labels": {},
+   "effective_mass": 158.8184356689453,
+   "mass_source": "explicit"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_wheel1_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.243996,
+    0.150776,
+    0.090896
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.204275,
+    0.071335,
+    0.011455
+   ],
+   "bounds_max": [
+    0.283716,
+    0.230217,
+    0.170336
+   ],
+   "labels": {},
+   "effective_mass": 1.5532,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_button1_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.243999,
+    0.290623,
+    1.133102
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.227701,
+    0.286637,
+    1.124903
+   ],
+   "bounds_max": [
+    0.260297,
+    0.294608,
+    1.141302
+   ],
+   "labels": {},
+   "effective_mass": 0.0458,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_button2_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.243999,
+    0.290623,
+    1.156109
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.227701,
+    0.286637,
+    1.147909
+   ],
+   "bounds_max": [
+    0.260297,
+    0.294608,
+    1.164308
+   ],
+   "labels": {},
+   "effective_mass": 0.0458,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_rudder_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.244226,
+    0.307854,
+    0.389424
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.097256,
+    0.258874,
+    0.367437
+   ],
+   "bounds_max": [
+    0.391197,
+    0.351154,
+    1.255182
+   ],
+   "labels": {},
+   "effective_mass": 31.247,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_forkwheels2_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.002879,
+    -0.235779,
+    0.357869
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.237926,
+    -0.287246,
+    0.306402
+   ],
+   "bounds_max": [
+    0.243683,
+    -0.184312,
+    0.409336
+   ],
+   "labels": {},
+   "effective_mass": 4.0698,
+   "mass_source": "mesh_volume_x_density"
+  }
+ ],
+ "colliders": [
+  {
+   "path": "/RootNode/Geometry/sm_glass_a01_obj_00/sm_glass_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_glass_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_trans__glass__clean_a",
+   "density": null,
+   "mesh_volume_m3": 0.00145415,
+   "hull_volume_m3": 0.00481147
+  },
+  {
+   "path": "/RootNode/Geometry/sm_handle_a01_obj_00/sm_handle_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_handle_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__unique_forklift_a",
+   "density": null,
+   "mesh_volume_m3": 0.00015963,
+   "hull_volume_m3": 8.573e-05
+  },
+  {
+   "path": "/RootNode/Geometry/sm_forkwheels1_a01_obj_00/sm_forkwheels1_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_forkwheels1_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__unique_forklift_a",
+   "density": null,
+   "mesh_volume_m3": 0.00052177,
+   "hull_volume_m3": 0.00400061
+  },
+  {
+   "path": "/RootNode/Geometry/sm_wheel4_a01_obj_00/sm_wheel4_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_wheel4_a01_obj_00",
+   "material": null,
+   "density": null,
+   "mesh_volume_m3": 0.00055214,
+   "hull_volume_m3": 0.00056695
+  },
+  {
+   "path": "/RootNode/Geometry/sm_ruddebase_a01_obj_00/sm_ruddebase_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_ruddebase_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__blue_unique_forklift_a",
+   "density": null,
+   "mesh_volume_m3": 0.0063954,
+   "hull_volume_m3": 0.00315232
+  },
+  {
+   "path": "/RootNode/Geometry/sm_fork_a01_obj_00/sm_fork_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_fork_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__painted_unique_forklift_a",
+   "density": null,
+   "mesh_volume_m3": 0.00775323,
+   "hull_volume_m3": 0.17346703
+  },
+  {
+   "path": "/RootNode/Geometry/sm_wheel3_a01_obj_00/sm_wheel3_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_wheel3_a01_obj_00",
+   "material": null,
+   "density": null,
+   "mesh_volume_m3": 0.00055214,
+   "hull_volume_m3": 0.00056695
+  },
+  {
+   "path": "/RootNode/Geometry/sm_button3_a01_obj_00/sm_button3_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_button3_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__unique_forklift_a",
+   "density": null,
+   "mesh_volume_m3": 9.199e-05,
+   "hull_volume_m3": 6.61e-06
+  },
+  {
+   "path": "/RootNode/Geometry/sm_wheel2_a01_obj_00/sm_wheel2_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_wheel2_a01_obj_00",
+   "material": "/RootNode/Geometry/sm_wheel2_a01_obj_00/VisualMaterials/opaque__rubber__unique_forklift_a",
+   "density": null,
+   "mesh_volume_m3": 0.00155318,
+   "hull_volume_m3": 0.00155318
+  },
+  {
+   "path": "/RootNode/Geometry/sm_body_a01_obj_00/sm_body_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_body_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__unique_forklift_a",
+   "density": null,
+   "mesh_volume_m3": 0.24328805,
+   "hull_volume_m3": 1.22553929
+  },
+  {
+   "path": "/RootNode/Geometry/sm_wheel1_a01_obj_00/sm_wheel1_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_wheel1_a01_obj_00",
+   "material": "/RootNode/Geometry/sm_wheel1_a01_obj_00/VisualMaterials/opaque__rubber__unique_forklift_a",
+   "density": null,
+   "mesh_volume_m3": 0.00155318,
+   "hull_volume_m3": 0.00155318
+  },
+  {
+   "path": "/RootNode/Geometry/sm_button1_a01_obj_00/sm_button1_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_button1_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__unique_forklift_a",
+   "density": null,
+   "mesh_volume_m3": 4.818e-05,
+   "hull_volume_m3": 3.98e-06
+  },
+  {
+   "path": "/RootNode/Geometry/sm_button2_a01_obj_00/sm_button2_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_button2_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__unique_forklift_a",
+   "density": null,
+   "mesh_volume_m3": 4.818e-05,
+   "hull_volume_m3": 3.98e-06
+  },
+  {
+   "path": "/RootNode/Geometry/sm_rudder_a01_obj_00/sm_rudder_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_rudder_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__painted_unique_forklift_a",
+   "density": null,
+   "mesh_volume_m3": 0.00400603,
+   "hull_volume_m3": 0.00989662
+  },
+  {
+   "path": "/RootNode/Geometry/sm_forkwheels2_a01_obj_00/sm_forkwheels2_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_forkwheels2_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__unique_forklift_a",
+   "density": null,
+   "mesh_volume_m3": 0.00052177,
+   "hull_volume_m3": 0.00400061
+  }
+ ],
+ "joints": [
+  {
+   "path": "/RootNode/Joints/joint_sm_button1_a01_joint_00",
+   "type": "prismatic",
+   "body0": "/RootNode/Geometry/sm_rudder_a01_obj_00/sm_rudder_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_button1_a01_obj_00/sm_button1_a01_mesh_00",
+   "local_pos0": [
+    -0.000227,
+    -0.017231,
+    0.743678
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Y",
+   "lower_limit": 0.0,
+   "upper_limit": 0.003000000026077032,
+   "limit_unit": "meters"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_button2_a01_joint_00",
+   "type": "prismatic",
+   "body0": "/RootNode/Geometry/sm_rudder_a01_obj_00/sm_rudder_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_button2_a01_obj_00/sm_button2_a01_mesh_00",
+   "local_pos0": [
+    -0.000227,
+    -0.017231,
+    0.766684
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Y",
+   "lower_limit": 0.0,
+   "upper_limit": 0.003000000026077032,
+   "limit_unit": "meters"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_handle_a01_joint_00",
+   "type": "prismatic",
+   "body0": "/RootNode/Geometry/sm_body_a01_obj_00/sm_body_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_handle_a01_obj_00/sm_handle_a01_mesh_00",
+   "local_pos0": [
+    -0.154038,
+    -0.027251,
+    0.741991
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    0.0,
+    -0.0,
+    -0.0
+   ],
+   "local_pos1": [
+    -0.001251,
+    -0.003019,
+    0.005421
+   ],
+   "local_rot1_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Z",
+   "lower_limit": -0.009999999776482582,
+   "upper_limit": 0.0,
+   "limit_unit": "meters",
+   "drive": {
+    "type": null,
+    "stiffness": 20.0,
+    "damping": 1.0,
+    "max_force": null,
+    "target_position": 0.009999999776482582,
+    "target_velocity": null
+   }
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_button3_a01_joint_00",
+   "type": "prismatic",
+   "body0": "/RootNode/Geometry/sm_rudder_a01_obj_00/sm_rudder_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_button3_a01_obj_00/sm_button3_a01_mesh_00",
+   "local_pos0": [
+    -0.000227,
+    -0.017839,
+    0.799929
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Y",
+   "lower_limit": 0.0,
+   "upper_limit": 0.003000000026077032,
+   "limit_unit": "meters"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_wheel1_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_body_a01_obj_00/sm_body_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_wheel1_a01_obj_00/sm_wheel1_a01_mesh_00",
+   "local_pos0": [
+    0.243996,
+    0.150776,
+    0.087061
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -Infinity,
+   "upper_limit": Infinity,
+   "limit_unit": "degrees",
+   "drive": {
+    "type": null,
+    "stiffness": null,
+    "damping": 0.05000000074505806,
+    "max_force": null,
+    "target_position": null,
+    "target_velocity": null
+   }
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_forkwheels2_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_fork_a01_obj_00/sm_fork_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_forkwheels2_a01_obj_00/sm_forkwheels2_a01_mesh_00",
+   "local_pos0": [
+    0.0,
+    -0.004244,
+    0.354034
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -Infinity,
+   "upper_limit": Infinity,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_fork_a01_joint_00",
+   "type": "prismatic",
+   "body0": "/RootNode/Geometry/sm_body_a01_obj_00/sm_body_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_fork_a01_obj_00/sm_fork_a01_mesh_00",
+   "local_pos0": [
+    0.002879,
+    -0.231535,
+    -0.0
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Z",
+   "lower_limit": 0.0,
+   "upper_limit": 1.5099999904632568,
+   "limit_unit": "meters"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_wheel2_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_body_a01_obj_00/sm_body_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_wheel2_a01_obj_00/sm_wheel2_a01_mesh_00",
+   "local_pos0": [
+    -0.22016,
+    0.01532,
+    0.087061
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -Infinity,
+   "upper_limit": Infinity,
+   "limit_unit": "degrees",
+   "drive": {
+    "type": null,
+    "stiffness": null,
+    "damping": 0.05000000074505806,
+    "max_force": null,
+    "target_position": null,
+    "target_velocity": null
+   }
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_forkwheels1_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_fork_a01_obj_00/sm_fork_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_forkwheels1_a01_obj_00/sm_forkwheels1_a01_mesh_00",
+   "local_pos0": [
+    1e-06,
+    -0.004244,
+    0.150804
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": null,
+   "upper_limit": null,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_rudder_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_ruddebase_a01_obj_00/sm_ruddebase_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_rudder_a01_obj_00/sm_rudder_a01_mesh_00",
+   "local_pos0": [
+    0.000238,
+    0.131737,
+    0.02486
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -60.0,
+   "upper_limit": 0.0,
+   "limit_unit": "degrees",
+   "drive": {
+    "type": "acceleration",
+    "stiffness": 50.0,
+    "damping": 1.0,
+    "max_force": null,
+    "target_position": 60.0,
+    "target_velocity": null
+   }
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_ruddebase_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_body_a01_obj_00/sm_body_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_ruddebase_a01_obj_00/sm_ruddebase_a01_mesh_00",
+   "local_pos0": [
+    0.243988,
+    0.176117,
+    0.360729
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    0.0,
+    -0.0,
+    -0.0
+   ],
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Z",
+   "lower_limit": -60.0,
+   "upper_limit": 60.0,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_wheel4_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_fork_a01_obj_00/sm_fork_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_wheel4_a01_obj_00/sm_wheel4_a01_mesh_00",
+   "local_pos0": [
+    -0.204241,
+    -0.931286,
+    0.046853
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": null,
+   "upper_limit": null,
+   "limit_unit": "degrees",
+   "drive": {
+    "type": null,
+    "stiffness": null,
+    "damping": 9.999999747378752e-05,
+    "max_force": null,
+    "target_position": null,
+    "target_velocity": null
+   }
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_wheel3_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_body_a01_obj_00/sm_body_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_wheel3_a01_obj_00/sm_wheel3_a01_mesh_00",
+   "local_pos0": [
+    0.20751,
+    -1.1657,
+    0.046851
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    0.0,
+    -0.0,
+    -0.0
+   ],
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": null,
+   "upper_limit": null,
+   "limit_unit": "degrees",
+   "drive": {
+    "type": null,
+    "stiffness": null,
+    "damping": 0.0010000000474974513,
+    "max_force": null,
+    "target_position": null,
+    "target_velocity": null
+   }
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_glass_a01_joint_00",
+   "type": "fixed",
+   "body0": "/RootNode/Geometry/sm_body_a01_obj_00/sm_body_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_glass_a01_obj_00/sm_glass_a01_mesh_00",
+   "local_pos0": [
+    0.002879,
+    -0.162899,
+    1.315719
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false
+  }
+ ],
+ "materials": {
+  "/RootNode/PhysicsMaterials/physics_mat_trans__glass__clean_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_trans__glass__clean_a",
+   "static_friction": 0.4000000059604645,
+   "dynamic_friction": 0.4000000059604645,
+   "restitution": 0.05000000074505806,
+   "density": 2500.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__unique_forklift_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__unique_forklift_a",
+   "static_friction": 0.4000000059604645,
+   "dynamic_friction": 0.4000000059604645,
+   "restitution": 0.4000000059604645,
+   "density": 950.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__unique_forklift_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__unique_forklift_a",
+   "static_friction": 0.5,
+   "dynamic_friction": 0.4000000059604645,
+   "restitution": 0.15000000596046448,
+   "density": 7800.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__blue_unique_forklift_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__blue_unique_forklift_a",
+   "static_friction": 0.5,
+   "dynamic_friction": 0.4000000059604645,
+   "restitution": 0.15000000596046448,
+   "density": 7800.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__painted_unique_forklift_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__painted_unique_forklift_a",
+   "static_friction": 0.5,
+   "dynamic_friction": 0.4000000059604645,
+   "restitution": 0.15000000596046448,
+   "density": 7800.0
+  },
+  "/RootNode/Geometry/sm_wheel2_a01_obj_00/VisualMaterials/opaque__rubber__unique_forklift_a": {
+   "path": "/RootNode/Geometry/sm_wheel2_a01_obj_00/VisualMaterials/opaque__rubber__unique_forklift_a"
+  },
+  "/RootNode/Geometry/sm_wheel1_a01_obj_00/VisualMaterials/opaque__rubber__unique_forklift_a": {
+   "path": "/RootNode/Geometry/sm_wheel1_a01_obj_00/VisualMaterials/opaque__rubber__unique_forklift_a"
+  }
+ },
+ "summary": {
+  "bodies": 15,
+  "colliders": 15,
+  "joints": 14,
+  "drives": 6,
+  "total_mass_kg": 316.741,
+  "bodies_without_explicit_mass": 14,
+  "approximations": [
+   "sdf"
+  ]
+ }
+}

@@ -1,0 +1,82 @@
+{
+ "source": "usd/ppe_helmet_hardHat_a01/simready_usd/sm_ppe_helmet_hardHat_a01_01.usd",
+ "variant": "PhysX",
+ "up_axis": "Z",
+ "meters_per_unit": 1.0,
+ "kilograms_per_unit": 1.0,
+ "default_prim": "/RootNode",
+ "labels": {
+  "semantics:labels:wikidata_class": "[helmet]",
+  "semantics:labels:wikidata_qcode": "[Q173603]"
+ },
+ "articulation_roots": [],
+ "bodies": [
+  {
+   "path": "/RootNode/Geometry/body_01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.144827,
+    -0.103775,
+    4.2e-05
+   ],
+   "bounds_max": [
+    0.144957,
+    0.103775,
+    0.173536
+   ],
+   "labels": {},
+   "effective_mass": 0.3214,
+   "mass_source": "mesh_volume_x_density"
+  }
+ ],
+ "colliders": [
+  {
+   "path": "/RootNode/Geometry/body_01_obj_00/body_01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/body_01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_m_opaque__plastic__black_a01",
+   "density": null,
+   "mesh_volume_m3": 0.00033827,
+   "hull_volume_m3": 0.00557874
+  }
+ ],
+ "joints": [],
+ "materials": {
+  "/RootNode/PhysicsMaterials/physics_mat_m_opaque__plastic__black_a01": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_m_opaque__plastic__black_a01",
+   "static_friction": 0.4000000059604645,
+   "dynamic_friction": 0.4000000059604645,
+   "restitution": 0.4000000059604645,
+   "density": 950.0
+  }
+ },
+ "summary": {
+  "bodies": 1,
+  "colliders": 1,
+  "joints": 0,
+  "drives": 0,
+  "total_mass_kg": 0.321,
+  "bodies_without_explicit_mass": 1,
+  "approximations": [
+   "sdf"
+  ]
+ }
+}

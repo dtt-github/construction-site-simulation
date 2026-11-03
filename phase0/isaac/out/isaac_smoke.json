@@ -1,0 +1,55 @@
+{
+  "rigid": [
+    {
+      "gpu_dynamics": true,
+      "write_back_to_usd": true,
+      "bodies": 4096,
+      "steps": 300,
+      "ms_per_step": 259.22,
+      "realtime_factor_at_60Hz": 0.06,
+      "top_box_final_z_m": 6.2
+    },
+    {
+      "gpu_dynamics": true,
+      "write_back_to_usd": false,
+      "bodies": 4096,
+      "steps": 300,
+      "ms_per_step": 87.063,
+      "realtime_factor_at_60Hz": 0.19,
+      "top_box_final_z_m": 7.25
+    },
+    {
+      "gpu_dynamics": false,
+      "write_back_to_usd": false,
+      "bodies": 4096,
+      "steps": 300,
+      "ms_per_step": 92.309,
+      "realtime_factor_at_60Hz": 0.18,
+      "top_box_final_z_m": 7.25
+    }
+  ],
+  "forklift": {
+    "rigid_bodies": 15,
+    "joints": 14,
+    "variant_selection": {
+      "MuJoCo": "Disabled",
+      "Newton": "Disabled",
+      "PhysX": "Enabled"
+    },
+    "first_body": "/forklift/Geometry/sm_glass_a01_obj_00",
+    "first_body_z_start_m": 1.579,
+    "first_body_z_after_5s_m": 1.307,
+    "ok": true
+  },
+  "render": {
+    "ok": true,
+    "shape": [
+      720,
+      1280,
+      3
+    ],
+    "mean_pixel": 133.1,
+    "seconds_first_frames": 2.8,
+    "png": "isaac/out/isaac_forklift.png"
+  }
+}

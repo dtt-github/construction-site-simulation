@@ -1,0 +1,163 @@
+{
+ "source": "usd/construction_wheelbarrow_metal_a01/simready_usd/sm_construction_wheelbarrow_metal_a01_01.usd",
+ "variant": "PhysX",
+ "up_axis": "Z",
+ "meters_per_unit": 1.0,
+ "kilograms_per_unit": 1.0,
+ "default_prim": "/RootNode",
+ "labels": {
+  "semantics:labels:wikidata_class": "[wheelbarrow]",
+  "semantics:labels:wikidata_qcode": "[Q175334]"
+ },
+ "articulation_roots": [],
+ "bodies": [
+  {
+   "path": "/RootNode/Geometry/wheel_01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -2.6e-05,
+    0.483493,
+    0.197847
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.041886,
+    0.291108,
+    0.00614
+   ],
+   "bounds_max": [
+    0.041785,
+    0.675692,
+    0.390725
+   ],
+   "labels": {},
+   "effective_mass": 7.7585,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/body_01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.0,
+    0.0,
+    0.385808
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.326979,
+    -0.97245,
+    0.009438
+   ],
+   "bounds_max": [
+    0.32088,
+    0.743527,
+    0.728437
+   ],
+   "labels": {},
+   "effective_mass": 38.9328,
+   "mass_source": "mesh_volume_x_density"
+  }
+ ],
+ "colliders": [
+  {
+   "path": "/RootNode/Geometry/wheel_01_obj_00/wheel_01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/wheel_01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_m_opaque__rubber__glossy_black_a01",
+   "density": null,
+   "mesh_volume_m3": 0.00646542,
+   "hull_volume_m3": 0.00884597
+  },
+  {
+   "path": "/RootNode/Geometry/body_01_obj_00/body_01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/body_01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_m_opaque__metal__paintedWorn_gray_a01",
+   "density": null,
+   "mesh_volume_m3": 0.00495959,
+   "hull_volume_m3": 0.39255267
+  }
+ ],
+ "joints": [
+  {
+   "path": "/RootNode/Joints/joint_wheel_01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/body_01_obj_00/body_01_mesh_00",
+   "body1": "/RootNode/Geometry/wheel_01_obj_00/wheel_01_mesh_00",
+   "local_pos0": [
+    -2.6e-05,
+    0.483493,
+    -0.18796
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    -0.0,
+    0.0,
+    0.0
+   ],
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -Infinity,
+   "upper_limit": Infinity,
+   "limit_unit": "degrees"
+  }
+ ],
+ "materials": {
+  "/RootNode/PhysicsMaterials/physics_mat_m_opaque__rubber__glossy_black_a01": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_m_opaque__rubber__glossy_black_a01",
+   "static_friction": 0.800000011920929,
+   "dynamic_friction": 0.800000011920929,
+   "restitution": 0.800000011920929,
+   "density": 1200.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_m_opaque__metal__paintedWorn_gray_a01": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_m_opaque__metal__paintedWorn_gray_a01",
+   "static_friction": 0.30000001192092896,
+   "dynamic_friction": 0.30000001192092896,
+   "restitution": 0.10000000149011612,
+   "density": 7850.0
+  }
+ },
+ "summary": {
+  "bodies": 2,
+  "colliders": 2,
+  "joints": 1,
+  "drives": 0,
+  "total_mass_kg": 46.691,
+  "bodies_without_explicit_mass": 2,
+  "approximations": [
+   "sdf"
+  ]
+ }
+}

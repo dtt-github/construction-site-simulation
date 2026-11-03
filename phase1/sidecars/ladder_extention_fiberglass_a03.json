@@ -1,0 +1,666 @@
+{
+ "source": "usd/ladder_extention_fiberglass_a03/simready_usd/sm_ladder_extention_fiberglass_a03_01.usd",
+ "variant": "PhysX",
+ "up_axis": "Z",
+ "meters_per_unit": 1.0,
+ "kilograms_per_unit": 1.0,
+ "default_prim": "/RootNode",
+ "labels": {
+  "semantic:wikidata_class:params:semanticData": "ladder",
+  "semantic:wikidata_class:params:semanticType": "wikidata_class",
+  "semantic:wikidata_qcode:params:semanticData": "Q168639",
+  "semantic:wikidata_qcode:params:semanticType": "wikidata_qcode",
+  "semantics:labels:wikidata_class": "[ladder]",
+  "semantics:labels:wikidata_qcode": "[Q168639]"
+ },
+ "articulation_roots": [
+  "/RootNode"
+ ],
+ "bodies": [
+  {
+   "path": "/RootNode/Geometry/sm_mainladder_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.0,
+    0.0,
+    5e-06
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.269799,
+    -0.091255,
+    5e-06
+   ],
+   "bounds_max": [
+    0.269799,
+    0.091255,
+    3.308695
+   ],
+   "labels": {},
+   "effective_mass": 25.2017,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_rolling_system_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.003457,
+    0.002296,
+    2.785039
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.003713,
+    -0.011257,
+    2.771544
+   ],
+   "bounds_max": [
+    0.010627,
+    0.015849,
+    2.798534
+   ],
+   "labels": {},
+   "effective_mass": 0.0124,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_lock2_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.186431,
+    -0.034627,
+    0.96169
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.182544,
+    -0.077964,
+    0.953608
+   ],
+   "bounds_max": [
+    0.190204,
+    -0.026482,
+    0.999248
+   ],
+   "labels": {},
+   "effective_mass": 0.0052,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_hook_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.003132,
+    0.002873,
+    2.832215
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.007022,
+    -0.00391,
+    2.809996
+   ],
+   "bounds_max": [
+    0.013286,
+    0.009656,
+    2.839285
+   ],
+   "labels": {},
+   "effective_mass": 0.0038,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_rope_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.003426,
+    0.002301,
+    2.814565
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.009231,
+    -0.088813,
+    0.271224
+   ],
+   "bounds_max": [
+    0.02252,
+    0.0357,
+    2.814612
+   ],
+   "labels": {},
+   "effective_mass": 0.3526,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_lock1_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.186998,
+    -0.034627,
+    0.96169
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.190981,
+    -0.077937,
+    0.954218
+   ],
+   "bounds_max": [
+    -0.183321,
+    -0.026455,
+    0.999859
+   ],
+   "labels": {},
+   "effective_mass": 0.0052,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_carabine1_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.186938,
+    -0.038642,
+    1.127402
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.195236,
+    -0.076873,
+    0.902834
+   ],
+   "bounds_max": [
+    -0.182084,
+    0.036268,
+    1.136409
+   ],
+   "labels": {},
+   "effective_mass": 0.0864,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_carabine2_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.186473,
+    -0.038642,
+    1.127402
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.181545,
+    -0.076873,
+    0.902834
+   ],
+   "bounds_max": [
+    0.194697,
+    0.036268,
+    1.136409
+   ],
+   "labels": {},
+   "effective_mass": 0.0864,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_sideladder_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.000269,
+    -0.051822,
+    0.293481
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.252158,
+    -0.089004,
+    0.293584
+   ],
+   "bounds_max": [
+    0.251619,
+    -0.011895,
+    3.666679
+   ],
+   "labels": {},
+   "effective_mass": 4.4089,
+   "mass_source": "mesh_volume_x_density"
+  }
+ ],
+ "colliders": [
+  {
+   "path": "/RootNode/Geometry/sm_mainladder_a01_obj_00/sm_mainladder_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_mainladder_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__aluminium_brushed_a",
+   "density": null,
+   "mesh_volume_m3": 0.00933396,
+   "hull_volume_m3": 0.23653331
+  },
+  {
+   "path": "/RootNode/Geometry/sm_rolling_system_a01_obj_00/sm_rolling_system_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_rolling_system_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__aluminium_brushed_a",
+   "density": null,
+   "mesh_volume_m3": 4.61e-06,
+   "hull_volume_m3": 7.31e-06
+  },
+  {
+   "path": "/RootNode/Geometry/sm_lock2_a01_obj_00/sm_lock2_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_lock2_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__aluminium_brushed_a",
+   "density": null,
+   "mesh_volume_m3": 1.94e-06,
+   "hull_volume_m3": 5.53e-06
+  },
+  {
+   "path": "/RootNode/Geometry/sm_hook_a01_obj_00/sm_hook_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_hook_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__aluminium_brushed_a",
+   "density": null,
+   "mesh_volume_m3": 1.39e-06,
+   "hull_volume_m3": 3.3e-06
+  },
+  {
+   "path": "/RootNode/Geometry/sm_rope_a01_obj_00/sm_rope_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_rope_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__aluminium_brushed_a",
+   "density": null,
+   "mesh_volume_m3": 0.00013059,
+   "hull_volume_m3": 0.00472682
+  },
+  {
+   "path": "/RootNode/Geometry/sm_lock1_a01_obj_00/sm_lock1_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_lock1_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__aluminium_brushed_a",
+   "density": null,
+   "mesh_volume_m3": 1.94e-06,
+   "hull_volume_m3": 5.53e-06
+  },
+  {
+   "path": "/RootNode/Geometry/sm_carabine1_a01_obj_00/sm_carabine1_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_carabine1_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__aluminium_brushed_a",
+   "density": null,
+   "mesh_volume_m3": 3.199e-05,
+   "hull_volume_m3": 0.0001167
+  },
+  {
+   "path": "/RootNode/Geometry/sm_carabine2_a01_obj_00/sm_carabine2_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_carabine2_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__aluminium_brushed_a",
+   "density": null,
+   "mesh_volume_m3": 3.199e-05,
+   "hull_volume_m3": 0.0001167
+  },
+  {
+   "path": "/RootNode/Geometry/sm_sideladder_a01_obj_00/sm_sideladder_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_sideladder_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__paper__unique_fiberglass_a",
+   "density": null,
+   "mesh_volume_m3": 0.00639903,
+   "hull_volume_m3": 0.12716009
+  }
+ ],
+ "joints": [
+  {
+   "path": "/RootNode/Joints/joint_sm_sideladder_a01_joint_00",
+   "type": "prismatic",
+   "body0": "/RootNode/Geometry/sm_mainladder_a01_obj_00/sm_mainladder_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_sideladder_a01_obj_00/sm_sideladder_a01_mesh_00",
+   "local_pos0": [
+    -0.000269,
+    -0.051822,
+    0.293481
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Z",
+   "lower_limit": 0.0,
+   "upper_limit": 2.6779990196228027,
+   "limit_unit": "meters"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_lock1_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_carabine1_a01_obj_00/sm_carabine1_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_lock1_a01_obj_00/sm_lock1_a01_mesh_00",
+   "local_pos0": [
+    -6e-05,
+    0.008201,
+    -0.165712
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_pos1": [
+    0.0,
+    0.004187,
+    -0.0
+   ],
+   "local_rot1_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -15.90000057220459,
+   "upper_limit": 60.0,
+   "limit_unit": "degrees",
+   "drive": {
+    "type": "force",
+    "stiffness": 0.009999999776482582,
+    "damping": null,
+    "max_force": null,
+    "target_position": 0.0,
+    "target_velocity": null
+   }
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_carabine2_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_sideladder_a01_obj_00/sm_sideladder_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_carabine2_a01_obj_00/sm_carabine2_a01_mesh_00",
+   "local_pos0": [
+    0.186742,
+    0.01318,
+    0.833921
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -1.5707963705062866,
+   "upper_limit": 30.0,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_rolling_system_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_rope_a01_obj_00/sm_rope_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_rolling_system_a01_obj_00/sm_rolling_system_a01_mesh_00",
+   "local_pos0": [
+    3.1e-05,
+    -4e-06,
+    -0.029525
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -Infinity,
+   "upper_limit": Infinity,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_carabine1_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_sideladder_a01_obj_00/sm_sideladder_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_carabine1_a01_obj_00/sm_carabine1_a01_mesh_00",
+   "local_pos0": [
+    -0.186669,
+    0.01318,
+    0.833921
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -1.5707963705062866,
+   "upper_limit": 30.0,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_rope_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_hook_a01_obj_00/sm_hook_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_rope_a01_obj_00/sm_rope_a01_mesh_00",
+   "local_pos0": [
+    0.000294,
+    -0.000572,
+    -0.017651
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Z",
+   "lower_limit": -Infinity,
+   "upper_limit": Infinity,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_lock2_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_carabine2_a01_obj_00/sm_carabine2_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_lock2_a01_obj_00/sm_lock2_a01_mesh_00",
+   "local_pos0": [
+    -4.2e-05,
+    0.004015,
+    -0.165712
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -15.90000057220459,
+   "upper_limit": 60.0,
+   "limit_unit": "degrees",
+   "drive": {
+    "type": "force",
+    "stiffness": 0.009999999776482582,
+    "damping": null,
+    "max_force": null,
+    "target_position": 0.0,
+    "target_velocity": null
+   }
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_hook_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_mainladder_a01_obj_00/sm_mainladder_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_hook_a01_obj_00/sm_hook_a01_mesh_00",
+   "local_pos0": [
+    0.003132,
+    0.002873,
+    2.832215
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Y",
+   "lower_limit": -90.0,
+   "upper_limit": 90.0,
+   "limit_unit": "degrees"
+  }
+ ],
+ "materials": {
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__aluminium_brushed_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__aluminium_brushed_a",
+   "static_friction": 0.6100000143051147,
+   "dynamic_friction": 0.4699999988079071,
+   "restitution": 0.10000000149011612,
+   "density": 2700.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__paper__unique_fiberglass_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__paper__unique_fiberglass_a",
+   "static_friction": 0.699999988079071,
+   "dynamic_friction": 0.699999988079071,
+   "restitution": 0.4000000059604645,
+   "density": 689.0
+  }
+ },
+ "summary": {
+  "bodies": 9,
+  "colliders": 9,
+  "joints": 8,
+  "drives": 2,
+  "total_mass_kg": 30.163,
+  "bodies_without_explicit_mass": 9,
+  "approximations": [
+   "sdf"
+  ]
+ }
+}

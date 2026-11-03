@@ -1,0 +1,15 @@
+=== granular dx=0.1
+Warning: Benchmark running at default process priority. Results may vary. Run with elevated privileges to automatically raise priority.
+   CUDA Toolkit 13.4, Driver 13.0
+     /home/dttai1/.cache/warp/1.19.0
+Benchmark: 29.0 FPS (97 frames in 3.35s)
+=== granular dx=0.05
+Warning: Benchmark running at default process priority. Results may vary. Run with elevated privileges to automatically raise priority.
+   CUDA Toolkit 13.4, Driver 13.0
+     /home/dttai1/.cache/warp/1.19.0
+Benchmark: 6.04 FPS (97 frames in 16.05s)
+=== granular dx=0.03
+Warning: Benchmark running at default process priority. Results may vary. Run with elevated privileges to automatically raise priority.
+   CUDA Toolkit 13.4, Driver 13.0
+     /home/dttai1/.cache/warp/1.19.0
+Benchmark: 1.38 FPS (28 frames in 20.30s)

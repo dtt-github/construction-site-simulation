@@ -1,0 +1,52 @@
+{
+  "settle": {
+    "bodies": 132,
+    "below_terrain": [],
+    "moving_over_0.2": [],
+    "stats": {
+      "assets": 44,
+      "bodies": 132,
+      "constraints": 90,
+      "motors": 8,
+      "totalMass": 6299.141125616665,
+      "loadMs": 2122.6999999284744,
+      "stepMs": 0.0057469444349398605,
+      "fps": 59.976009590444065,
+      "skippedJoints": 0
+    }
+  },
+  "mass_check_max_rel_error": 0.0,
+  "fork_lift": {
+    "target_m": 1.2,
+    "fork_joint_m": 1.185,
+    "pallet_y_before_after": [
+      0.072,
+      1.236
+    ],
+    "crate_y_before_after": [
+      0.284,
+      1.448
+    ]
+  },
+  "drive_forward_4s": {
+    "moved_m": 3.441,
+    "dx": 3.441,
+    "dz": -0.019
+  },
+  "steer_target_deg": 40,
+  "steer_joint_deg": 40.0,
+  "ramp_target_deg": 30,
+  "ramp_joint_deg": 31.7,
+  "final_stats": {
+    "assets": 44,
+    "bodies": 132,
+    "constraints": 90,
+    "motors": 8,
+    "totalMass": 6299.141125616665,
+    "loadMs": 2122.6999999284744,
+    "stepMs": 0.008508480448229536,
+    "fps": 60.27610344715961,
+    "skippedJoints": 0
+  },
+  "console_errors": []
+}

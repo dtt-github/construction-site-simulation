@@ -1,0 +1,6 @@
+Module scatter_field_dof_values_ec638f93 bde0ade load on device 'cuda:0' took 0.43 ms  (cached)
+Module warp._src.fem.space.restriction.dyn.fill_element_node_indices_16b56c40 9e00501 load on device 'cuda:0' took 103.21 ms  (compiled)
+Module warp.fem.integrate._identity_field_81a31827 31d30dc load on device 'cuda:0' took 324.63 ms  (compiled)
+Module newton._src.solvers.implicit_mpm.implicit_mpm_solver_kernels.advect_particles_bd3cafe6 16dc91b load on device 'cuda:0' took 211.48 ms  (compiled)
+Module test_body_state__locals__test_fn_kernel_feb719cf feb719c load on device 'cuda:0' took 274.97 ms  (compiled)
+Module test_particle_state__locals__test_fn_kernel_9f967af0 9f967af load on device 'cuda:0' took 88.06 ms  (compiled)

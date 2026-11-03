@@ -1,0 +1,305 @@
+{
+ "source": "usd/construction_fireSafetyPoint_trolley_a01/simready_usd/sm_construction_fireSafetyPoint_trolley_a01_01.usd",
+ "variant": "PhysX",
+ "up_axis": "Z",
+ "meters_per_unit": 1.0,
+ "kilograms_per_unit": 1.0,
+ "default_prim": "/RootNode",
+ "labels": {
+  "semantics:labels:wikidata_class": "[fire safety]",
+  "semantics:labels:wikidata_qcode": "[Q2997557]"
+ },
+ "articulation_roots": [],
+ "bodies": [
+  {
+   "path": "/RootNode/Geometry/wheel_02_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.22808,
+    -0.47884,
+    0.109668
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.124251,
+    -0.503067,
+    0.005839
+   ],
+   "bounds_max": [
+    0.331909,
+    -0.454614,
+    0.213497
+   ],
+   "labels": {},
+   "effective_mass": 7.9707,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/body_01_obj_01",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.063505,
+    0.007928,
+    0.237709
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.243147,
+    -0.51197,
+    0.001068
+   ],
+   "bounds_max": [
+    0.243144,
+    0.51197,
+    1.799825
+   ],
+   "labels": {},
+   "effective_mass": 83.5249,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/glass_01_obj_01",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.031608,
+    0.286435,
+    1.360397
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.030133,
+    0.251707,
+    1.341446
+   ],
+   "bounds_max": [
+    0.034248,
+    0.321165,
+    1.379349
+   ],
+   "labels": {},
+   "effective_mass": 0.0061,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/wheel_01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.22808,
+    0.47884,
+    0.109668
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.124251,
+    0.454614,
+    0.005839
+   ],
+   "bounds_max": [
+    0.331909,
+    0.503067,
+    0.213497
+   ],
+   "labels": {},
+   "effective_mass": 7.9707,
+   "mass_source": "mesh_volume_x_density"
+  }
+ ],
+ "colliders": [
+  {
+   "path": "/RootNode/Geometry/wheel_02_obj_00/wheel_02_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/wheel_02_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_m_opaque__metal__paintedWorn_gray_a01",
+   "density": null,
+   "mesh_volume_m3": 0.00101537,
+   "hull_volume_m3": 0.00159406
+  },
+  {
+   "path": "/RootNode/Geometry/body_01_obj_01/body_01_mesh_01",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/body_01_obj_01",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_m_opaque__metal__paintedWorn_gray_a01",
+   "density": null,
+   "mesh_volume_m3": 0.01064011,
+   "hull_volume_m3": 0.5056973
+  },
+  {
+   "path": "/RootNode/Geometry/glass_01_obj_01/glass_01_mesh_01",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/glass_01_obj_01",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_m_trans__glass__clean_a01",
+   "density": null,
+   "mesh_volume_m3": 2.43e-06,
+   "hull_volume_m3": 8.25e-06
+  },
+  {
+   "path": "/RootNode/Geometry/wheel_01_obj_00/wheel_01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/wheel_01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_m_opaque__metal__paintedWorn_gray_a01",
+   "density": null,
+   "mesh_volume_m3": 0.00101537,
+   "hull_volume_m3": 0.00159406
+  }
+ ],
+ "joints": [
+  {
+   "path": "/RootNode/Joints/joint_wheel_02_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/body_01_obj_01/body_01_mesh_01",
+   "body1": "/RootNode/Geometry/wheel_02_obj_00/wheel_02_mesh_00",
+   "local_pos0": [
+    0.164575,
+    -0.486768,
+    -0.128041
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Y",
+   "lower_limit": -Infinity,
+   "upper_limit": Infinity,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_wheel_01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/body_01_obj_01/body_01_mesh_01",
+   "body1": "/RootNode/Geometry/wheel_01_obj_00/wheel_01_mesh_00",
+   "local_pos0": [
+    0.164575,
+    0.470913,
+    -0.128041
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Y",
+   "lower_limit": -Infinity,
+   "upper_limit": Infinity,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_glass_01_joint_00",
+   "type": "fixed",
+   "body0": "/RootNode/Geometry/body_01_obj_01/body_01_mesh_01",
+   "body1": "/RootNode/Geometry/glass_01_obj_01/glass_01_mesh_01",
+   "local_pos0": [
+    -0.031897,
+    0.278508,
+    1.122688
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false
+  }
+ ],
+ "materials": {
+  "/RootNode/PhysicsMaterials/physics_mat_m_opaque__metal__paintedWorn_gray_a01": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_m_opaque__metal__paintedWorn_gray_a01",
+   "static_friction": 0.30000001192092896,
+   "dynamic_friction": 0.30000001192092896,
+   "restitution": 0.10000000149011612,
+   "density": 7850.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_m_trans__glass__clean_a01": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_m_trans__glass__clean_a01",
+   "static_friction": 0.4000000059604645,
+   "dynamic_friction": 0.4000000059604645,
+   "restitution": 0.05000000074505806,
+   "density": 2500.0
+  }
+ },
+ "summary": {
+  "bodies": 4,
+  "colliders": 4,
+  "joints": 3,
+  "drives": 0,
+  "total_mass_kg": 99.472,
+  "bodies_without_explicit_mass": 4,
+  "approximations": [
+   "sdf"
+  ]
+ }
+}

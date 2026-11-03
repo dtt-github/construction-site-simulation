@@ -1,0 +1,544 @@
+{
+ "source": "usd/ladder_step_aluminium_a06/simready_usd/sm_ladder_step_aluminium_a06_01.usd",
+ "variant": "PhysX",
+ "up_axis": "Z",
+ "meters_per_unit": 1.0,
+ "kilograms_per_unit": 1.0,
+ "default_prim": "/RootNode",
+ "labels": {
+  "semantic:wikidata_class:params:semanticData": "ladder",
+  "semantic:wikidata_class:params:semanticType": "wikidata_class",
+  "semantic:wikidata_qcode:params:semanticData": "Q168639",
+  "semantic:wikidata_qcode:params:semanticType": "wikidata_qcode",
+  "semantics:labels:wikidata_class": "[ladder]",
+  "semantics:labels:wikidata_qcode": "[Q168639]"
+ },
+ "articulation_roots": [],
+ "bodies": [
+  {
+   "path": "/RootNode/Geometry/sm_spreader3_a06_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.0,
+    -0.184478,
+    1.180149
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.194053,
+    -0.194966,
+    1.16616
+   ],
+   "bounds_max": [
+    0.194053,
+    0.026158,
+    1.193638
+   ],
+   "labels": {},
+   "effective_mass": 0.0683,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_sideladder_a06_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.0,
+    0.047896,
+    1.726067
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.300829,
+    0.02055,
+    4e-05
+   ],
+   "bounds_max": [
+    0.300829,
+    0.535586,
+    1.73612
+   ],
+   "labels": {},
+   "effective_mass": 1.1177,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_mainladder_a06_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.116547,
+    -0.006167,
+    1.746967
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.300856,
+    -0.535585,
+    5.5e-05
+   ],
+   "bounds_max": [
+    0.300855,
+    0.073791,
+    1.753208
+   ],
+   "labels": {},
+   "effective_mass": 7.2256,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_spreader1_a06_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.000101,
+    -0.062713,
+    1.422564
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.127471,
+    -0.069588,
+    1.415
+   ],
+   "bounds_max": [
+    0.127269,
+    0.041213,
+    1.434554
+   ],
+   "labels": {},
+   "effective_mass": 0.0484,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_spreader2_a06_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.0,
+    0.19482,
+    1.180151
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.194053,
+    -0.015303,
+    1.168828
+   ],
+   "bounds_max": [
+    0.194053,
+    0.203386,
+    1.190995
+   ],
+   "labels": {},
+   "effective_mass": 0.1426,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_shelf_a06_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": 0.49929192662239075,
+   "density": null,
+   "center_of_mass": [
+    -9e-06,
+    0.152064,
+    0.003963
+   ],
+   "diagonal_inertia": [
+    0.002469,
+    0.003895,
+    0.0063
+   ],
+   "position": [
+    0.0,
+    0.09934,
+    1.42813
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.13014,
+    -0.000195,
+    1.410132
+   ],
+   "bounds_max": [
+    0.13014,
+    0.393543,
+    1.442025
+   ],
+   "labels": {},
+   "effective_mass": 0.49929192662239075,
+   "mass_source": "explicit"
+  }
+ ],
+ "colliders": [
+  {
+   "path": "/RootNode/Geometry/sm_spreader3_a06_obj_00/sm_spreader3_a06_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_spreader3_a06_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__rough_black_a",
+   "density": null,
+   "mesh_volume_m3": 7.189e-05,
+   "hull_volume_m3": 0.00189242
+  },
+  {
+   "path": "/RootNode/Geometry/sm_sideladder_a06_obj_00/sm_sideladder_a06_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_sideladder_a06_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__paper__unique_step_ladder_a",
+   "density": null,
+   "mesh_volume_m3": 0.00162219,
+   "hull_volume_m3": 0.03765777
+  },
+  {
+   "path": "/RootNode/Geometry/sm_mainladder_a06_obj_00/sm_mainladder_a06_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_mainladder_a06_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__orange_a",
+   "density": null,
+   "mesh_volume_m3": 0.00802841,
+   "hull_volume_m3": 0.09305745
+  },
+  {
+   "path": "/RootNode/Geometry/sm_spreader1_a06_obj_00/sm_spreader1_a06_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_spreader1_a06_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__aluminium_brushed_b",
+   "density": null,
+   "mesh_volume_m3": 1.791e-05,
+   "hull_volume_m3": 0.00041048
+  },
+  {
+   "path": "/RootNode/Geometry/sm_spreader2_a06_obj_00/sm_spreader2_a06_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_spreader2_a06_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__aluminium_brushed_b",
+   "density": null,
+   "mesh_volume_m3": 5.28e-05,
+   "hull_volume_m3": 0.00173123
+  },
+  {
+   "path": "/RootNode/Geometry/sm_shelf_a06_obj_00/sm_shelf_a06_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_shelf_a06_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__rough_black_a",
+   "density": null,
+   "mesh_volume_m3": 0.0023735,
+   "hull_volume_m3": 0.0027507
+  }
+ ],
+ "joints": [
+  {
+   "path": "/RootNode/Joints/joint_sm_spreader3_a06_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_mainladder_a06_obj_00/sm_mainladder_a06_mesh_00",
+   "body1": "/RootNode/Geometry/sm_spreader3_a06_obj_00/sm_spreader3_a06_mesh_00",
+   "local_pos0": [
+    -0.116547,
+    -0.177492,
+    -0.566817
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_pos1": [
+    -0.0,
+    0.000819,
+    1e-06
+   ],
+   "local_rot1_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": 0.0,
+   "upper_limit": 80.0,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_shelf_a06_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_sideladder_a06_obj_00/sm_sideladder_a06_mesh_00",
+   "body1": "/RootNode/Geometry/sm_shelf_a06_obj_00/sm_shelf_a06_mesh_00",
+   "local_pos0": [
+    0.0,
+    0.058192,
+    -0.297897
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_pos1": [
+    0.0,
+    0.006748,
+    4e-05
+   ],
+   "local_rot1_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": 0.0,
+   "upper_limit": 110.0,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_spreader1_a06_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_mainladder_a06_obj_00/sm_mainladder_a06_mesh_00",
+   "body1": "/RootNode/Geometry/sm_spreader1_a06_obj_00/sm_spreader1_a06_mesh_00",
+   "local_pos0": [
+    -0.116648,
+    -0.056546,
+    -0.324403
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -85.0,
+   "upper_limit": 0.0,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_sideladder_a06_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_mainladder_a06_obj_00/sm_mainladder_a06_mesh_00",
+   "body1": "/RootNode/Geometry/sm_sideladder_a06_obj_00/sm_sideladder_a06_mesh_00",
+   "local_pos0": [
+    -0.116547,
+    0.054063,
+    -0.020939
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -25.30000114440918,
+   "upper_limit": 7.900000095367432,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_spreader2_a06_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_sideladder_a06_obj_00/sm_sideladder_a06_mesh_00",
+   "body1": "/RootNode/Geometry/sm_spreader2_a06_obj_00/sm_spreader2_a06_mesh_00",
+   "local_pos0": [
+    0.0,
+    0.146924,
+    -0.545877
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -80.0,
+   "upper_limit": 0.0,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_link_01",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_spreader3_a06_obj_00/sm_spreader3_a06_mesh_00",
+   "body1": "/RootNode/Geometry/sm_spreader2_a06_obj_00/sm_spreader2_a06_mesh_00",
+   "local_pos0": [
+    0.0,
+    0.189978,
+    1e-06
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_pos1": [
+    -0.0,
+    -0.18932,
+    0.0
+   ],
+   "local_rot1_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": null,
+   "upper_limit": null,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_link_02",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_spreader1_a06_obj_00/sm_spreader1_a06_mesh_00",
+   "body1": "/RootNode/Geometry/sm_shelf_a06_obj_00/sm_shelf_a06_mesh_00",
+   "local_pos0": [
+    0.000101,
+    0.085878,
+    0.005566
+   ],
+   "local_rot0_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_pos1": [
+    0.0,
+    -0.076175,
+    0.0
+   ],
+   "local_rot1_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": null,
+   "upper_limit": null,
+   "limit_unit": "degrees"
+  }
+ ],
+ "materials": {
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__rough_black_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__rough_black_a",
+   "static_friction": 0.4000000059604645,
+   "dynamic_friction": 0.4000000059604645,
+   "restitution": 0.4000000059604645,
+   "density": 950.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__paper__unique_step_ladder_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__paper__unique_step_ladder_a",
+   "static_friction": 0.699999988079071,
+   "dynamic_friction": 0.699999988079071,
+   "restitution": 0.4000000059604645,
+   "density": 689.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__orange_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__orange_a",
+   "static_friction": 0.5,
+   "dynamic_friction": 0.44999998807907104,
+   "restitution": 0.11999999731779099,
+   "density": 900.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__aluminium_brushed_b": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__aluminium_brushed_b",
+   "static_friction": 0.6100000143051147,
+   "dynamic_friction": 0.4699999988079071,
+   "restitution": 0.10000000149011612,
+   "density": 2700.0
+  }
+ },
+ "summary": {
+  "bodies": 6,
+  "colliders": 6,
+  "joints": 7,
+  "drives": 0,
+  "total_mass_kg": 9.102,
+  "bodies_without_explicit_mass": 5,
+  "approximations": [
+   "sdf"
+  ]
+ }
+}

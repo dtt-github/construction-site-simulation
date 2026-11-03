@@ -1,0 +1,22 @@
+{
+  "renderer": "ANGLE (NVIDIA, Vulkan 1.4.312 (NVIDIA NVIDIA GB10 (0x00002E12)), NVIDIA)",
+  "load_s": 1.95,
+  "after_8s": {
+    "bodies": 127,
+    "fell_below_ground": [],
+    "moving_over_0.2_mps": [],
+    "max_speed_mps": 0.197,
+    "fps": 60.0,
+    "step_ms": 0.38
+  },
+  "after_drops_8s": {
+    "bodies": 134,
+    "fell_below_ground": [],
+    "moving_over_0.2_mps": [],
+    "max_speed_mps": 0,
+    "fps": 59.8,
+    "step_ms": 0.01,
+    "bodies_total": 134
+  },
+  "console_errors": []
+}

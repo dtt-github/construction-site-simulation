@@ -1,0 +1,24 @@
+# Python / conda environments
+.venv*/
+**/.venv*/
+**/.env-chrono/
+__pycache__/
+*.pyc
+
+# Downloaded tools and caches (rebuild per phase0/RESULTS.md)
+phase0/tools/
+phase0/isaac/cache/
+
+# Third-party assets: re-download with phase1/fetch_assets.sh (NVIDIA SimReady, CC BY 4.0)
+phase0/assets/
+phase1/usd/
+phase1/glb/
+
+# Large raw simulation dumps
+*.npz
+
+# Local tool config
+.claude/
+
+# Server runtime logs
+phase2/logs/server*.log

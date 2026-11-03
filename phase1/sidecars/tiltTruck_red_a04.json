@@ -1,0 +1,652 @@
+{
+ "source": "usd/tiltTruck_red_a04/simready_usd/sm_tiltTruck_red_a04_01.usd",
+ "variant": "PhysX",
+ "up_axis": "Z",
+ "meters_per_unit": 1.0,
+ "kilograms_per_unit": 1.0,
+ "default_prim": "/RootNode",
+ "labels": {
+  "semantic:wikidata_class:params:semanticData": "dumpster",
+  "semantic:wikidata_class:params:semanticType": "wikidata_class",
+  "semantic:wikidata_qcode:params:semanticData": "Q8703132",
+  "semantic:wikidata_qcode:params:semanticType": "wikidata_qcode",
+  "semantics:labels:wikidata_class": "[dumpster]",
+  "semantics:labels:wikidata_qcode": "[Q8703132]"
+ },
+ "articulation_roots": [],
+ "bodies": [
+  {
+   "path": "/RootNode/Geometry/sm_rear_wheel1_a04_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.324547,
+    0.188151,
+    0.153112
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.244413,
+    0.035039,
+    0.0
+   ],
+   "bounds_max": [
+    0.331344,
+    0.341263,
+    0.306224
+   ],
+   "labels": {},
+   "effective_mass": 46.704,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_lid2_a04_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.000367,
+    0.129275,
+    1.309891
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.427056,
+    0.125785,
+    1.082507
+   ],
+   "bounds_max": [
+    0.426321,
+    0.930521,
+    1.313381
+   ],
+   "labels": {},
+   "effective_mass": 10.8283,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_frame1_a04_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.216134,
+    -0.522422,
+    0.161483
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.185913,
+    -0.572887,
+    0.055657
+   ],
+   "bounds_max": [
+    0.246355,
+    -0.492201,
+    0.161483
+   ],
+   "labels": {},
+   "effective_mass": 0.3909,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_wheel2_a04_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.215922,
+    -0.552924,
+    0.065028
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.234484,
+    -0.617952,
+    -0.0
+   ],
+   "bounds_max": [
+    -0.197359,
+    -0.487895,
+    0.130056
+   ],
+   "labels": {},
+   "effective_mass": 0.4259,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_wheel1_a04_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.216134,
+    -0.552924,
+    0.065028
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.197571,
+    -0.617952,
+    -0.0
+   ],
+   "bounds_max": [
+    0.234696,
+    -0.487895,
+    0.130056
+   ],
+   "labels": {},
+   "effective_mass": 0.4259,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_body_a04_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.420812,
+    -0.928309,
+    0.038156
+   ],
+   "bounds_max": [
+    0.420812,
+    0.928309,
+    1.149709
+   ],
+   "labels": {},
+   "effective_mass": 367.7074,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_rear_wheel2_a04_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.324335,
+    0.188151,
+    0.153112
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.331132,
+    0.035071,
+    3.2e-05
+   ],
+   "bounds_max": [
+    -0.244199,
+    0.341231,
+    0.306192
+   ],
+   "labels": {},
+   "effective_mass": 46.6847,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_frame2_a04_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.215922,
+    -0.522422,
+    0.161483
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.246143,
+    -0.572887,
+    0.055657
+   ],
+   "bounds_max": [
+    -0.185701,
+    -0.492201,
+    0.161483
+   ],
+   "labels": {},
+   "effective_mass": 0.3909,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_lid1_a04_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.000367,
+    0.129275,
+    1.309891
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.427055,
+    -0.889903,
+    1.082507
+   ],
+   "bounds_max": [
+    0.42632,
+    0.14149,
+    1.313382
+   ],
+   "labels": {},
+   "effective_mass": 100.7811,
+   "mass_source": "mesh_volume_x_density"
+  }
+ ],
+ "colliders": [
+  {
+   "path": "/RootNode/Geometry/sm_rear_wheel1_a04_obj_00/sm_rear_wheel1_a04_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_rear_wheel1_a04_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__glossy_a",
+   "density": null,
+   "mesh_volume_m3": 0.00594955,
+   "hull_volume_m3": 0.00578592
+  },
+  {
+   "path": "/RootNode/Geometry/sm_lid2_a04_obj_00/sm_lid2_a04_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_lid2_a04_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__black_a",
+   "density": null,
+   "mesh_volume_m3": 0.01139821,
+   "hull_volume_m3": 0.1174537
+  },
+  {
+   "path": "/RootNode/Geometry/sm_frame1_a04_obj_00/sm_frame1_a04_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_frame1_a04_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__glossy_a",
+   "density": null,
+   "mesh_volume_m3": 4.98e-05,
+   "hull_volume_m3": 0.00028595
+  },
+  {
+   "path": "/RootNode/Geometry/sm_wheel2_a04_obj_00/sm_wheel2_a04_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_wheel2_a04_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__rubber__rough_black_a",
+   "density": null,
+   "mesh_volume_m3": 0.00035492,
+   "hull_volume_m3": 0.00043457
+  },
+  {
+   "path": "/RootNode/Geometry/sm_wheel1_a04_obj_00/sm_wheel1_a04_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_wheel1_a04_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__rubber__rough_black_a",
+   "density": null,
+   "mesh_volume_m3": 0.00035492,
+   "hull_volume_m3": 0.00043457
+  },
+  {
+   "path": "/RootNode/Geometry/sm_body_a04_obj_00/sm_body_a04_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_body_a04_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__red_a",
+   "density": null,
+   "mesh_volume_m3": 0.04714197,
+   "hull_volume_m3": 1.18702422
+  },
+  {
+   "path": "/RootNode/Geometry/sm_rear_wheel2_a04_obj_00/sm_rear_wheel2_a04_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_rear_wheel2_a04_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__glossy_a",
+   "density": null,
+   "mesh_volume_m3": 0.00594709,
+   "hull_volume_m3": 0.00578355
+  },
+  {
+   "path": "/RootNode/Geometry/sm_frame2_a04_obj_00/sm_frame2_a04_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_frame2_a04_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__glossy_a",
+   "density": null,
+   "mesh_volume_m3": 4.98e-05,
+   "hull_volume_m3": 0.00028595
+  },
+  {
+   "path": "/RootNode/Geometry/sm_lid1_a04_obj_00/sm_lid1_a04_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_lid1_a04_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__glossy_a",
+   "density": null,
+   "mesh_volume_m3": 0.01283836,
+   "hull_volume_m3": 0.15142423
+  }
+ ],
+ "joints": [
+  {
+   "path": "/RootNode/Joints/joint_sm_rear_wheel1_a04_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_body_a04_obj_00/sm_body_a04_mesh_00",
+   "body1": "/RootNode/Geometry/sm_rear_wheel1_a04_obj_00/sm_rear_wheel1_a04_mesh_00",
+   "local_pos0": [
+    0.324547,
+    0.188151,
+    0.153112
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -Infinity,
+   "upper_limit": Infinity,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_frame1_a04_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_body_a04_obj_00/sm_body_a04_mesh_00",
+   "body1": "/RootNode/Geometry/sm_frame1_a04_obj_00/sm_frame1_a04_mesh_00",
+   "local_pos0": [
+    0.216134,
+    -0.522422,
+    0.161483
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Z",
+   "lower_limit": -Infinity,
+   "upper_limit": Infinity,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_lid1_a04_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_body_a04_obj_00/sm_body_a04_mesh_00",
+   "body1": "/RootNode/Geometry/sm_lid1_a04_obj_00/sm_lid1_a04_mesh_00",
+   "local_pos0": [
+    -0.000367,
+    0.133215,
+    1.287336
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -110.0,
+   "upper_limit": 0.0,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_lid2_a04_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_body_a04_obj_00/sm_body_a04_mesh_00",
+   "body1": "/RootNode/Geometry/sm_lid2_a04_obj_00/sm_lid2_a04_mesh_00",
+   "local_pos0": [
+    -0.000367,
+    0.133215,
+    1.287337
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": 0.0,
+   "upper_limit": 110.0,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_frame2_a04_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_body_a04_obj_00/sm_body_a04_mesh_00",
+   "body1": "/RootNode/Geometry/sm_frame2_a04_obj_00/sm_frame2_a04_mesh_00",
+   "local_pos0": [
+    -0.215922,
+    -0.522422,
+    0.161483
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Z",
+   "lower_limit": -Infinity,
+   "upper_limit": Infinity,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_wheel1_a04_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_frame1_a04_obj_00/sm_frame1_a04_mesh_00",
+   "body1": "/RootNode/Geometry/sm_wheel1_a04_obj_00/sm_wheel1_a04_mesh_00",
+   "local_pos0": [
+    0.0,
+    -0.030501,
+    -0.096455
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -Infinity,
+   "upper_limit": Infinity,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_wheel2_a04_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_frame2_a04_obj_00/sm_frame2_a04_mesh_00",
+   "body1": "/RootNode/Geometry/sm_wheel2_a04_obj_00/sm_wheel2_a04_mesh_00",
+   "local_pos0": [
+    0.0,
+    -0.030501,
+    -0.096455
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -Infinity,
+   "upper_limit": Infinity,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_rear_wheel2_a04_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_body_a04_obj_00/sm_body_a04_mesh_00",
+   "body1": "/RootNode/Geometry/sm_rear_wheel2_a04_obj_00/sm_rear_wheel2_a04_mesh_00",
+   "local_pos0": [
+    -0.324335,
+    0.188151,
+    0.153112
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -Infinity,
+   "upper_limit": Infinity,
+   "limit_unit": "degrees"
+  }
+ ],
+ "materials": {
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__glossy_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__glossy_a",
+   "static_friction": 0.30000001192092896,
+   "dynamic_friction": 0.30000001192092896,
+   "restitution": 0.10000000149011612,
+   "density": 7850.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__black_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__black_a",
+   "static_friction": 0.4000000059604645,
+   "dynamic_friction": 0.4000000059604645,
+   "restitution": 0.4000000059604645,
+   "density": 950.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__rubber__rough_black_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__rubber__rough_black_a",
+   "static_friction": 0.800000011920929,
+   "dynamic_friction": 0.800000011920929,
+   "restitution": 0.800000011920929,
+   "density": 1200.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__red_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__red_a",
+   "static_friction": 0.5,
+   "dynamic_friction": 0.4000000059604645,
+   "restitution": 0.15000000596046448,
+   "density": 7800.0
+  }
+ },
+ "summary": {
+  "bodies": 9,
+  "colliders": 9,
+  "joints": 8,
+  "drives": 0,
+  "total_mass_kg": 574.339,
+  "bodies_without_explicit_mass": 9,
+  "approximations": [
+   "sdf"
+  ]
+ }
+}

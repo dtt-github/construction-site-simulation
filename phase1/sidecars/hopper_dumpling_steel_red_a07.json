@@ -1,0 +1,86 @@
+{
+ "source": "usd/hopper_dumpling_steel_red_a07/simready_usd/sm_hopper_dumpling_steel_red_a07_01.usd",
+ "variant": "PhysX",
+ "up_axis": "Z",
+ "meters_per_unit": 1.0,
+ "kilograms_per_unit": 1.0,
+ "default_prim": "/RootNode",
+ "labels": {
+  "semantic:wikidata_class:params:semanticData": "hopper ",
+  "semantic:wikidata_class:params:semanticType": "wikidata_class",
+  "semantic:wikidata_qcode:params:semanticData": "Q3997382",
+  "semantic:wikidata_qcode:params:semanticType": "wikidata_qcode",
+  "semantics:labels:wikidata_class": "[hopper ]",
+  "semantics:labels:wikidata_qcode": "[Q3997382]"
+ },
+ "articulation_roots": [],
+ "bodies": [
+  {
+   "path": "/RootNode/Geometry/sm_hopper_dumpling_steel_red_a07_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.0,
+    0.0,
+    1e-06
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -1.040423,
+    -0.879607,
+    1e-06
+   ],
+   "bounds_max": [
+    1.040422,
+    0.879607,
+    1.295445
+   ],
+   "labels": {},
+   "effective_mass": 574.3177,
+   "mass_source": "mesh_volume_x_density"
+  }
+ ],
+ "colliders": [
+  {
+   "path": "/RootNode/Geometry/sm_hopper_dumpling_steel_red_a07_obj_00/sm_hopper_dumpling_steel_red_a07_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_hopper_dumpling_steel_red_a07_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__painted_red_a",
+   "density": null,
+   "mesh_volume_m3": 0.07363048,
+   "hull_volume_m3": 4.17787216
+  }
+ ],
+ "joints": [],
+ "materials": {
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__painted_red_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__painted_red_a",
+   "static_friction": 0.5,
+   "dynamic_friction": 0.4000000059604645,
+   "restitution": 0.15000000596046448,
+   "density": 7800.0
+  }
+ },
+ "summary": {
+  "bodies": 1,
+  "colliders": 1,
+  "joints": 0,
+  "drives": 0,
+  "total_mass_kg": 574.318,
+  "bodies_without_explicit_mass": 1,
+  "approximations": [
+   "sdf"
+  ]
+ }
+}

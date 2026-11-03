@@ -1,0 +1,170 @@
+{
+ "source": "usd/bucket_utility_red_a01/simready_usd/sm_bucket_utility_red_a01_01.usd",
+ "variant": "PhysX",
+ "up_axis": "Z",
+ "meters_per_unit": 1.0,
+ "kilograms_per_unit": 1.0,
+ "default_prim": "/RootNode",
+ "labels": {
+  "semantic:wikidata_class:params:semanticData": "bucket",
+  "semantic:wikidata_class:params:semanticType": "wikidata_class",
+  "semantic:wikidata_qcode:params:semanticData": "Q47107",
+  "semantic:wikidata_qcode:params:semanticType": "wikidata_qcode",
+  "semantics:labels:wikidata_class": "[bucket]",
+  "semantics:labels:wikidata_qcode": "[Q47107]"
+ },
+ "articulation_roots": [],
+ "bodies": [
+  {
+   "path": "/RootNode/Geometry/sm_handle_a01_01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.0,
+    -0.0,
+    0.231006
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.169256,
+    -0.004101,
+    0.073349
+   ],
+   "bounds_max": [
+    0.169016,
+    0.145347,
+    0.234951
+   ],
+   "labels": {},
+   "effective_mass": 0.2371,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_bucket_utility_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": 1.289946436882019,
+   "density": null,
+   "center_of_mass": [
+    -0.0,
+    0.018138,
+    0.062274
+   ],
+   "diagonal_inertia": [
+    0.025856,
+    0.025045,
+    0.021017
+   ],
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.155751,
+    -0.177759,
+    0.0
+   ],
+   "bounds_max": [
+    0.155749,
+    0.150297,
+    0.258783
+   ],
+   "labels": {},
+   "effective_mass": 1.289946436882019,
+   "mass_source": "explicit"
+  }
+ ],
+ "colliders": [
+  {
+   "path": "/RootNode/Geometry/sm_handle_a01_01_obj_00/sm_handle_a01_01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_handle_a01_01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__glossy_a",
+   "density": null,
+   "mesh_volume_m3": 2.964e-05,
+   "hull_volume_m3": 0.00071204
+  },
+  {
+   "path": "/RootNode/Geometry/sm_bucket_utility_a01_obj_00/sm_bucket_utility_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_bucket_utility_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__red_a",
+   "density": null,
+   "mesh_volume_m3": 0.00108209,
+   "hull_volume_m3": 0.01646878
+  }
+ ],
+ "joints": [
+  {
+   "path": "/RootNode/Joints/joint_sm_handle_a01_01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_bucket_utility_a01_obj_00/sm_bucket_utility_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_handle_a01_01_obj_00/sm_handle_a01_01_mesh_00",
+   "local_pos0": [
+    0.0,
+    -0.0,
+    0.231006
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": true,
+   "axis": "X",
+   "lower_limit": 0.0,
+   "upper_limit": 293.8000183105469,
+   "limit_unit": "degrees"
+  }
+ ],
+ "materials": {
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__glossy_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__glossy_a",
+   "static_friction": 0.30000001192092896,
+   "dynamic_friction": 0.30000001192092896,
+   "restitution": 0.10000000149011612,
+   "density": 8000.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__red_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__red_a",
+   "static_friction": 0.4000000059604645,
+   "dynamic_friction": 0.4000000059604645,
+   "restitution": 0.4000000059604645,
+   "density": 950.0
+  }
+ },
+ "summary": {
+  "bodies": 2,
+  "colliders": 2,
+  "joints": 1,
+  "drives": 0,
+  "total_mass_kg": 1.527,
+  "bodies_without_explicit_mass": 1,
+  "approximations": [
+   "sdf"
+  ]
+ }
+}

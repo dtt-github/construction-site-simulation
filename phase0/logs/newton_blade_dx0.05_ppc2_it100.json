@@ -1,0 +1,21 @@
+{
+  "voxel_m": 0.05,
+  "ppc_per_axis": 2,
+  "particles": 273861,
+  "bed_m": [
+    4.0,
+    2.0,
+    0.5
+  ],
+  "iterations": 100,
+  "frame_dt_s": 0.016666666666666666,
+  "ms_per_frame": 30.62,
+  "realtime_factor": 0.544,
+  "particle_steps_per_s_millions": 8.94,
+  "blade_force_x_N_mean_steady": 4631.3,
+  "blade_force_z_N_mean_steady": 1178.6,
+  "mckyes_force_N": 3275.3,
+  "mckyes_N_gamma": 5.217,
+  "force_ratio_sim_over_mckyes": 1.414,
+  "travel_m": 0.5
+}

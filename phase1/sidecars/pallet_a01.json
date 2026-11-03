@@ -1,0 +1,86 @@
+{
+ "source": "usd/pallet_a01/simready_usd/sm_pallet_a01_01.usd",
+ "variant": "PhysX",
+ "up_axis": "Z",
+ "meters_per_unit": 1.0,
+ "kilograms_per_unit": 1.0,
+ "default_prim": "/RootNode",
+ "labels": {
+  "semantic:wikidata_class:params:semanticData": "pallet",
+  "semantic:wikidata_class:params:semanticType": "wikidata_class",
+  "semantic:wikidata_qcode:params:semanticData": "Q505996",
+  "semantic:wikidata_qcode:params:semanticType": "wikidata_qcode",
+  "semantics:labels:wikidata_class": "[pallet]",
+  "semantics:labels:wikidata_qcode": "[Q505996]"
+ },
+ "articulation_roots": [],
+ "bodies": [
+  {
+   "path": "/RootNode/Geometry/sm_pallet_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.602101,
+    -0.400193,
+    0.0
+   ],
+   "bounds_max": [
+    0.602101,
+    0.400193,
+    0.208646
+   ],
+   "labels": {},
+   "effective_mass": 56.8785,
+   "mass_source": "mesh_volume_x_density"
+  }
+ ],
+ "colliders": [
+  {
+   "path": "/RootNode/Geometry/sm_pallet_a01_obj_00/sm_pallet_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_pallet_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__wood__unique_pallet_a",
+   "density": null,
+   "mesh_volume_m3": 0.08125504,
+   "hull_volume_m3": 0.2008078
+  }
+ ],
+ "joints": [],
+ "materials": {
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__wood__unique_pallet_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__wood__unique_pallet_a",
+   "static_friction": 0.5,
+   "dynamic_friction": 0.5,
+   "restitution": 0.4000000059604645,
+   "density": 700.0
+  }
+ },
+ "summary": {
+  "bodies": 1,
+  "colliders": 1,
+  "joints": 0,
+  "drives": 0,
+  "total_mass_kg": 56.879,
+  "bodies_without_explicit_mass": 1,
+  "approximations": [
+   "sdf"
+  ]
+ }
+}

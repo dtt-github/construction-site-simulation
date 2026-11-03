@@ -1,0 +1,289 @@
+<title>Construction Site Sim Feasibility</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column like a site engineering memo, with a status board up top and wide tables in their own scroll boxes */
+:root {
+  --bg: #f3f3f0;          /* concrete */
+  --surface: #ffffff;
+  --fg: #1d2023;
+  --muted: #5d6266;
+  --line: #d6d6d0;
+  --accent: #b86e00;      /* hazard amber, darkened for text contrast */
+  --accent-fill: #f2a900;
+  --ok: #2f7a3e;   --ok-bg: #e3f1e5;
+  --warn: #8a5a00; --warn-bg: #fbefd2;
+  --bad: #a3322a;  --bad-bg: #f8e1de;
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17191b; --surface: #202326; --fg: #e8e8e4; --muted: #a2a7aa; --line: #34383b;
+    --accent: #f2b43a; --accent-fill: #f2a900;
+    --ok: #7fcf8d; --ok-bg: #1d3323; --warn: #f2c46a; --warn-bg: #3a2f17; --bad: #f19a90; --bad-bg: #3d2220;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17191b; --surface: #202326; --fg: #e8e8e4; --muted: #a2a7aa; --line: #34383b;
+  --accent: #f2b43a; --accent-fill: #f2a900;
+  --ok: #7fcf8d; --ok-bg: #1d3323; --warn: #f2c46a; --warn-bg: #3a2f17; --bad: #f19a90; --bad-bg: #3d2220;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 400 16px/1.6 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 48px; }
+.tape { height: 10px; margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))) 0 calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
+  background: repeating-linear-gradient(-45deg, var(--accent-fill) 0 14px, var(--fg) 14px 28px); opacity: .9; }
+header { padding-top: 40px; display: flex; flex-direction: column; gap: 12px; }
+.eyebrow { font: 600 12px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 700; text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-size: clamp(2.4rem, 6vw, 3.6rem); letter-spacing: .005em; }
+h2 { font-size: 1.9rem; display: flex; align-items: baseline; gap: 12px; }
+h2 .sec { font: 500 13px/1 var(--font-mono); color: var(--accent); }
+h3 { font-size: 1.3rem; }
+p { margin: 0; max-width: 65ch; }
+.lede { font-size: 1.15rem; color: var(--fg); }
+.meta { color: var(--muted); font-size: .9rem; }
+section { display: flex; flex-direction: column; gap: 16px; }
+code, .mono { font-family: var(--font-mono); font-size: .86em; }
+
+/* status board */
+.board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.board .cell { background: var(--surface); border: 1px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.board .cell h3 { font-size: 1.15rem; }
+.board .cell p { font-size: .92rem; color: var(--muted); }
+@media (max-width: 680px) { .board { grid-template-columns: 1fr; } }
+
+.pill { display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; font: 600 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 3px; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.ok { color: var(--ok); background: var(--ok-bg); }
+.warn { color: var(--warn); background: var(--warn-bg); }
+.bad { color: var(--bad); background: var(--bad-bg); }
+
+.verdict { border-left: 4px solid var(--accent-fill); padding: 4px 0 4px 18px; display: flex; flex-direction: column; gap: 10px; }
+
+ul.plain { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 8px; max-width: 70ch; }
+
+.tbl { overflow-x: auto; border: 1px solid var(--line); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: .93rem; }
+th, td { text-align: left; vertical-align: top; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th { font: 600 11px/1.2 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+td .ids { display: block; margin-top: 6px; color: var(--muted); font-family: var(--font-mono); font-size: .78rem; line-height: 1.5; }
+
+.spec { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 20px; font-size: .95rem; }
+.spec dt { font-family: var(--font-mono); font-size: .8rem; color: var(--muted); padding-top: 3px; }
+.spec dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+ol.phases { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; counter-reset: ph; }
+ol.phases li { counter-increment: ph; display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 16px; padding: 18px 0; border-top: 1px solid var(--line); }
+ol.phases li::before { content: counter(ph, decimal-leading-zero); font: 700 2rem/1 var(--font-display); color: var(--accent); }
+ol.phases li div { display: flex; flex-direction: column; gap: 6px; }
+
+.sources { font-size: .88rem; columns: 2 280px; column-gap: 32px; padding-left: 1.2em; margin: 0; }
+.sources li { break-inside: avoid; margin-bottom: 6px; }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+
+<div class="tape" aria-hidden="true"></div>
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Feasibility review · 2 Nov 2026 · updated with browser decision and physics research</span>
+    <h1>Construction site simulation on NVIDIA SimReady + Isaac Sim</h1>
+    <p class="lede">Can we build a construction site simulation with full, realistic physics on NVIDIA's free SimReady assets, the way someone recently showed a warehouse?</p>
+    <p class="meta">Scope: the three source links, NVIDIA's SimReady asset library (scanned in full), Isaac Sim / Isaac Lab physics, and our DGX Spark workstation.</p>
+  </header>
+
+  <section aria-labelledby="verdict">
+    <h2 id="verdict"><span class="sec">§1</span>Verdict</h2>
+    <div class="verdict">
+      <p><strong>Yes, with two large gaps.</strong> NVIDIA's stack can run a physics-based construction site: rigid bodies, jointed machines, collisions, sensors. The free assets give us about 40% of what a site needs: barriers, scaffolds, beams, pallets, tools, forklifts. They contain <strong>no heavy machines</strong> and <strong>no soil or terrain</strong>. Those two parts are where the real work is.</p>
+      <p><strong>We don't have to use Omniverse.</strong> The assets are plain OpenUSD files and load outside NVIDIA's tools. The recommended setup is a hybrid: the DGX Spark runs the realistic physics, and a three.js page in the browser shows it. Omniverse / Isaac Sim stays optional.</p>
+    </div>
+    <div class="board">
+      <div class="cell"><span class="pill ok">Ready</span><h3>Site layout &amp; props</h3><p>Fences, scaffolds, ladders, beams, pallets, tools, forklifts. All have mass, colliders and friction set.</p></div>
+      <div class="cell"><span class="pill warn">Build or source</span><h3>Heavy machines</h3><p>Excavators, cranes, trucks and loaders are missing. Import from CAD or URDF and rig the joints ourselves.</p></div>
+      <div class="cell"><span class="pill bad">Experimental</span><h3>Digging &amp; soil</h3><p>Newton's granular solver handles small patches. Excavator-to-soil coupling is unproven in Isaac.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="links">
+    <h2 id="links"><span class="sec">§2</span>What the source links show</h2>
+    <ul class="plain">
+      <li><strong>X post (@SahilExec, 31 Oct 2026).</strong> A 25-second repost of a video by @anxuanng (codepawl). It claims Claude Opus 5.5 built a warehouse with racks, forklifts and picking/packing zones from SimReady assets. There's no code or repo. The same group published <code>codepawl/simready-glb</code>, the assets converted to GLB, which drops physics data. Our inference: the demo was most likely a 3D layout with scripted motion, not a physics simulation. We could not watch the video.</li>
+      <li><strong>Hugging Face: SimReady Central.</strong> A free library of 2,000+ OpenUSD assets with mass, friction, colliders, joints and semantic labels. It covers robotics, warehouses, factories, AI-factory racks and household items. Construction is not mentioned.</li>
+      <li><strong>NVIDIA blog: agents building simulations.</strong> Frontier AI agents assemble scenes with Isaac Sim, Newton physics, Warp and the new <code>ov*</code> libraries. All the examples are warehouses, kitchens and factories. Terrain and soil are not covered.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="assets">
+    <h2 id="assets"><span class="sec">§3</span>Asset coverage</h2>
+    <p>We scanned all 2,677 assets in <code>nvidia/simready-assets</code> (CC-BY-4.0, not gated) plus <code>PhysicalAI-SimReady-Warehouse-01</code>. Each asset ships separate physics payloads for <strong>PhysX, Newton and MuJoCo</strong>.</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th style="width:26%">Site need</th><th style="width:16%">Status</th><th>Available assets / what's missing</th></tr></thead>
+        <tbody>
+          <tr><td>Perimeter &amp; safety</td><td><span class="pill ok">Have</span></td><td>Metal fences, safety gates, plastic wall barriers, safety tape, fire-safety and first-aid trolleys, hard hats.<span class="ids">barrier_fence_metal_a02 · barrier_wall_plastic_orange_a03 · construction_firstAidPoint_trolley_a01 · ppe_helmet_hardHat_a01</span></td></tr>
+          <tr><td>Access &amp; structure</td><td><span class="pill ok">Have</span></td><td>Rolling steel scaffolds, about 12 ladder types, steel beams, plastic pipes.<span class="ids">scaffold_rolling_steel_a01 · ladder_extention_fiberglass_a03 · structure_beam_center_a01 · pipe_plastic_gray_b08</span></td></tr>
+          <tr><td>Material handling</td><td><span class="pill ok">Have</span></td><td>Forklifts (5), pallet jacks, ~60 pallets, wheelbarrow, tilt trucks, steel hoppers, hand trucks, scissor lift, engine crane and hoist.<span class="ids">vehicle_forklift_orange_a01 · construction_wheelbarrow_metal_a01 · hopper_dumpling_steel_red_a07 · vehicleSupport_scissor_lift_c01</span></td></tr>
+          <tr><td>Tools</td><td><span class="pill ok">Have</span></td><td>Sledgehammers, mallets, drills, wrenches, tool carts and cabinets, drums, crates.</td></tr>
+          <tr><td>Heavy equipment</td><td><span class="pill bad">Missing</span></td><td>Excavator, tower crane, mobile crane, dump truck, wheel loader, bulldozer, concrete mixer or pump, compactor.</td></tr>
+          <tr><td>Building materials</td><td><span class="pill bad">Missing</span></td><td>Rebar, formwork, bricks and blocks, cement bags, timber, precast panels, partially built structures.</td></tr>
+          <tr><td>Ground</td><td><span class="pill bad">Missing</span></td><td>Terrain, excavation pits, stockpiles, gravel, mud.</td></tr>
+          <tr><td>Workers</td><td><span class="pill warn">Elsewhere</span></td><td>Not in SimReady. Isaac Sim's animated-character tools cover walking workers with scripted routes.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="decision">
+    <h2 id="decision"><span class="sec">§4</span>Browser or Omniverse</h2>
+    <p><strong>The assets work in a three.js browser stack.</strong> We installed the standard USD Python library (<code>usd-core</code> 26.11) on our DGX Spark. It read the masses, joints, colliders and friction values from a real asset (the forklift) without any NVIDIA software. A third party has converted 2,595 of the assets to web-ready GLB files (<code>codepawl/simready-glb</code>, 228 GB down to 3.2 GB), with the physics data added back in. In their tests, the converted physics matched the originals.</p>
+    <p><strong>Loading USD directly in the browser isn't practical yet.</strong> three.js r187's USD loader can't fetch multi-file assets over the web and ignores physics. The best full in-browser USD library is licensed for non-commercial use only. So the route is: convert the assets offline, then load GLB files plus a physics data file.</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th style="width:22%">Option</th><th style="width:16%">Realism</th><th>What it means</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Hybrid</strong> (recommended)</td><td><span class="pill ok">Highest</span></td><td>The DGX Spark runs soil, machines, hydraulics and cables (NVIDIA Newton, with Project Chrono as the fallback). It streams compact positions and terrain changes to a three.js page. Many viewers, no video encoding, and the GPU is left free for physics.</td></tr>
+          <tr><td>All-browser</td><td><span class="pill warn">Reduced</span></td><td>Jolt physics in the browser for the machines, plus a small neural network that predicts how the ground changes, trained on the server's simulations. Good for demos and training; not accurate for digging forces.</td></tr>
+          <tr><td>Omniverse / Isaac Sim streaming</td><td><span class="pill warn">High, limited</span></td><td>Photoreal video streamed to the browser. Isaac Sim's web viewer allows one viewer per instance with no login. Use it for checking scenes, camera and LiDAR simulation, and a few high-quality views.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><strong>Why the browser can't do the digging alone:</strong> browser GPU particle soil reaches about 100k–300k particles in real time. That's only a few cubic metres, those demos are fluids rather than sand, and none produces accurate digging forces. Chrome on ARM Linux, like our DGX Spark, also needs a flag to enable WebGPU.</p>
+  </section>
+
+  <section aria-labelledby="physics">
+    <h2 id="physics"><span class="sec">§5</span>How realistic the physics can be</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th style="width:30%">Behaviour</th><th style="width:16%">Fidelity</th><th>Approach and limits</th></tr></thead>
+        <tbody>
+          <tr><td>Machines driving, lifting, carrying; collisions; falling objects</td><td><span class="pill ok">Good</span></td><td>PhysX rigid bodies and articulations. Hydraulic cylinders become motor-driven joints with force limits.</td></tr>
+          <tr><td>Crane cables and swinging loads</td><td><span class="pill warn">Approximate</span></td><td>A chain of linked rigid segments. It works, but needs tuning for stability and stretch.</td></tr>
+          <tr><td>Digging sand, soil, gravel; stockpiles</td><td><span class="pill bad">Limited</span></td><td>Isaac Lab 3.0 has Newton's implicit MPM solver for granular material. Two-way coupling with rigid bodies is in an experimental module. We found no published excavator example. Realistic for a few cubic metres, not a whole site in real time.</td></tr>
+          <tr><td>Cameras, LiDAR, synthetic training data</td><td><span class="pill ok">Good</span></td><td>RTX sensor simulation with semantic labels from the SimReady assets.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><strong>If earthmoving has to be truly realistic:</strong> the industry tool is <a href="https://algoryx.se/" target="_blank" rel="noopener">AGX Dynamics</a>. Its terrain module has working excavator and loader demos, but it's commercial and runs in Unity or Unreal, not Omniverse. <a href="https://projectchrono.org/" target="_blank" rel="noopener">Project Chrono</a> is a free alternative with a soil model.</p>
+  </section>
+
+  <section aria-labelledby="research">
+    <h2 id="research"><span class="sec">§6</span>What published research says about soil</h2>
+    <p>We surveyed soil and terrain simulation research worldwide. Each method trades realism against speed; only one has published accuracy at real-time speed.</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th style="width:28%">Method</th><th style="width:26%">Best validated accuracy</th><th style="width:22%">Speed</th><th>Open implementation</th></tr></thead>
+        <tbody>
+          <tr><td>Height map + particles near the bucket</td><td>10–25% vs DEM; ~10% vs field</td><td>Real time, &gt;1000× faster than DEM</td><td>None (AGX is commercial); method is published</td></tr>
+          <tr><td>GPU MPM (particles on a grid)</td><td>Sparse; real-excavator task transfer in 2026</td><td>Near-interactive in a small zone</td><td>Newton implicit MPM (experimental)</td></tr>
+          <tr><td>GPU SPH (Chrono CRM)</td><td>3 physical tests + digging benchmark</td><td>"Near interactive" at scale</td><td>Chrono CRM (BSD-3)</td></tr>
+          <tr><td>Terramechanics (Bekker-Wong, SCM)</td><td>Good for wheels and tracks</td><td>Real time on CPU</td><td>Chrono SCM</td></tr>
+          <tr><td>GPU DEM</td><td>~10% vs field bucket filling</td><td>100–10,000× slower than real time</td><td>Chrono DEM-Engine</td></tr>
+          <tr><td>FEM / CEL</td><td>8.8% vs soil bin</td><td>Hours per case</td><td>Abaqus (commercial)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="plain">
+      <li><strong>Best real-time method:</strong> keep the ground as a height map and turn only the soil near the bucket into particles (Servin and colleagues, Umeå / Algoryx, 2021). It's within 10–25% of slow, high-detail particle simulation (DEM) while running more than 1,000× faster.</li>
+      <li><strong>Calibration beats detail:</strong> field tests on a real wheel loader showed a ~10% gap between simulation and reality, and more simulation detail barely improved it.</li>
+      <li><strong>Real excavator:</strong> in September 2026, ETH Zurich trained a controller in GPU particle soil and ran it on an 11.5 t excavator. It built a 42 m embankment at an expert operator's pace. This is a preprint, and it shows the task works, not that the forces are accurate.</li>
+      <li><strong>Machines:</strong> realistic feel comes from hydraulics (pump, valves, cylinder pressures) computed inside each physics step. Most robotics simulators skip this and command joint speeds directly.</li>
+      <li><strong>Cranes:</strong> heavy loads on light ropes break game-style physics. Use a rope model built for heavy loads (adaptive-resolution wire or direct-solve rods), with the hook and load as full rigid bodies so sway and twist emerge naturally.</li>
+      <li><strong>Gaps nobody has filled:</strong> no validated digging forces in wet clay or mud, no shared excavator benchmark, and no public dataset pairing digging forces with lab-measured soil. That calibration will be our own work.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="hw">
+    <h2 id="hw"><span class="sec">§7</span>Our hardware</h2>
+    <dl class="spec">
+      <dt>Machine</dt><dd>NVIDIA DGX Spark (GB10 chip, ARM / aarch64)</dd>
+      <dt>Memory</dt><dd>128 GB unified (121 GB visible)</dd>
+      <dt>CPU</dt><dd>20 cores</dd>
+      <dt>Driver</dt><dd>580.178.04</dd>
+      <dt>Free disk</dt><dd>2.0 TB</dd>
+    </dl>
+    <p>Isaac Sim officially supports the DGX Spark; it's the only ARM machine NVIDIA supports. Known issues: some installs need a <code>libgomp</code> library preload to start, and users report rendering and PhysX GPU crashes on this chip. Check the driver against the current requirements page before installing. Our driver (580.178) is on the R580 branch NVIDIA requires for Isaac Sim on this machine; avoid upgrading to R590, which crashes Isaac Sim's renderer.</p>
+    <p>The GB10's memory bandwidth (about 205 GB/s measured) is roughly 1/6–1/8 of an RTX 5090's, so particle soil runs slower per step. The 128 GB of memory lets much larger offline simulations fit. Rough budget: about 1 million soil particles, real time only inside small zones around the tools (an estimate to measure in Phase 0). NVIDIA's Warp and Newton officially support this machine. The commercial soil engines (AGX, Vortex) don't document ARM support, so they would probably need a separate x86 machine.</p>
+  </section>
+
+  <section aria-labelledby="plan">
+    <h2 id="plan"><span class="sec">§8</span>Recommended architecture and build plan</h2>
+    <dl class="spec">
+      <dt>Assets</dt><dd>Offline on the Spark: read physics data from the USD files, start from the converted GLBs, and model the missing machines (excavator, crawler crane, dump truck, dozer) in USD so one source feeds both server and browser.</dd>
+      <dt>Server physics</dt><dd>NVIDIA Newton/Warp on the GB10: site height map, particle soil zones around each tool, machines with in-step hydraulics, heavy-load crane ropes, animated workers. Project Chrono is the fallback.</dd>
+      <dt>Transport</dt><dd>Compressed positions (about 0.5 Mbit/s for 100 machines and props at 30 Hz), terrain tile changes, and only the soil particles that are moving.</dd>
+      <dt>Browser</dt><dd>three.js WebGPU page with the GLB assets, a deformable terrain, soil particles, and Gaussian-splat captures of a real site for photoreal surroundings.</dd>
+    </dl>
+    <ol class="phases">
+      <li><div><h3>Platform smoke tests</h3><p>Run Newton's sand example, the Isaac Sim 6.2 container, a Chrono build with GPU modules, and Chrome WebGPU on the Spark. Exit: measured particle throughput and a go/no-go per engine.</p></div></li>
+      <li><div><h3>Assets and static site</h3><p>Physics-data extractor, check the 2,595 converted assets against the full set, three.js page with physics props, and an attribution page. Exit: a site of SimReady props loads in the browser with correct mass, joints and colliders.</p></div></li>
+      <li><div><h3>Soil core</h3><p>Height map plus particle zone around the bucket, tested against Chrono CRM on the same bucket pass. Exit: real-time single bucket pass on the GB10, and the engine choice is made.</p></div></li>
+      <li><div><h3>Machines</h3><p>Excavator, dozer, dump truck and crawler crane with hydraulics, tracks on soft ground, and crane hoist ropes. Exit: a stable dig cycle and a full-load lift without rope stretch.</p></div></li>
+      <li><div><h3>Calibration and validation</h3><p>High-detail DEM reference runs, public bucket-force data, real excavator logs. Exit: bucket force and fill within about 10–25% of DEM, with the field error documented.</p></div></li>
+      <li><div><h3>Streaming and multi-user</h3><p>Live state stream, real-site backdrops, an optional Omniverse high-quality view. Exit: a remote browser shows a live dig at 30 FPS over the local network.</p></div></li>
+      <li><div><h3>Browser-only tier</h3><p>Train the ground-prediction network on Phase 4 data and run it in the browser with Jolt machines. Exit: an all-browser demo with its error measured against the server.</p></div></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="open">
+    <h2 id="open"><span class="sec">§9</span>Open questions for the team</h2>
+    <ul class="plain">
+      <li>Is realistic digging a must-have, or is digging limited to a few zones acceptable?</li>
+      <li>Which machines matter most, and do we have manufacturer CAD files or a budget for 3D models?</li>
+      <li>What is the simulation for: visual planning, operator training, robot or AI training, or safety analysis? The answer changes the fidelity we need.</li>
+      <li>Can we get real machine data (bucket forces, hydraulic pressures) from a partner or an instrumented rig? Public data won't be enough to validate realism.</li>
+      <li>Would we add an x86 machine and a commercial license (AGX Dynamics) if Newton's soil coupling falls short?</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="src">
+    <h2 id="src"><span class="sec">§10</span>Sources</h2>
+    <ul class="sources">
+      <li><a href="https://x.com/SahilExec/status/2116560308869423131" target="_blank" rel="noopener">@SahilExec warehouse post</a></li>
+      <li><a href="https://huggingface.co/blog/nvidia/simready-central-assets-robotics-ai-factories" target="_blank" rel="noopener">SimReady Central announcement</a></li>
+      <li><a href="https://blogs.nvidia.com/blog/developers-simulation-frontier-ai-agents/" target="_blank" rel="noopener">NVIDIA: agents building simulations</a></li>
+      <li><a href="https://huggingface.co/datasets/nvidia/simready-assets" target="_blank" rel="noopener">nvidia/simready-assets dataset</a></li>
+      <li><a href="https://huggingface.co/datasets/nvidia/PhysicalAI-SimReady-Warehouse-01" target="_blank" rel="noopener">PhysicalAI-SimReady-Warehouse-01</a></li>
+      <li><a href="https://docs.nvidia.com/isaaclab/concepts/implicit-mpm" target="_blank" rel="noopener">Isaac Lab implicit MPM docs</a></li>
+      <li><a href="https://github.com/linjiw/newton-terrain-lab" target="_blank" rel="noopener">newton-terrain-lab</a></li>
+      <li><a href="https://forums.developer.nvidia.com/t/soil-deformation-in-isaac-sim/329569" target="_blank" rel="noopener">NVIDIA forum: soil deformation</a></li>
+      <li><a href="https://docs.isaacsim.omniverse.nvidia.com/latest/installation/requirements.html" target="_blank" rel="noopener">Isaac Sim requirements</a></li>
+      <li><a href="https://learn.arm.com/learning-paths/laptops-and-desktops/dgx_spark_isaac_robotics/2_isaac_installation/" target="_blank" rel="noopener">Isaac Sim on DGX Spark (Arm guide)</a></li>
+      <li><a href="https://forums.developer.nvidia.com/t/isaac-sim-6-0-1-gpu-crash-on-dgx-spark-gb10-arm64-driver-595-71-05/376418" target="_blank" rel="noopener">DGX Spark GPU crash report</a></li>
+      <li><a href="https://github.com/samuelp4065/excavator-isaac-sim" target="_blank" rel="noopener">excavator-isaac-sim</a></li>
+      <li><a href="https://algoryx.se/" target="_blank" rel="noopener">Algoryx AGX Dynamics</a></li>
+      <li><a href="https://arxiv.org/html/2501.01430v1" target="_blank" rel="noopener">TERA terrain excavation paper</a></li>
+      <li><a href="https://huggingface.co/datasets/codepawl/simready-glb" target="_blank" rel="noopener">codepawl/simready-glb (web GLB conversion)</a></li>
+      <li><a href="https://pypi.org/project/usd-core/" target="_blank" rel="noopener">usd-core on PyPI (aarch64 wheels)</a></li>
+      <li><a href="https://github.com/jrouwe/JoltPhysics.js" target="_blank" rel="noopener">JoltPhysics.js</a></li>
+      <li><a href="https://github.com/matsuoka-601/WebGPU-Ocean" target="_blank" rel="noopener">WebGPU-Ocean (browser MPM)</a></li>
+      <li><a href="https://github.com/gpuweb/gpuweb/wiki/Implementation-Status" target="_blank" rel="noopener">WebGPU implementation status</a></li>
+      <li><a href="https://arxiv.org/abs/2011.00459v1" target="_blank" rel="noopener">Servin et al. 2021: multiscale terrain</a></li>
+      <li><a href="https://arxiv.org/abs/2310.05765" target="_blank" rel="noopener">Aoshima &amp; Servin: wheel-loader field tests</a></li>
+      <li><a href="https://arxiv.org/abs/2609.12677" target="_blank" rel="noopener">ETH RSL 2026: MPM-trained excavator</a></li>
+      <li><a href="https://arxiv.org/abs/2507.05643" target="_blank" rel="noopener">Chrono CRM terramechanics</a></li>
+      <li><a href="https://arxiv.org/abs/2311.04648v2" target="_blank" rel="noopener">Chrono DEM-Engine</a></li>
+      <li><a href="https://arxiv.org/html/2309.12016v4" target="_blank" rel="noopener">Umeå learned heightmap models</a></li>
+      <li><a href="https://api.projectchrono.org/classchrono_1_1_ch_hydraulic_actuator2.html" target="_blank" rel="noopener">Chrono hydraulic actuator</a></li>
+      <li><a href="https://docs.isaacsim.omniverse.nvidia.com/latest/installation/manual_livestream_clients.html" target="_blank" rel="noopener">Isaac Sim livestream clients</a></li>
+      <li><a href="https://github.com/NVIDIA-Omniverse/ovstream" target="_blank" rel="noopener">NVIDIA ovstream</a></li>
+    </ul>
+  </section>
+
+  <footer>Asset counts come from a full scan of the Hugging Face file listings on 2 Nov 2026. The library updates often, so recheck before committing to an asset plan. Research findings are summarized from a full report with citations (reports/Construction site physics simulation.md in the project folder); several cited papers are preprints.</footer>
+</div>

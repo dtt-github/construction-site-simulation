@@ -1,0 +1,86 @@
+{
+ "source": "usd/barrier_wall_plastic_orange_a03/simready_usd/sm_barrier_wall_plastic_orange_a03_01.usd",
+ "variant": "PhysX",
+ "up_axis": "Z",
+ "meters_per_unit": 1.0,
+ "kilograms_per_unit": 1.0,
+ "default_prim": "/RootNode",
+ "labels": {
+  "semantic:wikidata_class:params:semanticData": "water barrier",
+  "semantic:wikidata_class:params:semanticType": "wikidata_class",
+  "semantic:wikidata_qcode:params:semanticData": "Q11130803",
+  "semantic:wikidata_qcode:params:semanticType": "wikidata_qcode",
+  "semantics:labels:wikidata_class": "[water barrier]",
+  "semantics:labels:wikidata_qcode": "[Q11130803]"
+ },
+ "articulation_roots": [],
+ "bodies": [
+  {
+   "path": "/RootNode/Geometry/sm_barrier_wall_a03_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.91629,
+    -0.236233,
+    0.0
+   ],
+   "bounds_max": [
+    0.912551,
+    0.23538,
+    2.036498
+   ],
+   "labels": {},
+   "effective_mass": 417.5545,
+   "mass_source": "mesh_volume_x_density"
+  }
+ ],
+ "colliders": [
+  {
+   "path": "/RootNode/Geometry/sm_barrier_wall_a03_obj_00/sm_barrier_wall_a03_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_barrier_wall_a03_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__orange_standard_a",
+   "density": null,
+   "mesh_volume_m3": 0.46394949,
+   "hull_volume_m3": 1.14618269
+  }
+ ],
+ "joints": [],
+ "materials": {
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__orange_standard_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__plastic__orange_standard_a",
+   "static_friction": 0.5,
+   "dynamic_friction": 0.44999998807907104,
+   "restitution": 0.11999999731779099,
+   "density": 900.0
+  }
+ },
+ "summary": {
+  "bodies": 1,
+  "colliders": 1,
+  "joints": 0,
+  "drives": 0,
+  "total_mass_kg": 417.555,
+  "bodies_without_explicit_mass": 1,
+  "approximations": [
+   "sdf"
+  ]
+ }
+}

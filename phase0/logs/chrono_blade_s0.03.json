@@ -1,0 +1,14 @@
+{
+  "spacing_m": 0.03,
+  "particles": 164016,
+  "active_domain": false,
+  "cfd_step_s": 0.00025,
+  "wall_s_per_sim_s": 26.05,
+  "realtime_factor": 0.0384,
+  "blade_force_x_N_mean_steady": 8525.3,
+  "blade_force_z_N_mean_steady": 2049.6,
+  "motor_force_N_mean_steady": 8523.0,
+  "mckyes_force_N": 3275.3,
+  "force_ratio_sim_over_mckyes": 2.603,
+  "blade_travel_m": 0.501
+}

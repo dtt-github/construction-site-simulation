@@ -1,0 +1,511 @@
+[
+ {
+  "asset": "barrier_fence_metal_a02",
+  "bodies usd/glb": "1/1",
+  "joints usd/glb": "0/0",
+  "mass usd kg": 177.786,
+  "mass glb kg": 45.41,
+  "mass ratio": 0.255,
+  "friction usd": [
+   0.4
+  ],
+  "friction glb": [
+   0.4
+  ],
+  "densities usd": [
+   7800.0
+  ],
+  "glb hulls": 4,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "barrier_wall_plastic_orange_a03",
+  "bodies usd/glb": "1/1",
+  "joints usd/glb": "0/0",
+  "mass usd kg": 417.555,
+  "mass glb kg": 6.803,
+  "mass ratio": 0.016,
+  "friction usd": [
+   0.45
+  ],
+  "friction glb": [
+   0.45
+  ],
+  "densities usd": [
+   900.0
+  ],
+  "glb hulls": 4,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "barrier_gate_safety_a02",
+  "bodies usd/glb": "13/13",
+  "joints usd/glb": "12/12",
+  "mass usd kg": 52.513,
+  "mass glb kg": 8.804,
+  "mass ratio": 0.168,
+  "friction usd": [
+   0.3,
+   0.4,
+   0.47
+  ],
+  "friction glb": [
+   0.3,
+   0.4,
+   0.47
+  ],
+  "densities usd": [
+   950.0,
+   2700.0,
+   7800.0
+  ],
+  "glb hulls": 52,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "scaffold_rolling_steel_a01",
+  "bodies usd/glb": "9/9",
+  "joints usd/glb": "8/8",
+  "mass usd kg": 120.725,
+  "mass glb kg": 243.97,
+  "mass ratio": 2.021,
+  "friction usd": [
+   0.3,
+   0.4,
+   0.8
+  ],
+  "friction glb": [
+   0.3,
+   0.4,
+   0.8
+  ],
+  "densities usd": [
+   1200.0,
+   7800.0,
+   7850.0
+  ],
+  "glb hulls": 36,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "ladder_step_aluminium_a06",
+  "bodies usd/glb": "6/6",
+  "joints usd/glb": "7/7",
+  "mass usd kg": 9.102,
+  "mass glb kg": 4.311,
+  "mass ratio": 0.474,
+  "friction usd": [
+   0.4,
+   0.45,
+   0.47,
+   0.7
+  ],
+  "friction glb": [
+   0.4,
+   0.45,
+   0.47,
+   0.7
+  ],
+  "densities usd": [
+   689.0,
+   900.0,
+   950.0,
+   2700.0
+  ],
+  "glb hulls": 24,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "ladder_extention_fiberglass_a03",
+  "bodies usd/glb": "9/9",
+  "joints usd/glb": "8/8",
+  "mass usd kg": 30.163,
+  "mass glb kg": 11.871,
+  "mass ratio": 0.394,
+  "friction usd": [
+   0.47,
+   0.7
+  ],
+  "friction glb": [
+   0.47,
+   0.7
+  ],
+  "densities usd": [
+   689.0,
+   2700.0
+  ],
+  "glb hulls": 36,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "construction_wheelbarrow_metal_a01",
+  "bodies usd/glb": "2/2",
+  "joints usd/glb": "1/1",
+  "mass usd kg": 46.691,
+  "mass glb kg": 24.286,
+  "mass ratio": 0.52,
+  "friction usd": [
+   0.3,
+   0.8
+  ],
+  "friction glb": [
+   0.3,
+   0.8
+  ],
+  "densities usd": [
+   1200.0,
+   7850.0
+  ],
+  "glb hulls": 8,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "construction_firstAidPoint_trolley_a01",
+  "bodies usd/glb": "5/5",
+  "joints usd/glb": "4/4",
+  "mass usd kg": 159.017,
+  "mass glb kg": 21.494,
+  "mass ratio": 0.135,
+  "friction usd": [
+   0.4
+  ],
+  "friction glb": [
+   0.4
+  ],
+  "densities usd": [
+   950.0,
+   2500.0
+  ],
+  "glb hulls": 20,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "construction_fireSafetyPoint_trolley_a01",
+  "bodies usd/glb": "4/4",
+  "joints usd/glb": "3/3",
+  "mass usd kg": 99.472,
+  "mass glb kg": 28.897,
+  "mass ratio": 0.291,
+  "friction usd": [
+   0.3,
+   0.4
+  ],
+  "friction glb": [
+   0.3,
+   0.4
+  ],
+  "densities usd": [
+   2500.0,
+   7850.0
+  ],
+  "glb hulls": 16,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "pallet_a01",
+  "bodies usd/glb": "1/1",
+  "joints usd/glb": "0/0",
+  "mass usd kg": 56.879,
+  "mass glb kg": 50.732,
+  "mass ratio": 0.892,
+  "friction usd": [
+   0.5
+  ],
+  "friction glb": [
+   0.5
+  ],
+  "densities usd": [
+   700.0
+  ],
+  "glb hulls": 4,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "pallet_block_a01",
+  "bodies usd/glb": "1/1",
+  "joints usd/glb": "0/0",
+  "mass usd kg": 30.247,
+  "mass glb kg": 51.384,
+  "mass ratio": 1.699,
+  "friction usd": [
+   0.5
+  ],
+  "friction glb": [
+   0.5
+  ],
+  "densities usd": [
+   700.0
+  ],
+  "glb hulls": 4,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "drum_steel_a01",
+  "bodies usd/glb": "2/2",
+  "joints usd/glb": "1/1",
+  "mass usd kg": 156.923,
+  "mass glb kg": 102.3,
+  "mass ratio": 0.652,
+  "friction usd": [
+   0.3
+  ],
+  "friction glb": [
+   0.3
+  ],
+  "densities usd": [
+   8000.0
+  ],
+  "glb hulls": 8,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "crate_plywood_b01",
+  "bodies usd/glb": "1/1",
+  "joints usd/glb": "0/0",
+  "mass usd kg": 6261.96,
+  "mass glb kg": 94.629,
+  "mass ratio": 0.015,
+  "friction usd": [
+   0.3
+  ],
+  "friction glb": [
+   0.3
+  ],
+  "densities usd": [
+   8000.0
+  ],
+  "glb hulls": 4,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "structure_beam_a01",
+  "bodies usd/glb": "1/1",
+  "joints usd/glb": "0/0",
+  "mass usd kg": 865.343,
+  "mass glb kg": 865.343,
+  "mass ratio": 1.0,
+  "friction usd": [
+   0.4
+  ],
+  "friction glb": [
+   0.4
+  ],
+  "densities usd": [
+   7800.0
+  ],
+  "glb hulls": 4,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "pipe_plastic_gray_b08",
+  "bodies usd/glb": "1/1",
+  "joints usd/glb": "0/0",
+  "mass usd kg": 408.038,
+  "mass glb kg": 3669.053,
+  "mass ratio": 8.992,
+  "friction usd": [
+   0.8
+  ],
+  "friction glb": [
+   0.8
+  ],
+  "densities usd": [
+   1200.0
+  ],
+  "glb hulls": 4,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "ppe_helmet_hardHat_a01",
+  "bodies usd/glb": "1/1",
+  "joints usd/glb": "0/0",
+  "mass usd kg": 0.321,
+  "mass glb kg": 0.708,
+  "mass ratio": 2.206,
+  "friction usd": [
+   0.4
+  ],
+  "friction glb": [
+   0.4
+  ],
+  "densities usd": [
+   950.0
+  ],
+  "glb hulls": 4,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "vehicle_forklift_orange_a01",
+  "bodies usd/glb": "15/15",
+  "joints usd/glb": "14/14",
+  "mass usd kg": 316.741,
+  "mass glb kg": 274.667,
+  "mass ratio": 0.867,
+  "friction usd": [
+   0.4
+  ],
+  "friction glb": [
+   0.4
+  ],
+  "densities usd": [
+   950.0,
+   2500.0,
+   7800.0
+  ],
+  "glb hulls": 60,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "hopper_dumpling_steel_red_a07",
+  "bodies usd/glb": "1/1",
+  "joints usd/glb": "0/0",
+  "mass usd kg": 574.318,
+  "mass glb kg": 963.264,
+  "mass ratio": 1.677,
+  "friction usd": [
+   0.4
+  ],
+  "friction glb": [
+   0.4
+  ],
+  "densities usd": [
+   7800.0
+  ],
+  "glb hulls": 4,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "tiltTruck_red_a04",
+  "bodies usd/glb": "9/9",
+  "joints usd/glb": "8/8",
+  "mass usd kg": 574.339,
+  "mass glb kg": 16.932,
+  "mass ratio": 0.029,
+  "friction usd": [
+   0.3,
+   0.4,
+   0.8
+  ],
+  "friction glb": [
+   0.3,
+   0.4,
+   0.8
+  ],
+  "densities usd": [
+   950.0,
+   1200.0,
+   7800.0,
+   7850.0
+  ],
+  "glb hulls": 36,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "handTool_hammer_sledge_a01",
+  "bodies usd/glb": "1/1",
+  "joints usd/glb": "0/0",
+  "mass usd kg": 1.211,
+  "mass glb kg": 1.211,
+  "mass ratio": 1.0,
+  "friction usd": [
+   0.8
+  ],
+  "friction glb": [
+   0.8
+  ],
+  "densities usd": [
+   1200.0
+  ],
+  "glb hulls": 4,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "bucket_utility_red_a01",
+  "bodies usd/glb": "2/2",
+  "joints usd/glb": "1/1",
+  "mass usd kg": 1.527,
+  "mass glb kg": 1.521,
+  "mass ratio": 0.996,
+  "friction usd": [
+   0.3,
+   0.4
+  ],
+  "friction glb": [
+   0.3,
+   0.4
+  ],
+  "densities usd": [
+   950.0,
+   8000.0
+  ],
+  "glb hulls": 8,
+  "collider approx usd": [
+   "sdf"
+  ]
+ },
+ {
+  "asset": "vehicleSupport_scissor_lift_c01",
+  "bodies usd/glb": "5/5",
+  "joints usd/glb": "4/4",
+  "mass usd kg": 3121.048,
+  "mass glb kg": 2986.005,
+  "mass ratio": 0.957,
+  "friction usd": [
+   0.3,
+   0.4
+  ],
+  "friction glb": [
+   0.3,
+   0.4
+  ],
+  "densities usd": [
+   7800.0,
+   7850.0,
+   8000.0
+  ],
+  "glb hulls": 20,
+  "collider approx usd": [
+   "sdf"
+  ]
+ }
+]

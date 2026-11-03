@@ -1,0 +1,80 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>WebGPU check</title>
+<pre id="out">running</pre>
+<script type="module">
+// Reports the WebGPU adapter, key limits, and a particle-update compute benchmark
+// (fixed-point atomic scatter to a grid, like the P2G step in browser MPM demos).
+const out = document.getElementById("out");
+const result = { ok: false };
+try {
+  if (!navigator.gpu) throw new Error("navigator.gpu missing (WebGPU disabled)");
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+  if (!adapter) throw new Error("requestAdapter returned null");
+  const info = adapter.info || {};
+  result.adapter = { vendor: info.vendor, architecture: info.architecture, device: info.device, description: info.description, isFallback: info.isFallbackAdapter ?? null };
+  const L = adapter.limits;
+  result.limits = {
+    maxStorageBufferBindingSize: L.maxStorageBufferBindingSize,
+    maxBufferSize: L.maxBufferSize,
+    maxComputeWorkgroupStorageSize: L.maxComputeWorkgroupStorageSize,
+    maxComputeInvocationsPerWorkgroup: L.maxComputeInvocationsPerWorkgroup,
+  };
+  result.features = [...adapter.features].sort();
+  const device = await adapter.requestDevice({
+    requiredLimits: { maxStorageBufferBindingSize: L.maxStorageBufferBindingSize, maxBufferSize: L.maxBufferSize },
+  });
+
+  const N = 1 << 20;            // 1,048,576 particles
+  const GRID = 128;             // 128^3 grid
+  const code = `
+    struct P { pos: vec4f, vel: vec4f };
+    @group(0) @binding(0) var<storage, read_write> ps: array<P>;
+    @group(0) @binding(1) var<storage, read_write> grid: array<atomic<i32>>;
+    const G = ${GRID}u;
+    @compute @workgroup_size(256)
+    fn step(@builtin(global_invocation_id) id: vec3u) {
+      let i = id.x;
+      if (i >= arrayLength(&ps)) { return; }
+      var p = ps[i];
+      p.vel = p.vel + vec4f(0.0, 0.0, -9.81 * 0.001, 0.0);
+      p.pos = p.pos + p.vel * 0.001;
+      if (p.pos.z < 0.0) { p.pos.z = 0.0; p.vel.z = -0.3 * p.vel.z; }
+      ps[i] = p;
+      let c = vec3u(clamp(p.pos.xyz, vec3f(0.0), vec3f(0.999)) * f32(G));
+      let cell = c.x + G * (c.y + G * c.z);
+      atomicAdd(&grid[cell], i32(p.vel.z * 65536.0));
+    }`;
+  const module = device.createShaderModule({ code });
+  const pipeline = device.createComputePipeline({ layout: "auto", compute: { module, entryPoint: "step" } });
+  const init = new Float32Array(N * 8);
+  for (let i = 0; i < N; i++) { init[i*8] = Math.random(); init[i*8+1] = Math.random(); init[i*8+2] = Math.random(); }
+  const pbuf = device.createBuffer({ size: init.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  device.queue.writeBuffer(pbuf, 0, init);
+  const gbuf = device.createBuffer({ size: GRID ** 3 * 4, usage: GPUBufferUsage.STORAGE });
+  const bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: pbuf } }, { binding: 1, resource: { buffer: gbuf } }] });
+
+  async function run(steps) {
+    const enc = device.createCommandEncoder();
+    const pass = enc.beginComputePass();
+    pass.setPipeline(pipeline); pass.setBindGroup(0, bind);
+    for (let s = 0; s < steps; s++) pass.dispatchWorkgroups(Math.ceil(N / 256));
+    pass.end();
+    device.queue.submit([enc.finish()]);
+    await device.queue.onSubmittedWorkDone();
+  }
+  await run(10); // warm-up
+  const steps = 500;
+  const t0 = performance.now();
+  await run(steps);
+  const ms = performance.now() - t0;
+  result.bench = { particles: N, steps, ms: Math.round(ms), ms_per_step: +(ms / steps).toFixed(3), million_particle_steps_per_s: Math.round(N * steps / (ms / 1000) / 1e6) };
+  result.ok = true;
+} catch (e) {
+  result.error = String(e);
+}
+result.userAgent = navigator.userAgent;
+out.textContent = JSON.stringify(result, null, 2);
+document.title = "DONE";
+window.__result = result;
+</script>

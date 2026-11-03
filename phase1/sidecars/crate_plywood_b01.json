@@ -1,0 +1,86 @@
+{
+ "source": "usd/crate_plywood_b01/simready_usd/sm_crate_plywood_b01_01.usd",
+ "variant": "PhysX",
+ "up_axis": "Z",
+ "meters_per_unit": 1.0,
+ "kilograms_per_unit": 1.0,
+ "default_prim": "/RootNode",
+ "labels": {
+  "semantic:wikidata_class:params:semanticData": "crate",
+  "semantic:wikidata_class:params:semanticType": "wikidata_class",
+  "semantic:wikidata_qcode:params:semanticData": "Q605384",
+  "semantic:wikidata_qcode:params:semanticType": "wikidata_qcode",
+  "semantics:labels:wikidata_class": "[crate]",
+  "semantics:labels:wikidata_qcode": "[Q605384]"
+ },
+ "articulation_roots": [],
+ "bodies": [
+  {
+   "path": "/RootNode/Geometry/sm_crate_b01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.501085,
+    -0.504332,
+    0.0
+   ],
+   "bounds_max": [
+    0.501121,
+    0.504337,
+    1.016536
+   ],
+   "labels": {},
+   "effective_mass": 6261.9602,
+   "mass_source": "mesh_volume_x_density"
+  }
+ ],
+ "colliders": [
+  {
+   "path": "/RootNode/Geometry/sm_crate_b01_obj_00/sm_crate_b01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_crate_b01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__unique_crate_plywood_b",
+   "density": null,
+   "mesh_volume_m3": 0.78274502,
+   "hull_volume_m3": 1.02285334
+  }
+ ],
+ "joints": [],
+ "materials": {
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__unique_crate_plywood_b": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__unique_crate_plywood_b",
+   "static_friction": 0.30000001192092896,
+   "dynamic_friction": 0.30000001192092896,
+   "restitution": 0.10000000149011612,
+   "density": 8000.0
+  }
+ },
+ "summary": {
+  "bodies": 1,
+  "colliders": 1,
+  "joints": 0,
+  "drives": 0,
+  "total_mass_kg": 6261.96,
+  "bodies_without_explicit_mass": 1,
+  "approximations": [
+   "sdf"
+  ]
+ }
+}

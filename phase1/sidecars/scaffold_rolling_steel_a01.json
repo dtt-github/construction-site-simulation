@@ -1,0 +1,645 @@
+{
+ "source": "usd/scaffold_rolling_steel_a01/simready_usd/sm_scaffold_rolling_steel_a01_01.usd",
+ "variant": "PhysX",
+ "up_axis": "Z",
+ "meters_per_unit": 1.0,
+ "kilograms_per_unit": 1.0,
+ "default_prim": "/RootNode",
+ "labels": {
+  "semantic:wikidata_class:params:semanticData": "scaffold",
+  "semantic:wikidata_class:params:semanticType": "wikidata_class",
+  "semantic:wikidata_qcode:params:semanticData": "Q233320",
+  "semantic:wikidata_qcode:params:semanticType": "wikidata_qcode",
+  "semantics:labels:wikidata_class": "[scaffold]",
+  "semantics:labels:wikidata_qcode": "[Q233320]"
+ },
+ "articulation_roots": [],
+ "bodies": [
+  {
+   "path": "/RootNode/Geometry/sm_platform_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.398879,
+    -0.949819,
+    0.15324
+   ],
+   "bounds_max": [
+    0.390627,
+    0.949818,
+    1.881225
+   ],
+   "labels": {},
+   "effective_mass": 118.2372,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_front_left_wheel_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.361031,
+    -0.912309,
+    0.152665
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.388467,
+    -0.992009,
+    0.049641
+   ],
+   "bounds_max": [
+    -0.333596,
+    -0.885213,
+    0.188867
+   ],
+   "labels": {},
+   "effective_mass": 0.3155,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_front_right_wheel_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.352776,
+    -0.912309,
+    0.152665
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.32534,
+    -0.992009,
+    0.049641
+   ],
+   "bounds_max": [
+    0.380212,
+    -0.885213,
+    0.188867
+   ],
+   "labels": {},
+   "effective_mass": 0.3155,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_back_left_tire_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.361031,
+    0.881124,
+    0.060653
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.379984,
+    0.820472,
+    1e-06
+   ],
+   "bounds_max": [
+    -0.342079,
+    0.941776,
+    0.121305
+   ],
+   "labels": {},
+   "effective_mass": 0.364,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_front_left_tire_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.361031,
+    -0.943506,
+    0.060653
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.379984,
+    -1.004158,
+    1e-06
+   ],
+   "bounds_max": [
+    -0.342079,
+    -0.882854,
+    0.121305
+   ],
+   "labels": {},
+   "effective_mass": 0.364,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_back_left_wheel_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    -0.361031,
+    0.912309,
+    0.152665
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    -0.388467,
+    0.832608,
+    0.049641
+   ],
+   "bounds_max": [
+    -0.333596,
+    0.939405,
+    0.188867
+   ],
+   "labels": {},
+   "effective_mass": 0.2003,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_back_right_tire_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.352776,
+    0.881118,
+    0.060653
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.333824,
+    0.820466,
+    1e-06
+   ],
+   "bounds_max": [
+    0.371728,
+    0.94177,
+    0.121305
+   ],
+   "labels": {},
+   "effective_mass": 0.364,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_back_right_wheel_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.352776,
+    0.912309,
+    0.152665
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.32534,
+    0.832608,
+    0.049641
+   ],
+   "bounds_max": [
+    0.380212,
+    0.939405,
+    0.188867
+   ],
+   "labels": {},
+   "effective_mass": 0.2003,
+   "mass_source": "mesh_volume_x_density"
+  },
+  {
+   "path": "/RootNode/Geometry/sm_front_right_tirel_a01_obj_00",
+   "kinematic": false,
+   "enabled": true,
+   "mass": null,
+   "density": null,
+   "center_of_mass": null,
+   "diagonal_inertia": null,
+   "position": [
+    0.352776,
+    -0.943506,
+    0.060653
+   ],
+   "orientation_wxyz": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_min": [
+    0.333824,
+    -1.004158,
+    1e-06
+   ],
+   "bounds_max": [
+    0.371728,
+    -0.882854,
+    0.121305
+   ],
+   "labels": {},
+   "effective_mass": 0.364,
+   "mass_source": "mesh_volume_x_density"
+  }
+ ],
+ "colliders": [
+  {
+   "path": "/RootNode/Geometry/sm_platform_a01_obj_00/sm_platform_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_platform_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__painted_yellow_a",
+   "density": null,
+   "mesh_volume_m3": 0.01515861,
+   "hull_volume_m3": 2.52968885
+  },
+  {
+   "path": "/RootNode/Geometry/sm_front_left_wheel_a01_obj_00/sm_front_left_wheel_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_front_left_wheel_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__steel_a",
+   "density": null,
+   "mesh_volume_m3": 4.019e-05,
+   "hull_volume_m3": 0.00041584
+  },
+  {
+   "path": "/RootNode/Geometry/sm_front_right_wheel_a01_obj_00/sm_front_right_wheel_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_front_right_wheel_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__steel_a",
+   "density": null,
+   "mesh_volume_m3": 4.019e-05,
+   "hull_volume_m3": 0.00041584
+  },
+  {
+   "path": "/RootNode/Geometry/sm_back_left_tire_a01_obj_00/sm_back_left_tire_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_back_left_tire_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__rubber__black_a",
+   "density": null,
+   "mesh_volume_m3": 0.00030337,
+   "hull_volume_m3": 0.00035512
+  },
+  {
+   "path": "/RootNode/Geometry/sm_front_left_tire_a01_obj_00/sm_front_left_tire_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_front_left_tire_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__rubber__black_a",
+   "density": null,
+   "mesh_volume_m3": 0.00030337,
+   "hull_volume_m3": 0.00035512
+  },
+  {
+   "path": "/RootNode/Geometry/sm_back_left_wheel_a01_obj_00/sm_back_left_wheel_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_back_left_wheel_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__steel_a",
+   "density": null,
+   "mesh_volume_m3": 2.552e-05,
+   "hull_volume_m3": 0.00041584
+  },
+  {
+   "path": "/RootNode/Geometry/sm_back_right_tire_a01_obj_00/sm_back_right_tire_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_back_right_tire_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__rubber__black_a",
+   "density": null,
+   "mesh_volume_m3": 0.00030337,
+   "hull_volume_m3": 0.00035512
+  },
+  {
+   "path": "/RootNode/Geometry/sm_back_right_wheel_a01_obj_00/sm_back_right_wheel_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_back_right_wheel_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__steel_a",
+   "density": null,
+   "mesh_volume_m3": 2.552e-05,
+   "hull_volume_m3": 0.00041584
+  },
+  {
+   "path": "/RootNode/Geometry/sm_front_right_tirel_a01_obj_00/sm_front_right_tirel_a01_mesh_00",
+   "type": "Mesh",
+   "enabled": true,
+   "approximation": "sdf",
+   "body": "/RootNode/Geometry/sm_front_right_tirel_a01_obj_00",
+   "material": "/RootNode/PhysicsMaterials/physics_mat_opaque__rubber__black_a",
+   "density": null,
+   "mesh_volume_m3": 0.00030337,
+   "hull_volume_m3": 0.00035512
+  }
+ ],
+ "joints": [
+  {
+   "path": "/RootNode/Joints/joint_sm_front_right_tirel_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_front_right_wheel_a01_obj_00/sm_front_right_wheel_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_front_right_tirel_a01_obj_00/sm_front_right_tirel_a01_mesh_00",
+   "local_pos0": [
+    0.0,
+    -0.031197,
+    -0.092013
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -3.1415927410125732,
+   "upper_limit": 3.1415927410125732,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_front_left_wheel_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_platform_a01_obj_00/sm_platform_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_front_left_wheel_a01_obj_00/sm_front_left_wheel_a01_mesh_00",
+   "local_pos0": [
+    -0.361031,
+    -0.912309,
+    0.152665
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Z",
+   "lower_limit": -3.1415927410125732,
+   "upper_limit": 3.1415927410125732,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_front_left_tire_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_front_left_wheel_a01_obj_00/sm_front_left_wheel_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_front_left_tire_a01_obj_00/sm_front_left_tire_a01_mesh_00",
+   "local_pos0": [
+    0.0,
+    -0.031197,
+    -0.092013
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -3.1415927410125732,
+   "upper_limit": 3.1415927410125732,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_back_left_wheel_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_platform_a01_obj_00/sm_platform_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_back_left_wheel_a01_obj_00/sm_back_left_wheel_a01_mesh_00",
+   "local_pos0": [
+    -0.361031,
+    0.912309,
+    0.152665
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Z",
+   "lower_limit": -3.1415927410125732,
+   "upper_limit": 3.1415927410125732,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_back_left_tire_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_back_left_wheel_a01_obj_00/sm_back_left_wheel_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_back_left_tire_a01_obj_00/sm_back_left_tire_a01_mesh_00",
+   "local_pos0": [
+    0.0,
+    -0.031185,
+    -0.092013
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -3.1415927410125732,
+   "upper_limit": 3.1415927410125732,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_front_right_wheel_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_platform_a01_obj_00/sm_platform_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_front_right_wheel_a01_obj_00/sm_front_right_wheel_a01_mesh_00",
+   "local_pos0": [
+    0.352776,
+    -0.912309,
+    0.152665
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Z",
+   "lower_limit": -3.1415927410125732,
+   "upper_limit": 3.1415927410125732,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_back_right_tire_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_back_right_wheel_a01_obj_00/sm_back_right_wheel_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_back_right_tire_a01_obj_00/sm_back_right_tire_a01_mesh_00",
+   "local_pos0": [
+    0.0,
+    -0.031191,
+    -0.092013
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "X",
+   "lower_limit": -3.1415927410125732,
+   "upper_limit": 3.1415927410125732,
+   "limit_unit": "degrees"
+  },
+  {
+   "path": "/RootNode/Joints/joint_sm_back_right_wheel_a01_joint_00",
+   "type": "revolute",
+   "body0": "/RootNode/Geometry/sm_platform_a01_obj_00/sm_platform_a01_mesh_00",
+   "body1": "/RootNode/Geometry/sm_back_right_wheel_a01_obj_00/sm_back_right_wheel_a01_mesh_00",
+   "local_pos0": [
+    0.352776,
+    0.912309,
+    0.152665
+   ],
+   "local_rot0_wxyz": null,
+   "local_pos1": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "local_rot1_wxyz": null,
+   "enabled": true,
+   "exclude_from_articulation": false,
+   "axis": "Z",
+   "lower_limit": -3.1415927410125732,
+   "upper_limit": 3.1415927410125732,
+   "limit_unit": "degrees"
+  }
+ ],
+ "materials": {
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__painted_yellow_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__painted_yellow_a",
+   "static_friction": 0.5,
+   "dynamic_friction": 0.4000000059604645,
+   "restitution": 0.15000000596046448,
+   "density": 7800.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__steel_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__metal__steel_a",
+   "static_friction": 0.30000001192092896,
+   "dynamic_friction": 0.30000001192092896,
+   "restitution": 0.10000000149011612,
+   "density": 7850.0
+  },
+  "/RootNode/PhysicsMaterials/physics_mat_opaque__rubber__black_a": {
+   "path": "/RootNode/PhysicsMaterials/physics_mat_opaque__rubber__black_a",
+   "static_friction": 0.800000011920929,
+   "dynamic_friction": 0.800000011920929,
+   "restitution": 0.800000011920929,
+   "density": 1200.0
+  }
+ },
+ "summary": {
+  "bodies": 9,
+  "colliders": 9,
+  "joints": 8,
+  "drives": 0,
+  "total_mass_kg": 120.725,
+  "bodies_without_explicit_mass": 9,
+  "approximations": [
+   "sdf"
+  ]
+ }
+}
