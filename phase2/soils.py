@@ -2,10 +2,15 @@
 to check them: the critical height of an unsupported vertical cut and McKyes' fundamental earthmoving
 equation with its cohesion and adhesion terms.
 
-Newton's implicit MPM yields on a Drucker-Prager cone, sqrt(J2) <= yield_stress + friction * (p + p_t)
-(p the mean pressure, compression positive; p_t = tensile_yield_ratio * yield_pressure, the tensile
-strength). With friction taken as tan(phi), as the sand calibration does, yield_stress is the cohesion c.
-Each preset's c is checked against the vertical-cut test in soil_calibrate.py.
+Newton's implicit MPM yields on a Drucker-Prager cone. In its orthonormal stress vector (normal part
+r_N = tr(sigma)/sqrt(3), shear part |r_T| = |dev sigma| = sqrt(2 J2)) it is |r_T| <= yield_stress +
+(friction / sqrt(3/2)) (r_N + tensile), that is sqrt(J2) <= friction p + yield_stress / sqrt(2) (p the mean
+pressure, compression positive), with a flat cap at half the yield pressure. Its plastic flow has no
+dilatancy, so in plane strain it matches Mohr-Coulomb (phi, c) at friction = sin(phi) and yield_stress =
+sqrt(2) c cos(phi) (soils.drucker_prager). The presets instead set friction = tan(phi) and yield_stress = c,
+a cone stronger than their phi and c, which the excavator's unconverged rheology solve (150 iterations at
+1/30 s) softens again: the values are effective ones for that solver setting, checked there against the
+vertical-cut and blade tests in soil_calibrate.py (RESULTS.md, "Why cutting forces change with the MPM step").
 
     dry sand     cohesionless, 37 deg (the calibrated sand of phases 0-2)
     moist sand   capillary ("apparent") cohesion of a few kPa between grains; stands in steep faces
@@ -36,6 +41,12 @@ DEFAULT_SOIL = "dry-sand"
 # than drawing out into strands (MPM's perfectly plastic tension cap would let it stretch without limit).
 # Pressed together again (Jp back to 1) it regains strength.
 CRACK_STRAIN = 0.1
+
+
+def drucker_prager(phi, c):
+    """Newton MPM friction and yield_stress matching Mohr-Coulomb (phi rad, c Pa) in plane strain with no
+    dilatancy (converged solve)."""
+    return math.sin(phi), math.sqrt(2.0) * c * math.cos(phi)
 
 
 def mpm_attributes(soil):

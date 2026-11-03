@@ -912,10 +912,65 @@ At native size the blade spans 3 cells, and the force is 2× too high. So the 8 
 - **Not a slow build-up:** at 1/240 s the force settles to a steady 6.0–6.5 kN along the cut, so the rise is in the steady cutting resistance itself.
 - **The trend:** as the solve converges (smaller step, more iterations), the cutting resistance rises and the vertical force falls toward zero. At 1/120 s the speed effect shrinks to +3–5 %, close to the measured value.
 - **Consequence:** a cohesion fitted at one solver setting is an effective value for that setting, not a soil property. The presets, the vertical-cut checks and the McKyes blade comparisons are all at the excavator's setting (1/30 s, 150 iterations), and they hold there. Changing the MPM step means recalibrating.
-- **Cause:** not settled. The column collapse showed the large step also lets columns compact under their own weight. That fits a rheology solve that leaves cohesive soil softer than its yield surface when it does not converge. It is worth an issue for Newton's implicit MPM, with this test as the reproducer.
+- **Cause:** the rheology solve does not converge in 150 iterations; see the next section.
 
 **What validation 2 says:**
 - **Model shape:** cutting forces scale right with depth once the soil profile is right.
 - **Resolution:** the grid needs about 13 cells across a tool.
 - **Vertical forces:** they are the weak point.
 - **Cohesive presets:** these are calibrated values tied to the solver setting.
+
+## Why cutting forces change with the MPM step
+
+Validation 2 found tool forces rising as the MPM step shrinks. The cause is the rheology solve, and behind it, how the presets map φ and c onto Newton's yield cone. Log: `logs/solver_convergence.json`; the runs are `soil_calibrate.py … --dt … --iterations …`.
+
+**1. It is solver convergence, not the time step.** The flat-blade test (`soil_calibrate.py blade`, a 0.96 m vertical blade cutting 0.3 m, between frictionless walls):
+
+| | Dry sand | Loam |
+|---|---|---|
+| 1/30 s, 150 iterations (the excavator) | 14.4 kN | 45.3 kN |
+| 1/60 s, 150 iterations | 20.4 kN | 61.5 kN |
+| 1/120 s, 150 iterations | 24.0 kN | 66.5 kN |
+| 1/240 s, 150 iterations | 26.8 kN | 69.5 kN |
+| 1/30 s, 600 iterations | 21.0 kN | 61.5 kN |
+| 1/30 s, 2000 iterations | 23.2 kN | 66.4 kN |
+| 1/30 s, 2000 iterations, tolerance 1e-7 | – | 66.4 kN |
+
+- **At a fixed step:** more iterations raise the force exactly as shrinking the step does, and the force stops changing by 2000 iterations. A smaller step only starts each solve closer to the answer.
+- **Things that make no difference:**
+  - the warm start (`auto`, `particles`, `grid`, `smoothed`: within 5 % of each other at 2000 iterations; `smoothed` is softer at 150);
+  - the collider velocity mode;
+  - grid resolution (dry sand at 0.6 m depth with a 2× bed has the same ratio to McKyes).
+- **The solver choice is limited.** The conjugate-gradient solver refuses contacts, and the excavator ran Gauss–Seidel already (the earlier solver comparison, at the top of "Sand at 30 Hz").
+
+**Why an unconverged solve is softer.** Newton's soil is rigid-plastic (Young's modulus 1e15) with no dilatancy: it may shear on the yield cone but not change volume, except by opening up. Gauss–Seidel enforces both constraints iteratively, and 150 sweeps leave them partly unmet. The soil then gives way at lower stress than its yield surface allows. That is the same error that let tall columns sink under their own weight (24 % at 150 iterations, 2.5 % at 1/120 s). It grows with the size of the stressed region, so a tall column or a deep cut is softened more than a shallow one.
+
+**2. The presets map φ and c onto a cone stronger than they say.** In Newton's stress vector (normal part tr σ/√3, shear part |dev σ| = √(2 J₂)), the yield condition is |dev σ| ≤ `yield_stress` + (`friction`/√1.5)·(tr σ/√3 + tension). That is √J₂ ≤ `friction`·p + `yield_stress`/√2, with a flat cap at half the yield pressure (`rheology_solver_kernels.py`, `YieldParamVec`, `shear_yield_stress`). With no dilatancy, the flow is plane-strain incompressible. There σ₂ is the mean of σ₁ and σ₃, so √J₂ = (σ₁ − σ₃)/2 and p = (σ₁ + σ₃)/2. Mohr–Coulomb then matches at `friction` = sin φ and `yield_stress` = √2·c·cos φ (`soils.drucker_prager`).
+
+The presets use `friction` = tan φ and `yield_stress` = c:
+
+| Preset | Nominal φ | Equivalent φ of tan φ | Cohesion carried as |
+|---|---|---|---|
+| Dry sand | 37° | **48.6°** | – |
+| Loam | 29° | 33.4° | 0.85 c |
+| Clay | 3° | 3° | 0.71 c |
+| Aluminium rods (column test) | 21.9° | 23.7° | – |
+
+McKyes for dry sand at 0.3 m gives 6.6 kN at 37° but 18.2 kN at 48.6°. The converged sim, 23.2 kN, is 1.27× the latter.
+
+**With the mapping corrected and the solve converged** (2000 iterations at 1/30 s):
+
+| | 150 iterations | 2000 iterations |
+|---|---|---|
+| Dry sand, φ 37° (friction 0.60): × McKyes | 1.40 | 1.74 |
+| Loam, φ 29°, c 12 kPa (friction 0.485, yield_stress 14.8 kPa): × McKyes | 1.58 | 2.21 |
+| Column collapse, rods (friction sin 21.9° = 0.373), a ≈ 4: runout, sim … | 6.5 … 8.4 | 8.2 … 9.8 |
+| … against measured 10.1; final height, against measured 0.29 | 0.22 | 0.18 |
+
+- **What fits:** a converged solve with the correct mapping is a consistent model, independent of the step. It still cuts 1.7–2.2× harder than McKyes; the wedge equation is an approximation, and the sim force includes the surcharge of the growing heap.
+- **What doesn't:** it makes the column-collapse heights worse, not better. That confirms the flat piles are a material-model limit.
+
+**What this means:**
+- **The presets are effective values** for the operating setting (1/30 s, 150 iterations). There, the over-strong cone (tan φ) and the softening of the unconverged solve largely cancel. That is why the sand calibration of Phase 0 and the checks of Phase 2 hold at that setting, and why they drift when it changes.
+- **The two errors do not cancel in general.** The softening depends on the stressed region's size and on the number of sweeps, so it is scene-dependent: a deep cut is softened more than a shallow one. That is the depth-trend error a uniform soil showed in validation 2. For research use, this is the most important known limit of the soil model.
+- **The way out is a converged solve with the correct mapping.** At 2000 iterations the solve costs about 10× the excavator's per-step MPM time. That needs a better solver (a multigrid or preconditioned rheology solve) more than a smaller step. It is worth an issue for Newton's implicit MPM: the blade test here is a 20-line reproducer, and the 150-iteration default convergence is not documented. Until then, `soil_calibrate.py --iterations 2000` gives converged reference runs to check the effective presets against.

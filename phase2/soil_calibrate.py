@@ -31,6 +31,7 @@ from newton.solvers import SolverImplicitMPM
 import soils
 
 SPACING, VOXEL, DT, ITERATIONS = 0.04, 0.08, 1.0 / 30.0, 150
+CONFIG = {}  # extra SolverImplicitMPM.Config fields, for solver studies
 
 # the aluminium-rod model ground of Nguyen et al. (rods 1.6 and 3.0 mm, 5 cm long): unit weight
 # 20.4 kN/m3, phi 21.9 deg, c 0 (their Table 1); a test material, not a soil preset of the excavator
@@ -109,6 +110,8 @@ def make_solver(model, particles, soil, attrs=None, collider_friction=None):
     cfg.max_iterations = ITERATIONS
     cfg.critical_fraction = 0.0
     cfg.strain_basis = "P0"
+    for k, v in CONFIG.items():
+        setattr(cfg, k, v)
     mpm = SolverImplicitMPM(sand, config=cfg)
     mpm.setup_collider(model=model, collider_friction=collider_friction)
     st = sand.state()
@@ -339,6 +342,7 @@ def blade_test(soil, depth, speed=0.5, travel=1.0, width=0.96, bed=(3.2, 1.36, 0
 
 
 def main():
+    global DT, ITERATIONS
     ap = argparse.ArgumentParser()
     ap.add_argument("test", choices=("cut", "blade", "column", "tine"))
     ap.add_argument("--cohesion", type=float, default=10e3, help="tine: lab-scale cohesion (Pa)")
@@ -352,7 +356,10 @@ def main():
     ap.add_argument("--heights", type=float, nargs="+", default=[0.5, 1.0, 2.0])
     ap.add_argument("--depth", type=float, nargs="+", default=[0.2])
     ap.add_argument("--out", default=None)
+    ap.add_argument("--dt", type=float, default=DT, help="MPM step (s)")
+    ap.add_argument("--iterations", type=int, default=ITERATIONS, help="rheology solver iterations")
     args = ap.parse_args()
+    DT, ITERATIONS = args.dt, args.iterations
     rows = []
     if args.test == "tine":
         for lam in args.lam:
