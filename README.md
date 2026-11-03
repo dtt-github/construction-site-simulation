@@ -72,6 +72,7 @@ obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
   - **Depth camera:** 320 × 240, 90° wide, on the cab front, looking down at the dig area.
   - **IMU:** angular velocity and specific force in the upper structure.
 - **Speed:** about 1.1× real time per environment on a GB10, about 11 control steps per second; with all three sensors about 1.0× (10 steps per second).
+- **ROS 2:** [ros2_bridge/](ros2_bridge/README.md) publishes the machine, the soil loads and the sensors as ROS 2 Jazzy topics, in simulation time, and takes lever commands. The joint names and angles are those of the PWRI OPERA ZX200 URDF. ROS runs in a Docker container; nothing is installed on the host.
 - **Determinism:** within one process, identical runs give identical results; Gymnasium's `env_checker` passes (`test_env.py`). Between processes, results differ slightly (GPU atomics), for example 1.13 against 1.17 t loaded in 25 s.
 - **Units:** SI throughout. The coordinate frame is documented in the module.
 
@@ -98,7 +99,7 @@ Only licenses that allow redistribution, modification and commercial use are acc
 
 - Operator models beyond the scripted cycle (learned or recorded operator inputs), and checking heaped bucket loads against field data
 - Converged soil solves: loads still depend on the MPM iteration count
-- Research APIs: the Gymnasium environment with lidar, depth camera and IMU is done. Next: a ROS 2 bridge
+- Research APIs: the Gymnasium environment, the lidar, depth camera and IMU, and the ROS 2 bridge are done. Next: a `ros2_control` hardware interface, sensor noise models, and several environments per GPU
 - Measured ZX200 masses, swing torque and pressure logs for validation
 - Measured pressure logs, port relief and house inertia to validate the hydraulics
 - Soil–steel adhesion, bulking of dug clods, and soil presets calibrated to measured sites and bucket loads

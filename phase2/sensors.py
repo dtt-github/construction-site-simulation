@@ -166,6 +166,12 @@ def compose(p, q, lp, lq):
     return p + R @ lp, qq
 
 
+def house_pose(sim):
+    """Upper structure (URDF body_link) pose in the zone frame: position and rotation matrix."""
+    bq = sim.state_0.body_q.numpy()[sim.links["house"]]
+    return bq[:3].astype(float), quat_matrix(bq[3:])
+
+
 class SensorRig:
     def __init__(self, sim, lidar_channels=32, lidar_columns=1024, lidar_fov=(-45.0, 45.0), lidar_range=40.0,
                  camera_size=(320, 240), camera_hfov=90.0, camera_range=30.0):
@@ -225,8 +231,7 @@ class SensorRig:
 
     # ------------------------------------------------------------------ scene update
     def house_pose(self):
-        bq = self.sim.state_0.body_q.numpy()[self.sim.links["house"]]
-        return bq[:3].astype(float), quat_matrix(bq[3:])
+        return house_pose(self.sim)
 
     def _refresh(self):
         sim = self.sim
