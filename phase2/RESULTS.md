@@ -855,3 +855,67 @@ Final heights do not change (rods a ≈ 4: 0.21–0.24 against 0.29–0.32 measu
 - **Cost:** frames cost 18–25 % more. That uses up the real-time margin (1.18 → 1.01), so hard digs would dip below real time in the live server. p95 falls, because every frame now carries the same load.
 - **Bucket loads move:** dry sand carries 6 % more, and loam's learned curl, tuned at 30 Hz, lands at 80 % of its typical payload.
 - **Decision:** the default stays at 1/30 s for the live server. Use `--mpm-every 1` for accuracy runs. Switching the default would first need a cheaper MPM step, so that 60 Hz keeps a margin, and a re-tuned cohesive curl.
+
+## Validation 2: a subsoiler in a clay soil bin
+
+**The experiment:** Makange et al. 2021, "Prediction of precise subsoiling based on analytical method, discrete element simulation and experimental data from soil bin" (Sci. Rep. 11:11082, CC BY 4.0, full text from Europe PMC, PMC8155074).
+- **Tool:** a rectangular subsoiler blade, 260 mm effective width, at 23° to the ground, on a 30 mm thick arc shank.
+- **Runs:** pulled through a clay soil bin at 0.15, 0.20 and 0.30 m depth and 1, 2 and 2.5 km/h. Their Table 4 gives horizontal and vertical force for all nine runs: 1.2–3.4 kN horizontal, with vertical about 0.4 of horizontal, pulling the tool down.
+- **Soil:** 10.8–11.2 % moisture. Their Table 1 gives the profile by depth: bulk density rises from 1464 to 1787 kg/m³ and cone index from 325 to 3031 kPa.
+- **What is missing:** a continuum cohesion and friction angle (the 10 kPa in the paper is a DEM contact parameter) and the blade's length. So cohesion is fitted at one depth, and the other depths, the vertical force and the speed effect are predictions.
+
+**The test** (`soil_calibrate.py tine`, log `logs/soil_tine.json`):
+- **Scaling:** the tool is scaled up λ times. Lengths and cohesion scale with λ, speed with √λ, and forces with λ³.
+- **Model:** half the bin with a symmetry wall, soil–steel friction 0.55 (theirs), and a blade 0.15 m long (assumed). Forces are averaged once the blade is fully in the cut.
+
+**Resolution converges by λ = 4.**
+
+| Scale | Blade width in cells | Horizontal force, 0.20 m |
+|---|---|---|
+| 1 (native) | 3 | 6976 N |
+| 2 | 6.5 | 4003 N |
+| 4 | 13 | 3510 N |
+| 6 | 19.5 | 3499 N |
+
+At native size the blade spans 3 cells, and the force is 2× too high. So the 8 cm grid needs a tool about 1 m wide to resolve cutting forces. The excavator bucket, 1.06 m and 13 cells wide, just meets that.
+
+**A uniform soil cannot match the depth trend.**
+- **Fit at 0.20 m:** with cohesion fitted there, the 0.15 m force comes out +10…+17 % and the 0.30 m force −10…−19 %, for φ = 20–37°.
+- **The ratio:** the measured 0.30/0.15 m ratio is 2.74. The sim gives 1.91 at φ 20°, 2.08 at 30° and 2.23 at 37°.
+- **Fitting both depths:** that needs φ ≳ 47°, implausible for a clay.
+
+**The bin's measured profile does.** The bed is built in the paper's seven layers, with their densities and with cohesion in proportion to cone index (one free value, at the mean cone index). Cohesion is fitted at 0.20 m and 1 km/h, at the excavator's step of 1/30 s:
+
+| Depth | Speed | Measured H | Sim H, φ 30° (c 5.3 kPa) | Sim H, φ 37° (c 4.0 kPa) | Measured V | Sim V, φ 30° |
+|---|---|---|---|---|---|---|
+| 0.15 m | 1 km/h | 1235 N | 1152 N (−7 %) | 1174 N (−5 %) | 490 N | 300 N (−39 %) |
+| 0.20 m | 1 km/h | 1905 N | 1876 N (fit) | 1980 N (fit) | 741 N | 381 N (−49 %) |
+| 0.30 m | 1 km/h | 3382 N | 3675 N (+9 %) | 3701 N (+9 %) | 1390 N | 1203 N (−13 %) |
+| 0.15 m | 2.5 km/h | 1312 N | 1258 N (−4 %) | 1325 N (+1 %) | 511 N | 254 N |
+| 0.30 m | 2.5 km/h | 3418 N | 4282 N (+25 %) | 4386 N (+28 %) | 1410 N | 940 N |
+
+- **Horizontal force:** predicted within −7 to +9 % at 1 km/h. The paper's own DEM, with more parameters calibrated, reached 2–6 %.
+- **Vertical force:** pulls the tool down, as measured, but is 13–49 % too small. The assumed blade length, which sets how much soil rides on the blade, matters most here.
+- **Speed effect:** too large. From 1 to 2.5 km/h the sim adds 9–17 % force, where the measurement adds 1–6 %.
+
+**The forces are not converged in the time step.** This is the main finding.
+
+| MPM step | Iterations | H at 0.15 m | H at 0.30 m | V at 0.30 m |
+|---|---|---|---|---|
+| 1/30 s | 150 | 1152 N | 3675 N | 1203 N |
+| 1/60 s | 60 | 1170 N | 3802 N | 1259 N |
+| 1/60 s | 150 | 1365 N | 4491 N | 1131 N |
+| 1/120 s | 150 | 1486 N | 5122 N | 840 N |
+| 1/120 s | 300 | 1514 N | 5411 N | 644 N |
+| 1/240 s | 150 | 1553 N | 5922 N | 247 N |
+
+- **Not a slow build-up:** at 1/240 s the force settles to a steady 6.0–6.5 kN along the cut, so the rise is in the steady cutting resistance itself.
+- **The trend:** as the solve converges (smaller step, more iterations), the cutting resistance rises and the vertical force falls toward zero. At 1/120 s the speed effect shrinks to +3–5 %, close to the measured value.
+- **Consequence:** a cohesion fitted at one solver setting is an effective value for that setting, not a soil property. The presets, the vertical-cut checks and the McKyes blade comparisons are all at the excavator's setting (1/30 s, 150 iterations), and they hold there. Changing the MPM step means recalibrating.
+- **Cause:** not settled. The column collapse showed the large step also lets columns compact under their own weight. That fits a rheology solve that leaves cohesive soil softer than its yield surface when it does not converge. It is worth an issue for Newton's implicit MPM, with this test as the reproducer.
+
+**What validation 2 says:**
+- **Model shape:** cutting forces scale right with depth once the soil profile is right.
+- **Resolution:** the grid needs about 13 cells across a tool.
+- **Vertical forces:** they are the weak point.
+- **Cohesive presets:** these are calibrated values tied to the solver setting.

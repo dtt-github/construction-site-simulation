@@ -77,7 +77,10 @@ Only licenses that allow redistribution, modification and commercial use are acc
 - Measured ZX200 masses, swing torque and pressure logs for validation
 - Measured pressure logs, port relief and house inertia to validate the hydraulics
 - Soil–steel adhesion, bulking of dug clods, and soil presets calibrated to measured sites and bucket loads
-- Validation against measurements: column collapse is done ([phase2/RESULTS.md](phase2/RESULTS.md)). It shows the 30 Hz MPM step shortens fast flows and tall piles end up too flat. Next: a soil-bin blade test and a full-scale wheel-loader dig
+- Validation against measurements ([phase2/RESULTS.md](phase2/RESULTS.md)):
+  - Done: column collapse, and a clay soil-bin subsoiler (Makange 2021). Horizontal forces are within −7 to +9 % once the bin's layering is modelled.
+  - Found: the 30 Hz MPM step shortens fast flows; tall piles end up too flat; vertical tool forces are low; cohesive cutting forces depend on the MPM step.
+  - Next: a full-scale wheel-loader dig
 - Wheel loader, articulated dump truck, mobile and tower crane dynamics with ropes
 - Multi-user sessions and operator training scenarios
 
