@@ -467,3 +467,11 @@ Screenshots: `logs/hyd_lift.png`, `logs/hyd_linkage.png`, `logs/hyd_arm_cylinder
 - **No line or port relief.** The real valve has overload reliefs above 34.3 MPa that let an externally loaded cylinder yield. Here one relief value caps both pushing and holding.
 - **Swing is still a joint motor** at 65 kN·m. Swing relief and motor displacement would make it physical.
 - **The rod meshes are slightly short.** Near full extension a few cm of gap shows between rod and barrel.
+
+## Recorded replay for the static demo
+
+GitHub Pages has no GPU server, so `record_replay.py` records one auto pass headless:
+- The hello message plus the frames the WebSocket would have sent, at 15 Hz with grains thinned to 3000 per frame, gzip-compressed.
+- The result is `assets/replay/zx200_cycle.bin.gz`: 27 s, 404 frames, 5.0 MB (10.2 MB uncompressed).
+
+When no server is connected, `soil.js` plays it in a loop through the normal frame path, so the cylinders, pressures, stall flags, pit, truck and grains all show as live. The levers are disabled. `?replay` forces it locally. In a local static-site test, the replay loaded in 3.8 s and played at 60 fps with no errors. Re-record after physics changes, so the demo matches the code.

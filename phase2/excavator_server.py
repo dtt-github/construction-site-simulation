@@ -963,6 +963,10 @@ class ExcavatorSim:
             "truck_capacity_kg": TRUCK_CAPACITY_KG,
         }
 
+    def hello(self):
+        """First message to a client: machine, limits and scene geometry."""
+        return {"type": "hello", "kind": "excavator", "particles": self.n_particles, "zone": True, "voxel": self.voxel, "joints": JOINTS, "limits": LIMITS, "vmax": dict(zip(JOINTS, self.vmax.round(3).tolist())), "relief_mpa": hyd.P_RELIEF / 1e6, "geometry": self.geometry(), "stages": [c[0] for c in self.CYCLE]}
+
     def frame_bytes(self, frame_no, moving):
         bq = self.state_0.body_q.numpy()
         links = b"".join(struct.pack("<3f4f", *self.to_three(bq[i][:3]), *self.quat_to_three(bq[i][3:])) for i in (self.links[name] for name in LINKS))
@@ -1027,7 +1031,7 @@ async def serve(sim, host, port):
 
     async def handler(ws):
         clients.add(ws)
-        await ws.send(json.dumps({"type": "hello", "kind": "excavator", "particles": sim.n_particles, "zone": True, "voxel": sim.voxel, "joints": JOINTS, "limits": LIMITS, "vmax": dict(zip(JOINTS, sim.vmax.round(3).tolist())), "relief_mpa": hyd.P_RELIEF / 1e6, "geometry": sim.geometry(), "stages": [c[0] for c in sim.CYCLE]}))
+        await ws.send(json.dumps(sim.hello()))
         try:
             async for msg in ws:
                 try:

@@ -3,8 +3,9 @@
 # Layout mirrors phase1/ so the relative paths in web/*.js keep working:
 #   _site/web/        index.html, site.js, showcase.js, soil.js, site.json, hulls/
 #   _site/glb/        NVIDIA SimReady props (CC BY 4.0), downloaded here by assets/fetch_assets.py
-#   _site/assets/     open machines and site items from git (machinery/, site/) plus licenses
-# The GPU soil server is not part of the demo; the soil panel shows an offline notice.
+#   _site/assets/     open machines and site items from git (machinery/, site/) plus licenses, and
+#                     replay/: a dig cycle recorded from the GPU server (phase2/record_replay.py)
+# The GPU soil server is not part of the demo; the soil panel plays the recorded cycle instead.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 out="${1:-_site}"
@@ -15,7 +16,7 @@ rm -rf "$out"
 mkdir -p "$out/assets"
 cp -r phase1/web "$out/web"
 cp -r phase1/glb "$out/glb"
-cp -r assets/machinery assets/site assets/licenses assets/registry.json "$out/assets/"
+cp -r assets/machinery assets/site assets/licenses assets/replay assets/registry.json "$out/assets/"
 cp NOTICE LICENSE "$out/"
 
 # every model the site asks for must be present
@@ -25,6 +26,7 @@ out = pathlib.Path(sys.argv[1])
 site = json.loads((out / "web/site.json").read_text())
 need = {f"glb/{p['asset']}.glb" for p in site.get("placements", [])}
 need |= {i["file"] for i in site.get("showcase", [])}
+need.add("assets/replay/zx200_cycle.bin.gz")  # soil panel replay
 missing = sorted(n for n in need if not (out / n).is_file())
 if missing:
     sys.exit("missing from the Pages build: " + ", ".join(missing))

@@ -9,7 +9,7 @@ Initiated and maintained by **[DigitalTwin Technology GmbH](https://www.digitalt
 
 ![Open-licensed machines in the site: Komatsu D37PXi dozer, Hitachi IC120 carrier, Hitachi ZX200 excavator](assets/screenshots/showcase_machines.png)
 
-**[Try the site in your browser](https://dtt-github.github.io/construction-site-simulation/)**, no GPU needed: the terrain, the SimReady props and the open machines run client-side (three.js + Jolt). The excavator and soil need the GPU server; see [Quick start](#quick-start).
+**[Try the site in your browser](https://dtt-github.github.io/construction-site-simulation/)**, no GPU needed: the terrain, the SimReady props and the open machines run client-side (three.js + Jolt). The excavator and soil need the GPU server, so the demo plays a recorded dig–swing–load pass from it (ZX200 hydraulics, MPM sand, cylinder pressures; `phase2/record_replay.py`). Click *View pit* to watch it. For live control, see [Quick start](#quick-start).
 
 **Goal:** a site you can trust numerically. Soil that digs like soil, machines whose hydraulics stall like real ones, and every model checked against measured data. Rigid-body site physics runs in the browser (three.js + Jolt). Soil and machine dynamics run on a GPU server (NVIDIA Newton: MPM sand, MuJoCo articulations) and stream into the same page.
 

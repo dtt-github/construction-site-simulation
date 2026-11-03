@@ -1,9 +1,10 @@
 // Phase 2 soil client: shows the Newton MPM sand streamed from the Spark in the site.
 // Works with two servers:
 //   soil_server.py       ("SOIL" frames) - a kinematic bucket steered by position sliders
-//   excavator_server.py  ("EXC2" frames) - a joint-driven excavator (swing, boom, stick, bucket)
-//                                           with hydraulic-style actuators, steered with levers,
-//                                           loading a dump truck parked beside it
+//   excavator_server.py  ("EXC3" frames) - the ZX200 (swing, boom, stick, bucket) driven by its
+//                                           hydraulic cylinders, steered with levers, loading a
+//                                           dump truck parked beside it
+// With no server (e.g. the static GitHub Pages demo) it plays a recorded excavator pass instead.
 // Draws the sand surface from the streamed heightmap, the moving grains as points and the
 // bucket / arm, and mirrors the surface into a Jolt heightfield so site props rest on the dug ground.
 
@@ -21,6 +22,9 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   // stay offline unless ?soil=host:port names a server explicitly.
   const tryConnect = Boolean(params.get("soil")) || location.protocol !== "https:";
   const QUICK_START = "https://github.com/dtt-github/construction-site-simulation#quick-start";
+  // one auto dig-swing-load pass recorded from excavator_server.py (phase2/record_replay.py), played
+  // back when no server is connected, so the static demo shows the real simulation
+  const REPLAY_URL = "../assets/replay/zx200_cycle.bin.gz";
 
   // ------------------------------------------------------------ panel (controls depend on the server kind)
   const box = document.createElement("fieldset");
@@ -41,8 +45,10 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   const controlsEl = box.querySelector("#soil-controls");
   const buttonsEl = box.querySelector("#soil-buttons");
   const showOffline = (detail) => {
+    if (replay) return; // the recorded cycle is playing
     buttonsEl.hidden = controlsEl.hidden = true;
-    statusEl.innerHTML = `<strong>Soil server not connected.</strong> The excavator and soil need the GPU server (NVIDIA Newton); see the <a href="${QUICK_START}" target="_blank" rel="noopener">README quick start</a>. ${detail}`;
+    statusEl.innerHTML = `<strong>Soil server not connected.</strong> The excavator and soil need the GPU server (NVIDIA Newton); see the <a href="${QUICK_START}" target="_blank" rel="noopener">README quick start</a>. ${detail} <button id="soil-replay" class="secondary">Play recorded dig cycle</button>`;
+    statusEl.querySelector("#soil-replay").addEventListener("click", startReplay);
   };
 
   let ws = null;
@@ -435,6 +441,74 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     stats.bytes += buf.byteLength;
   }
 
+  function onHello(hello) {
+    const newKind = hello.kind === "excavator" ? "excavator" : "bucket";
+    if (newKind !== kind) {
+      kind = newKind;
+      if (kind === "excavator") {
+        if (!arm.base) buildExcavator(hello.geometry);
+        excavatorControls();
+      } else bucketControls();
+    }
+    stages = hello.stages ?? [];
+    zoneMode = !!hello.zone;
+  }
+
+  // ------------------------------------------------------------ recorded replay (no server)
+  let replay = null; // { frames: [{t, buf}], t0, k }
+  async function startReplay() {
+    if (replay) return;
+    statusEl.textContent = "Loading the recorded dig cycle…";
+    try {
+      const res = await fetch(REPLAY_URL);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      let buf = await res.arrayBuffer();
+      const head = new Uint8Array(buf, 0, 2);
+      if (head[0] === 0x1f && head[1] === 0x8b) {
+        // served as a plain .gz file: decompress here (a server that set Content-Encoding already did)
+        buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+      }
+      const dv = new DataView(buf);
+      if (dv.getUint32(0, true) !== 0x594c5052) throw new Error("not a replay file"); // "RPLY"
+      const helloLen = dv.getUint32(8, true);
+      const hello = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 12, helloLen)));
+      let o = 12 + helloLen;
+      const n = dv.getUint32(o, true);
+      o += 4;
+      const frames = [];
+      for (let k = 0; k < n; k++) {
+        const len = dv.getUint32(o, true);
+        const frame = buf.slice(o + 4, o + 4 + len);
+        frames.push({ t: new DataView(frame).getFloat32(8, true), buf: frame });
+        o += 4 + len;
+      }
+      onHello(hello);
+      replay = { frames, t0: performance.now() - frames[0].t * 1000, k: 0 };
+      buttonsEl.hidden = controlsEl.hidden = false;
+      autoBtn.hidden = box.querySelector("#soil-reset").hidden = true;
+      controlsEl.querySelectorAll("input").forEach((el) => (el.disabled = true));
+      const secs = frames[frames.length - 1].t.toFixed(0);
+      statusEl.innerHTML = `<strong>Recorded replay</strong> (${secs} s, loops): one auto dig–swing–load pass of the ZX200 with its hydraulic cylinders, in Newton MPM sand, recorded from the GPU server. For live control, run the server (<a href="${QUICK_START}" target="_blank" rel="noopener">quick start</a>).`;
+    } catch (err) {
+      replay = null;
+      statusEl.textContent = `Could not load the recorded cycle (${err.message}).`;
+    }
+  }
+  function tickReplay() {
+    const r = replay;
+    const now = performance.now();
+    let t = (now - r.t0) / 1000;
+    if (t > r.frames[r.frames.length - 1].t + 1.0) {
+      // loop: start over from the untouched pit
+      r.t0 = now - r.frames[0].t * 1000;
+      r.k = 0;
+      t = r.frames[0].t;
+    }
+    let next = null;
+    while (r.k < r.frames.length && r.frames[r.k].t <= t) next = r.frames[r.k++];
+    if (next) handleFrame(next.buf);
+  }
+
   let failures = 0; // back off retries so a missing local server doesn't flood the console
   function connect() {
     try {
@@ -445,6 +519,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     }
     ws.binaryType = "arraybuffer";
     ws.onopen = () => {
+      if (replay) location.reload(); // a live server appeared: start clean with live control
       buttonsEl.hidden = controlsEl.hidden = false;
       failures = 0;
       statusEl.textContent = `Connected to ${url}`;
@@ -452,20 +527,11 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     ws.onmessage = (ev) => {
       if (typeof ev.data === "string") {
         const hello = JSON.parse(ev.data);
-        const newKind = hello.kind === "excavator" ? "excavator" : "bucket";
-        if (newKind !== kind) {
-          kind = newKind;
-          if (kind === "excavator") {
-            if (!arm.base) buildExcavator(hello.geometry);
-            excavatorControls();
-          } else bucketControls();
-        }
-        stages = hello.stages ?? [];
+        onHello(hello);
         const soilText = hello.zone
           ? `moving soil zone (${hello.particles.toLocaleString()}-particle pool)`
           : `${hello.particles.toLocaleString()} particles`;
         statusEl.textContent = `Connected · ${kind === "excavator" ? "excavator arm" : "kinematic bucket"} · ${soilText}, ${Math.round(hello.voxel * 100)} cm grid`;
-        zoneMode = !!hello.zone;
         return;
       }
       try {
@@ -481,11 +547,12 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       setTimeout(connect, Math.min(30000, 2000 * 2 ** failures++));
     };
   }
-  if (tryConnect) connect();
-  else showOffline("The rest of the site runs fully in the browser.");
+  if (params.has("replay") || !tryConnect) startReplay(); // ?replay forces the recording
+  else connect();
 
   // ------------------------------------------------------------ per render frame
   function update() {
+    if (replay) tickReplay();
     const f = latest.frame;
     if (!f) return;
     latest.frame = null;
