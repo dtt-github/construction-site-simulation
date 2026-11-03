@@ -38,7 +38,7 @@ while sim.passes < args.passes and sim.sim_time < 60.0 * args.passes:
         sim.measure()
         dig_z = sim._stage_z(sim.CYCLE[2])  # drag pin height used this pass
         rows.append({"pass": passes + 1, "s": round(sim.sim_time - pass_t0, 1), "truck_kg": round(sim.truck_kg - truck), "drag_pin_z": round(dig_z, 2),
-                     "frame_ms": round(float(np.mean(pass_ms[10:])), 1), "active_peak": peak, "skipped": len(sim.skipped)})
+                     "frame_ms": round(float(np.mean(pass_ms[10:])), 1), "active_peak": peak, "skipped": len(sim.skipped), "ease_m": round(sim.ease, 2), "early_curls": sim.early_curls})
         print(json.dumps(rows[-1]), flush=True)
         truck, pass_t0, pass_ms, peak = sim.truck_kg, sim.sim_time, [], 0
 wall = time.perf_counter() - t0

@@ -72,7 +72,7 @@ Only licenses that allow redistribution, modification and commercial use are acc
 
 ## Roadmap
 
-- Operator-realistic cycles (bite size that adapts to the cut depth, so deep passes don't stall at relief)
+- Operator models beyond the scripted cycle (learned or recorded operator inputs), and checking heaped bucket loads against field data
 - Cut the fixed per-step MPM overhead so hard cuts keep real time too
 - Measured ZX200 masses, swing torque and pressure logs for validation
 - Line and port reliefs and a physical swing motor; measured pressure logs to validate the hydraulics

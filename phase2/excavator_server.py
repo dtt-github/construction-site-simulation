@@ -649,6 +649,7 @@ class ExcavatorSim:
         self.auto_s = 0.0
         self.passes = 0
         self.skipped = []
+        self.ease, self.seg_from, self.auto_frame, self.auto_fill, self.early_curls = 0.0, None, 0, 0.0, 0
         self._z_cache = {}
         self.stage_time = 0.0
         self.auto_wait = 0.0
@@ -752,22 +753,63 @@ class ExcavatorSim:
         r, phi = wp_[2], wp_[4]
         return ik(math.radians(self._stage_psi(wp_, start)), r, self._stage_z(wp_), math.radians(phi))
 
+    # operator judgement in the auto cycle: ease off a cut that stalls the arm or bucket at relief, and
+    # curl as soon as the bucket is full instead of finishing the planned drag
+    EASE_PRESSURE = 0.9  # fraction of relief on the arm or bucket cylinder that counts as stalling
+    EASE_RATE, EASE_MAX = 0.4, 0.8  # m/s the dig path rises while stalled; most it rises in one pass
+    FULL_KG = 1.1 * BUCKET_RATED_KG  # curl now: heaped to 110 % of rated
+
+    def _pin_pose(self):
+        """Current bucket pin as a cycle waypoint (swing deg, radius, height, mouth angle deg)."""
+        _, p2, b3 = chain(self.q)
+        return (math.degrees(self.q[0]), float(p2[0]), float(p2[2] + SWING_POS[2]), math.degrees(MOUTH_ANGLE - b3))
+
+    def _bucket_fill(self):
+        self.fill_counter.zero_()
+        wp.launch(bucket_profile_fill_kernel, dim=self.n_particles, inputs=[self.sand.particle_q, self.bucket_xform(), self.bucket_poly, BUCKET_W / 2, self.fill_counter])
+        return float(self.fill_counter.numpy()[0]) * self.particle_mass
+
+    def _jump_to(self, stage):
+        """Start the segment into `stage` from where the bucket is now."""
+        self.auto_stage = next(k for k, w in enumerate(self.CYCLE) if w[0] == stage) - 1
+        self.auto_s, self.stage_time, self.auto_wait = 0.0, 0.0, 0.0
+        self.seg_from = self._pin_pose()
+
     def _auto_control(self):
         """Track the cycle: move a target along the current segment only while the arm keeps up."""
         n = len(self.CYCLE)
         a = self.CYCLE[self.auto_stage]
         b = self.CYCLE[(self.auto_stage + 1) % n]
         self.stage_name = b[0]
+        digging = b[0] in self.DIG_STAGES
+        if digging and self.auto_frame % 6 == 0:
+            self.auto_fill = self._bucket_fill()
+            if self.auto_fill >= self.FULL_KG and b[0] != "curl":
+                self.early_curls += 1
+                self._jump_to("curl")
+                return self._auto_control()
+        self.auto_frame += 1
+        ease_a = self.ease if a[0] in self.DIG_STAGES else 0.0
+        ease_b = self.ease if digging else 0.0
         q_end = self._waypoint_q(b)
+        q_end = ik(q_end[0], b[2], self._stage_z(b) + ease_b, math.radians(b[4])) if ease_b else q_end
         speed = b[5] if len(b) > 5 else 1.0
-        seg_time = max(np.max(np.abs(self._waypoint_q(a, start=True) - q_end) / (self.vmax * speed)), 0.5)
         s = self.auto_s
-        za, zb = self._stage_z(a), self._stage_z(b)
-        pa, pb = self._stage_psi(a, start=True), self._stage_psi(b)
-        mix = [pa + s * (pb - pa), a[2] + s * (b[2] - a[2]), za + s * (zb - za), a[4] + s * (b[4] - a[4])]
+        if self.seg_from is not None:
+            pa, ra, za, fa = self.seg_from
+        else:
+            pa, ra, za, fa = self._stage_psi(a, start=True), a[2], self._stage_z(a) + ease_a, a[4]
+        q_start = ik(math.radians(pa), ra, za, math.radians(fa))
+        seg_time = max(np.max(np.abs(q_start - q_end) / (self.vmax * speed)), 0.5)
+        zb = self._stage_z(b) + ease_b
+        pb = self._stage_psi(b)
+        mix = [pa + s * (pb - pa), ra + s * (b[2] - ra), za + s * (zb - za), fa + s * (b[4] - fa)]
         q_goal = ik(math.radians(mix[0]), mix[1], mix[2], math.radians(mix[3]))  # straight bucket-pin path
         err = q_goal - self.q
         self.levers = np.clip(4.0 * err / self.vmax, -speed, speed) * LEVER_SIGN
+        # stalled in the cut (arm or bucket at relief and falling behind): raise the dig path
+        if digging and max(self.press[2], self.press[3]) >= self.EASE_PRESSURE * self.relief and np.max(np.abs(err)) > 0.05:
+            self.ease = min(self.ease + self.EASE_RATE * self.frame_dt, self.EASE_MAX)
         # advance along the segment at the pace the slowest joint allows, but only if tracking is good
         if np.max(np.abs(err)) < 0.12:
             self.auto_s = min(1.0, s + self.frame_dt / seg_time)
@@ -785,8 +827,10 @@ class ExcavatorSim:
             self.auto_stage = (self.auto_stage + 1) % n
             self.auto_s = 0.0
             self.stage_time = 0.0
+            self.seg_from = None
             if self.auto_stage == 0:
                 self.passes += 1
+                self.ease = 0.0
 
     # -------------------------------------------------------------- hydraulics
     def link_frames(self, q):
@@ -1037,6 +1081,8 @@ class ExcavatorSim:
             "edge": [round(v, 2) for v in fk(self.q)[2]],
             "truck_kg": round(self.truck_kg),
             "active": self.zones.n_active,
+            "ease_m": round(self.ease, 2),
+            "early_curls": self.early_curls,
             "zone": dict(self.zones.counters),
         }
 
@@ -1062,6 +1108,7 @@ async def serve(sim, host, port):
                 elif kind == "auto":
                     sim.auto = bool(cmd.get("on", True))
                     sim.auto_stage, sim.auto_s, sim.passes = 0, 0.0, 0
+                    sim.ease, sim.seg_from = 0.0, None
                     if not sim.auto:
                         sim.set_levers(0, 0, 0, 0)
                 elif kind == "relief":

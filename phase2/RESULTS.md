@@ -517,3 +517,24 @@ Sand's angle of repose here is 37°, so the slumped trench walls come out at the
 - **Speed in deep passes.** Deep passes wake up to 150k particles, and the run averages 0.92× real time. The 150k pool runs short at the deepest passes (469 times). A 220k pool removes that but makes no difference to loads or skips and is slower (0.87×; `logs/trench_bench_pool220k.json`), so 150k stays the default.
 
 **Browser** (`logs/deep_browser_test.json`): two loads (1102 kg and 1085 kg), 60 fps, no errors. Floor stall: boom and stick at −343 bar. At 40 % relief: the stick at 137 bar. The demo replay is re-recorded on the 2 m bed: 24.8 s, 4.5 MB.
+
+## Adaptive auto operator
+
+The fixed cycle stalled on deep trench passes. The auto cycle now makes two operator calls:
+- **Ease off a stalling cut.** When the arm or bucket cylinder is at 90 % of relief or more and the arm falls behind its path, the dig path rises at 0.4 m/s (up to 0.8 m per pass).
+- **Curl when full.** The fill is checked every 6 frames while digging. At 110 % of the rated load, the cycle goes straight to curl, starting from the current pose.
+
+Trench, 8 passes (`bench_trench.py 8`, `logs/trench_bench.json`):
+
+| | Fixed cycle | Adaptive |
+|---|---|---|
+| Skipped (stalled) stages | 16 | **0** |
+| Time per pass | 24–42 s | 24–31 s |
+| 8 passes take | 266 s | 209 s |
+| Real-time factor | 0.92 | 0.975 |
+| Per pass to the truck | 1099–1885 kg | 1097, 1447, 1611, 1649, 1714, 1751, 1435, 1054 kg |
+| Trench at x = 0 | 1.78 m deep, 37–42° sides | 1.73 m deep, 42–45° sides |
+
+The early curl fires on passes 3 to 8. Loads still reach 1.6–1.75 t, about 130 % of rated, because sand from the cut face keeps pouring in while the bucket curls. Whether a real 0.8 m³ bucket heaps that much in loose sand is a question for field data.
+
+The normal cycle is unchanged (`logs/deep_bench.json`): 1.095× real time, 1072 kg per pass, no skips.
