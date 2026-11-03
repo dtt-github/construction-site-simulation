@@ -718,22 +718,44 @@ Loam and clay match without tuning. At sand-like friction the Drucker–Prager c
 **Three things the first cohesive runs got wrong:**
 - **Strands instead of cracks.** MPM's tension cap is perfectly plastic, so cohesive soil drew out into strands instead of cracking. The fix is `soil_bond_kernel`: each particle's cohesion and tensile strength fall toward the remoulded fraction (1/sensitivity) as it opens up plastically, at Jp − 1 up to 0.1. Newton only tracks per-particle Jp with particle stress warm-starting, so cohesive soils use `warmstart_mode = "particles"` (no measurable cost). The damage stays while a particle is awake. Soil woken from the undisturbed bed starts intact.
 - **A clay lump stuck in the bucket.** Once healing was allowed, dug clay compacted into one 45 kPa lump wedged in the curved shell, and it rode back to the pit. With damage that stays, plus an operator move, the clay comes out. The move: if more than 25 % of a full bucket is still in after the dump, rap the bucket against its dump stop, up to 2.5 s (`_shake`, `shakes` in `stats()`).
-- **Overfilled buckets.** Cohesive soil does not flow off, so a slab stood on the mouth while the operator, counting only the shell, kept dragging. In cohesive soils the operator now counts the heap on and ahead of the mouth too, and curls at 75 % of the rated load.
+- **Overfilled buckets.** Cohesive soil does not flow off, so a slab stood on the mouth while the operator, counting only the shell, kept dragging. In cohesive soils the operator now counts the heap on and ahead of the mouth too. That alone still left clay buckets at 140–165 % of rating; see "Bucket fill in cohesive soils" below.
 
 The dormant zone wakes steep faces so they can fail. For a cohesive soil it now only wakes faces higher than 0.8 × the lower critical height, so trench walls in loam and clay stand.
 
-**Auto cycle, 130 s per soil** (`SOIL=… bench_zone.py 130`, `logs/zone_bench_<soil>.json`):
+### Bucket fill in cohesive soils
 
-| Soil | Passes | Per pass (mean) | Of rated 0.8 m³ | Real-time factor | Skipped stages |
-|---|---|---|---|---|---|
-| Dry sand | 7 | 1017 kg | 79 % | 1.18 | 0 |
-| Moist sand | 7 | 1275 kg | 91 % | 1.20 | 0 |
-| Loam | 7 | 1528 kg (2.1 t → 0.4 t over the run) | 103 % | 1.18 | 0 |
-| Clay | 5 | 2219 kg | 142 % | 1.16 | 2 (in the last pass) |
+**Where the overfill came from.** A trace of the first clay pass showed it. The operator curled early at 1.3 t, counted with the heap, but the planned curl then dragged the bucket another 0.9 m along the cut while curling. That tore up a slab that rode on the bucket: +1.1 t during the curl, 2.64 t in the truck.
+
+**Target: what a bucket typically carries.** Each preset now has a handbook bucket fill factor and a bank-to-loose swell (`fill_factor`, `swell`, `soils.payload_kg`). Fill factors for hydraulic excavators (Caterpillar Performance Handbook): sand and gravel 95–110 %, moist loam and sandy clay 100–110 %, hard tough clay 80–90 %. Typical swell: sand 10–15 %, loam 20–30 %, clay 30–40 %. For the 0.8 m³ (heaped) bucket:
+
+| Soil | Fill factor | Swell | Typical payload |
+|---|---|---|---|
+| Dry sand | 100 % | 12 % | 1143 kg |
+| Moist sand | 100 % | 15 % | 1217 kg |
+| Loam | 105 % | 25 % | 1243 kg |
+| Clay | 85 % | 35 % | 982 kg |
+
+The old "of rated" figures divided by bank density, so they overstated the comparison. Against these targets, clay was at 226 % and loam at 123 %.
+
+**Two operator changes:**
+- **Curl out, not along the cut.** In loam and clay an early curl now lifts out where the bucket is: the pin moves 0.2 m in and 1.0 m up while curling (`CURL_OUT`), instead of going on to the planned curl point. Raising the lift from 0.7 to 1.0 to 1.4 m cut clay's gain while curling from 480 to 370 to 250 kg, with no change in cycle time. Loam loses part of its heap above 1.0 m. Only soils whose vertical cuts stand higher than the bucket (lower critical height > 1.2 m) hold a heap while lifting out. Moist sand (0.6 m) lost its heap this way, so it is curled along the cut as sand is.
+- **Learn what the curl adds.** The operator curls when the load, counted with the heap, reaches the typical payload less what the curl added last pass (`curl_gain_kg` in `stats()`). The first guess is 30 % of the payload. The figure is negative when the heap falls off, as in loam. Dry sand is unchanged: it is still curled at 110 % of rated inside the shell.
+
+**Result,** 130 s per soil, run one at a time (`SOIL=… bench_zone.py 130`, `logs/zone_bench_<soil>.json`):
+
+| Soil | Passes | Per pass, mean (range) | Typical payload | Mean / typical | Before | Real-time factor | Skipped stages |
+|---|---|---|---|---|---|---|---|
+| Dry sand | 7 | 1015 kg (771–1209) | 1143 kg | 89 % | 1017 kg | 1.18 | 0 |
+| Moist sand | 7 | 1214 kg (800–1469) | 1217 kg | 100 % | 1275 kg | 1.26 | 0 |
+| Loam | 7 | 1242 kg (732–1605) | 1243 kg | 100 % | 1528 kg | 1.23 | 0 |
+| Clay | **7** (was 5) | 1014 kg (690–1283) | 982 kg | 103 % | 2219 kg | 1.19 | 0 (was 2) |
+
+Clay passes no longer need shaking: the smaller load comes out on the dump. That is how clay gets 7 passes instead of 5. The first clay pass now takes 14.9 s, against 17.2 s before.
 
 **Limits:**
-- **Overfill:** clay buckets carry 140–165 % of rating, and loam's first passes about 140 %. Handbook fill factors are about 100–110 % for loam and 85–100 % for clay. Curling earlier barely helps: the curl itself lifts a cohesive wedge with the bucket. This is the next calibration target, against measured bucket fill.
-- **Clay shaking:** it adds 2–3.5 s to each clay pass.
+- **Pass-to-pass spread:** loads vary ±35 % from pass to pass. Lanes and depths differ, and the learned curl gain is a single number. Clay loads fall over the run, to 0.7 t in the deeper passes.
+- **No bulking:** dug clods stay at bank density. A clay load on target therefore fills only about two-thirds of the bucket by eye, where real clay would fill it with voids.
+- **Clay shaking:** it is still there for loads that stick, but did not trigger in these runs.
 - **No adhesion:** soil–steel adhesion is not modelled, so sticky clay holds only by geometry and friction.
 - **Healing:** soil does not regain strength over time, and the load in the truck becomes intact again only when it sleeps.
 - **Unvalidated values:** the presets are typical published values, not one measured site. Moist sand's cohesion depends strongly on its water content.

@@ -651,10 +651,14 @@ class ExcavatorSim:
         if self.bond is not None:
             self.zones.on_spawn = lambda slots: wp.launch(reset_bond_kernel, dim=slots.shape[0], inputs=[slots, self.bond_state])
         # curl now: sand heaped to 110 % of rated inside the shell (the rest flows off). A cohesive soil is
-        # counted with the heap standing on and ahead of the mouth, which does not flow off and grows during
-        # the curl, so the operator curls at 75 % of rated: thinner bites, as in sticky ground
+        # counted with the heap standing on and ahead of the mouth, which does not flow off and still grows
+        # while the bucket curls out, so the operator curls short of the payload the soil typically gives
         self.heap_check = material["cohesion"] > 0.0
-        self.full_kg = (self.COHESIVE_CURL if self.heap_check else 1.1) * BUCKET_RATED_M3 * density
+        # a soil whose cut faces stand taller than the bucket holds its heap while the bucket lifts out of
+        # the cut; a weaker one (moist sand) loses it, and is curled along the cut as sand is
+        self.lift_out = self.heap_check and soils.critical_height(soil)[0] > self.HEAP_STANDS_M
+        self.payload_kg = soils.payload_kg(soil, BUCKET_RATED_M3)
+        self.full_kg = self.payload_kg if self.heap_check else 1.1 * BUCKET_RATED_M3 * density
 
         # actuator parameters on the GPU
         arr = lambda d: wp.array([float(d[j]) for j in JOINTS], dtype=float)  # noqa: E731
@@ -708,6 +712,9 @@ class ExcavatorSim:
         self.passes = 0
         self.skipped = []
         self.ease, self.seg_from, self.auto_frame, self.auto_fill, self.early_curls = 0.0, None, 0, 0.0, 0
+        self.curl_out = None  # curl waypoint replaced for this pass (lifting out of a full cohesive cut)
+        self.curl_gain = self.CURL_GAIN_GUESS * self.payload_kg if self.heap_check else 0.0
+        self.curl_from = None  # load when this pass's early curl began
         self.swing_inertia = self.SWING_INERTIA_GUESS
         self._z_cache = {}
         self.stage_time = 0.0
@@ -775,6 +782,8 @@ class ExcavatorSim:
         the hard floor on the way there."""
         if wp_[0] in ("swing to truck", "dump"):
             return wp_[3] + self._load_raise()
+        if wp_ is self.curl_out:
+            return wp_[3]
         if wp_[0] not in self.DIG_STAGES:
             return wp_[3]
         key = (wp_[0], self.passes)
@@ -820,6 +829,8 @@ class ExcavatorSim:
     # curl as soon as the bucket is full instead of finishing the planned drag
     EASE_PRESSURE = 0.9  # fraction of relief on the arm or bucket cylinder that counts as stalling
     EASE_RATE, EASE_MAX = 0.4, 0.8  # m/s the dig path rises while stalled; most it rises in one pass
+    HEAP_STANDS_M = 1.2  # m: critical cut height above which a heap stands on the bucket as it lifts out
+    CURL_OUT = (0.2, 1.0)  # m the pin moves in and up while curling out of a full cut in cohesive soil
 
     def _pin_pose(self):
         """Current bucket pin as a cycle waypoint (swing deg, radius, height, mouth angle deg)."""
@@ -929,7 +940,7 @@ class ExcavatorSim:
                 lever = math.copysign(min(abs(lever) if abs(v) <= 0.15 else 1.0, v_ok / SWING_VMAX), lever)
         return lever
 
-    COHESIVE_CURL = 0.75  # of the rated load, counted with the heap
+    CURL_GAIN_GUESS = 0.3  # of the payload a cohesive load gains (< 0: loses) curling out, until measured
     SHAKE_IF = 0.25  # fraction of a full bucket still in it after the dump that makes the operator shake it out
     SHAKE_S, SHAKE_PERIOD = 2.5, 0.32  # most time spent shaking; one rap: dump to the stop, then a short curl back
 
@@ -952,13 +963,21 @@ class ExcavatorSim:
         n = len(self.CYCLE)
         a = self.CYCLE[self.auto_stage]
         b = self.CYCLE[(self.auto_stage + 1) % n]
+        a, b = (self.curl_out if self.curl_out is not None and w[0] == "curl" else w for w in (a, b))
         self.stage_name = b[0]
         digging = b[0] in self.DIG_STAGES
         if digging and self.auto_frame % 6 == 0:
             self.auto_fill = self._bucket_fill()
-            if self.auto_fill >= self.full_kg and b[0] != "curl":
+            if self.auto_fill >= self.full_kg - self.curl_gain and b[0] != "curl":
                 self.early_curls += 1
                 self._jump_to("curl")
+                if self.lift_out:
+                    # cohesive soil: curl while lifting out where the bucket is, not on along the cut to
+                    # the planned curl point (dragging on through clay would tear up another slab)
+                    _, r, z, _ = self.seg_from
+                    c = self.CYCLE[self.auto_stage + 1]
+                    self.curl_out = (c[0], c[1], r - self.CURL_OUT[0], z + self.CURL_OUT[1], c[4])
+                self.curl_from = self.auto_fill if self.heap_check else None
                 return self._auto_control()
         if self.shaking is not None:
             return self._shake()
@@ -1043,6 +1062,9 @@ class ExcavatorSim:
         # (that cannot quite reach the pose) is let go on instead of timing out
         tol = 0.06 if self.stage_time < seg_all + 1.5 else 0.15
         if timed_out or (self.auto_s >= 1.0 and np.max(np.abs(q_end - self.q)) < tol):
+            if b[0] == "curl" and self.curl_from is not None:
+                # learn how much the curl adds (< 0: the heap fell off), to curl that much short next time
+                self.curl_gain += 0.5 * (self._bucket_fill() - self.curl_from - self.curl_gain)
             if b[0] == "dump" and self._bucket_fill() > self.SHAKE_IF * self.full_kg:
                 self.shaking = 0.0  # sticky load still in the bucket: shake it out before swinging back
                 self.shakes += 1
@@ -1055,6 +1077,7 @@ class ExcavatorSim:
             if self.auto_stage == 0:
                 self.passes += 1
                 self.ease = 0.0
+                self.curl_out, self.curl_from = None, None
 
     # -------------------------------------------------------------- hydraulics
     def link_frames(self, q):
@@ -1325,6 +1348,8 @@ class ExcavatorSim:
             "active": self.zones.n_active,
             "ease_m": round(self.ease, 2),
             "early_curls": self.early_curls,
+            "payload_kg": round(self.payload_kg),
+            "curl_gain_kg": round(self.curl_gain),
             "zone": dict(self.zones.counters),
         }
 

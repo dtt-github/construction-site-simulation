@@ -76,7 +76,7 @@ Only licenses that allow redistribution, modification and commercial use are acc
 - Converged soil solves: loads still depend on the MPM iteration count
 - Measured ZX200 masses, swing torque and pressure logs for validation
 - Measured pressure logs, port relief and house inertia to validate the hydraulics
-- Bucket fill in cohesive soils (clay carries 140–165 % of rating), soil–steel adhesion, and soil presets calibrated to measured sites
+- Soil–steel adhesion, bulking of dug clods, and soil presets calibrated to measured sites and bucket loads
 - Wheel loader, articulated dump truck, mobile and tower crane dynamics with ropes
 - Multi-user sessions and operator training scenarios
 
