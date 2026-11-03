@@ -18,7 +18,7 @@ SAMPLE = """(() => { const f = window.__soil?.lastFrame; if (!f || f.kind !== 'e
   const d = (v) => Math.round(v * 180 / Math.PI);
   return { t: +f.simTime.toFixed(2), rtf: +f.rtf.toFixed(2), stage: f.stage, q: f.q.map(d), qd: f.qd.map(v => +v.toFixed(2)),
     press: f.press.map(v => +v.toFixed(2)), fill: Math.round(f.fill), fx: Math.round(f.force[0]), fy: Math.round(f.force[1]),
-    grains: f.grains.count, truck: Math.round(f.truck), stalled: window.__soil.stalled, recvFps: +window.__soil.stats.fps.toFixed(1), model: window.__soil.model, siteFps: Math.round(window.__site.stats.fps) }; })()"""
+    grains: f.grains.count, active: f.particles, truck: Math.round(f.truck), stalled: window.__soil.stalled, recvFps: +window.__soil.stats.fps.toFixed(1), model: window.__soil.model, siteFps: Math.round(window.__site.stats.fps) }; })()"""
 
 
 def sample_for(page, seconds, every=0.5, shots=None, prefix=""):

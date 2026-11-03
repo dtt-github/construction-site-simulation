@@ -13,6 +13,10 @@ a curved bucket with teeth traced from its mesh. Each joint is driven by a hydra
 The arm is a Newton articulation solved with MuJoCo; its bucket is a dynamic MPM collider, so the
 sand pushes back on the arm (two-way coupling as in Newton's mpm_twoway_coupling example).
 
+Only the soil near the bucket is simulated as MPM particles (soil_zone.py): resting soil elsewhere in the
+pit and in the truck is kept as dormant columns that act as a rigid heightfield collider, and wakes into
+particles when the bucket comes near. This runs the dig-swing-load cycle in real time.
+
 Streams the same heightmap/grain data as soil_server.py plus the three link poses, joint angles,
 speeds and relief-pressure ratios, and accepts lever / auto / relief / reset commands.
 
@@ -50,6 +54,7 @@ from soil_server import (
     heightmap_kernel,
     mckyes_n_gamma,
 )
+from soil_zone import CELL, LAYER_PER_PARTICLE, SPACING, SoilZones
 
 # ------------------------------------------------------------------ machine (zone frame, Z up)
 # Hitachi ZX200 (20 t class) from the PWRI OPERA URDF (zx200_ros2, Apache-2.0): joint origins in the
@@ -115,6 +120,23 @@ TRUCK_NY = int(round(BED_W / TRUCK_CELL))
 ARMATURE = 200.0
 RIGID_SUBSTEPS = 4
 USE_MUJOCO_CPU = False  # GPU MuJoCo, with the rigid substeps recorded as one CUDA graph
+# moving soil zone (soil_zone.py): only soil near the bucket is MPM particles, the rest is dormant columns
+POOL = 120_000  # particle capacity; the whole 6 x 5 x 0.5 m bed would be 234k particles
+ZONE_EVERY = 4  # frames between wake/sleep updates (15 Hz)
+
+
+def ground_height(x, y):
+    """Ground under the soil (zone frame): pit floor, 1V:1.5H sides on the machine (+x) and truck (+y)
+    sides, site ground beyond (as the static colliders below)."""
+    x, y = np.broadcast_arrays(np.asarray(x, dtype=float), np.asarray(y, dtype=float))
+    side = np.maximum(np.clip((x - ZONE_HALF[0]) / 1.5, 0.0, 2.5), np.clip((y - ZONE_HALF[1]) / 1.5, 0.0, 2.5))
+    return np.where((x > 6.75) | (y > 6.25), GROUND_Z, side)
+
+
+# dormant-soil regions, raised ones first: the truck bed, then the pit with its sides and the ground
+# around it (spill), from the pit's walled -x / -y sides to past the machine and the truck
+TRUCK_REGION = ("truck", float(BED_LO[0]), float(BED_LO[1]), int(BED_L / CELL), int(BED_W / CELL), lambda x, y: np.full(np.shape(x), BED_FLOOR_Z))
+GROUND_REGION = ("ground", -ZONE_HALF[0], -ZONE_HALF[1], 160, 140, ground_height)
 
 
 def box_inertia(m, hx, hy, hz):
@@ -330,6 +352,7 @@ def subtract_body_force(
 def stream_kernel(
     q: wp.array[wp.vec3],
     qd: wp.array[wp.vec3],
+    flags: wp.array[wp.int32],
     min_speed: float,
     zone_hx: float,
     zone_hy: float,
@@ -342,6 +365,8 @@ def stream_kernel(
     """Grains to stream: moving sand, plus sand resting outside the pit and outside the truck bed
     (spill on the ground). Resting sand in the pit and in the bed is sent as heightmaps instead."""
     i = wp.tid()
+    if (flags[i] & int(newton.ParticleFlags.ACTIVE)) == 0:
+        return
     p = q[i]
     in_zone = wp.abs(p[0]) <= zone_hx and wp.abs(p[1]) <= zone_hy
     in_bed = p[0] > bed_lo[0] and p[0] < bed_hi[0] and p[1] > bed_lo[1] and p[1] < bed_hi[1] and p[2] > bed_lo[2] - 0.1
@@ -501,24 +526,28 @@ class ExcavatorSim:
         b.add_ground_plane(cfg=floor)
         self.model = b.finalize()
 
-        # sand
+        # sand: a fixed pool of particles on a 4 cm lattice (2 per voxel edge). The bed starts as dormant
+        # columns (soil_zone.py); particles are placed where the bucket digs and parked elsewhere.
+        assert abs(voxel - 2 * SPACING) < 1e-9 and ppc == 2, "the soil zone lattice assumes an 8 cm voxel, 2 particles per edge"
         sb = newton.ModelBuilder()
         SolverImplicitMPM.register_custom_attributes(sb)
-        lo = np.array([-zx, -zy, 0.0])
-        hi = np.array([zx, zy, BED_DEPTH])
-        res = np.array(np.ceil(ppc * (hi - lo) / voxel), dtype=int)
-        cell = (hi - lo) / res
-        self.radius = float(np.max(cell) * 0.5)
-        self.particle_mass = float(np.prod(cell) * density)
+        self.radius = SPACING / 2
+        self.particle_mass = SPACING**3 * density
+        side = int(math.ceil(POOL ** (1 / 3)))
         sb.add_particle_grid(
-            pos=wp.vec3(lo), rot=wp.quat_identity(), vel=wp.vec3(0.0),
-            dim_x=int(res[0]) + 1, dim_y=int(res[1]) + 1, dim_z=int(res[2]) + 1,
-            cell_x=float(cell[0]), cell_y=float(cell[1]), cell_z=float(cell[2]),
-            mass=self.particle_mass, jitter=2.0 * self.radius, radius_mean=self.radius,
+            pos=wp.vec3(0.0), rot=wp.quat_identity(), vel=wp.vec3(0.0),
+            dim_x=side, dim_y=side, dim_z=int(math.ceil(POOL / side**2)),
+            cell_x=SPACING, cell_y=SPACING, cell_z=SPACING,
+            mass=self.particle_mass, jitter=0.0, radius_mean=self.radius,
             custom_attributes={"mpm:friction": friction},
         )
         self.sand_model = sb.finalize()
         self.n_particles = self.sand_model.particle_count
+        self.zones = SoilZones([TRUCK_REGION, GROUND_REGION], self.n_particles, SPACING**3)
+        z = self.zones
+        in_pit = z.region_mask("ground") & (np.abs(z.col_x) < ZONE_HALF[0]) & (np.abs(z.col_y) < ZONE_HALF[1])
+        self.bed_counts = np.where(in_pit, int(round(BED_DEPTH / LAYER_PER_PARTICLE)), 0)
+        z.set_display(z.region_mask("ground") & ~in_pit)  # the pit and truck heightmaps show the rest
 
         cfg = SolverImplicitMPM.Config()
         cfg.voxel_size = voxel
@@ -526,7 +555,14 @@ class ExcavatorSim:
         cfg.critical_fraction = 0.0
         cfg.strain_basis = "P0"
         self.mpm = SolverImplicitMPM(self.sand_model, config=cfg)
-        self.mpm.setup_collider(model=self.model)
+        # colliders: static shapes, the stick and bucket, and the dormant soil columns
+        collide = [bid for bid in range(self.model.body_count) if bid in (stick, bucket)]
+        self.mpm.setup_collider(
+            model=self.model,
+            collider_body_ids=[-1, *collide, None],
+            collider_meshes=[None] * (1 + len(collide)) + [self.zones.mesh],
+            collider_friction=[None] * (1 + len(collide)) + [friction],
+        )
         self.collider_body = self.mpm.collider_body_index
 
         self.solver = SolverMuJoCo(self.model, use_mujoco_contacts=False, njmax=200, nconmax=200, use_mujoco_cpu=USE_MUJOCO_CPU)
@@ -568,6 +604,9 @@ class ExcavatorSim:
         self.sand.body_q = wp.empty_like(self.state_0.body_q)
         self.sand.body_qd = wp.empty_like(self.state_0.body_qd)
         self.sand.body_f = wp.empty_like(self.state_0.body_f)
+        self.zones.attach(self.sand_model, self.sand, self.mpm)
+        self.zones.reset(self.bed_counts)
+        self.zone_frame = 0
         self.sand_forces = wp.zeros_like(self.state_0.body_f)
         self.imp_ids.fill_(-1)
         self.rigid_graph = None  # new state buffers: record the rigid graph again
@@ -735,6 +774,9 @@ class ExcavatorSim:
         else:
             wp.capture_launch(self.rigid_graph)
 
+        if self.zone_frame % ZONE_EVERY == 0:
+            self.zones.update(self.bucket_box())
+        self.zone_frame += 1
         wp.launch(subtract_body_force, dim=self.model.body_count, inputs=[self.frame_dt, self.state_0.body_q, self.state_0.body_qd, self.sand_forces, self.model.body_inv_inertia, self.model.body_inv_mass, self.sand.body_q, self.sand.body_qd])
         self.mpm.step(self.sand, self.sand, contacts=None, control=None, dt=self.frame_dt)
         self._collect_impulses()
@@ -746,6 +788,25 @@ class ExcavatorSim:
         self.q = self.state_0.joint_q.numpy()[:4].astype(float)
         self.qd = self.state_0.joint_qd.numpy()[:4].astype(float)
         self.press = self.pressure.numpy().astype(float)
+
+    BUCKET_LOCAL_BOX = (
+        np.array([min(BUCKET_SHELL[:, 0].min(), TOOTH_TIP[0]) - PLATE, -BUCKET_W / 2 - PLATE, min(BUCKET_SHELL[:, 1].min(), TOOTH_TIP[1]) - PLATE]),
+        np.array([max(BUCKET_SHELL[:, 0].max(), TOOTH_TIP[0]) + PLATE, BUCKET_W / 2 + PLATE, max(BUCKET_SHELL[:, 1].max(), TOOTH_TIP[1]) + PLATE]),
+    )
+
+    def bucket_box(self):
+        """World AABB of the bucket (zone frame), for the soil zone."""
+        bq = self.state_0.body_q.numpy()[self.links["bucket"]]
+        lo, hi = self.BUCKET_LOCAL_BOX
+        corners = np.array([[x, y, z] for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])])
+        x, y, z, w = bq[3:]
+        R = np.array([
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+        ])
+        pts = corners @ R.T + bq[:3]
+        return pts.min(axis=0), pts.max(axis=0)
 
     # -------------------------------------------------------------- outputs
     def bucket_xform(self):
@@ -759,12 +820,15 @@ class ExcavatorSim:
         self.hm.fill_(0.0)
         wp.launch(heightmap_kernel, dim=self.n_particles, inputs=[q, self.sand.particle_qd, SURFACE_MAX_SPEED, self.radius, -ZONE_HALF[0], -ZONE_HALF[1], HM_CELL, HM_NX, HM_NY, self.hm])
         self.counter.zero_()
-        wp.launch(stream_kernel, dim=self.n_particles, inputs=[q, self.sand.particle_qd, MOVING_SPEED, ZONE_HALF[0] + 0.6, ZONE_HALF[1] + 0.6, wp.vec3(*BED_LO), wp.vec3(*BED_HI), MAX_SEND_PARTICLES, self.counter, self.moving])
+        self.zones.merge_heightmap(self.hm, -ZONE_HALF[0], -ZONE_HALF[1], HM_CELL, HM_NX, HM_NY)
+        wp.launch(stream_kernel, dim=self.n_particles, inputs=[q, self.sand.particle_qd, self.sand_model.particle_flags, MOVING_SPEED, ZONE_HALF[0] + 0.6, ZONE_HALF[1] + 0.6, wp.vec3(*BED_LO), wp.vec3(*BED_HI), MAX_SEND_PARTICLES, self.counter, self.moving])
+        self.zones.stream_dormant(MAX_SEND_PARTICLES, self.counter, self.moving)
         # truck: load inside the bed, and the surface of the resting load
         self.truck_counter.zero_()
         wp.launch(bucket_fill_kernel, dim=self.n_particles, inputs=[q, wp.transform_identity(), wp.vec3(*BED_LO), wp.vec3(*BED_HI), self.truck_counter])
         self.truck_hm.fill_(BED_FLOOR_Z)
         wp.launch(heightmap_kernel, dim=self.n_particles, inputs=[q, self.sand.particle_qd, SURFACE_MAX_SPEED, self.radius, float(BED_LO[0]), float(BED_LO[1]), TRUCK_CELL, TRUCK_NX, TRUCK_NY, self.truck_hm])
+        self.zones.merge_heightmap(self.truck_hm, float(BED_LO[0]), float(BED_LO[1]), TRUCK_CELL, TRUCK_NX, TRUCK_NY)
         self.fill_counter.zero_()
         # inside the shell profile, up to the mouth (struck load)
         wp.launch(bucket_profile_fill_kernel, dim=self.n_particles, inputs=[q, self.bucket_xform(), self.bucket_poly, BUCKET_W / 2, self.fill_counter])
@@ -772,7 +836,7 @@ class ExcavatorSim:
         n_moving = min(int(self.counter.numpy()[0]), MAX_SEND_PARTICLES)
         moving = self.moving.numpy()[:n_moving]
         self.fill_kg = float(self.fill_counter.numpy()[0]) * self.particle_mass
-        self.truck_kg = float(self.truck_counter.numpy()[0]) * self.particle_mass
+        self.truck_kg = float(self.truck_counter.numpy()[0] + self.zones.dormant_in("truck")) * self.particle_mass
         self.truck_hm_np = self.truck_hm.numpy()
         _, _, edge = fk(self.q)
         ix = int((edge[0] + ZONE_HALF[0]) / HM_CELL)
@@ -837,7 +901,7 @@ class ExcavatorSim:
         f = self.force
         header = struct.pack(
             "<4sIfffI",
-            b"EXC2", frame_no, self.sim_time, self.step_ms, min(self.frame_dt * 1000 / max(self.step_ms, 1e-3), 99.0), self.n_particles,
+            b"EXC2", frame_no, self.sim_time, self.step_ms, min(self.frame_dt * 1000 / max(self.step_ms, 1e-3), 99.0), self.zones.n_active,
         )
         arm = struct.pack(
             "<4f4f4f3f6fB",
@@ -876,6 +940,8 @@ class ExcavatorSim:
             "mckyes_kN": round(self.fee_ref / 1000, 1),
             "edge": [round(v, 2) for v in fk(self.q)[2]],
             "truck_kg": round(self.truck_kg),
+            "active": self.zones.n_active,
+            "zone": dict(self.zones.counters),
         }
 
 
@@ -887,7 +953,7 @@ async def serve(sim, host, port):
 
     async def handler(ws):
         clients.add(ws)
-        await ws.send(json.dumps({"type": "hello", "kind": "excavator", "particles": sim.n_particles, "voxel": sim.voxel, "joints": JOINTS, "limits": LIMITS, "vmax": VMAX, "tau_max": TAU_MAX, "geometry": sim.geometry(), "stages": [c[0] for c in sim.CYCLE]}))
+        await ws.send(json.dumps({"type": "hello", "kind": "excavator", "particles": sim.n_particles, "zone": True, "voxel": sim.voxel, "joints": JOINTS, "limits": LIMITS, "vmax": VMAX, "tau_max": TAU_MAX, "geometry": sim.geometry(), "stages": [c[0] for c in sim.CYCLE]}))
         try:
             async for msg in ws:
                 try:

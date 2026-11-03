@@ -19,7 +19,7 @@ Initiated and maintained by **[DigitalTwin Technology GmbH](https://www.digitalt
 |---|---|
 | Site | 128 m terrain with pad, haul road, stockpile and a 2.5 m excavation pit; 40+ physics props from NVIDIA SimReady (CC BY 4.0) with checked masses and colliders |
 | Real machines (open-licensed) | Hitachi ZX200 excavator, Hitachi IC120 crawler carrier, Komatsu D37PXi dozer (articulated, from the PWRI OPERA project, Apache-2.0); 35 m tower crane, cones, barrels and jersey barriers (Gazebo, CC0) |
-| Soil | 266k-particle MPM sand bed (Newton implicit MPM) on the GPU, two-way coupled to the machine |
+| Soil | MPM sand (Newton implicit MPM) on the GPU, two-way coupled to the machine; only soil near the bucket is particles (up to 60k), resting soil elsewhere is a heightfield, so the full cycle runs in real time (1.12×) |
 | Excavator | The real Hitachi ZX200 (OPERA URDF geometry and joint limits, curved bucket with teeth) as a 4-joint machine with flow-limited, relief-capped hydraulic actuators that slow and stall under load; full dig–swing–load cycle into a dump truck, 964 kg per pass (75 % of the 0.8 m³ bucket's rating) |
 | Browser client | Levers and keyboard control, cylinder pressure gauges, stall warnings, live truck load; 60 fps |
 | Validation | Bucket forces compared with the McKyes/Reece earthmoving equation; field data wanted (see below) |
@@ -30,7 +30,7 @@ Initiated and maintained by **[DigitalTwin Technology GmbH](https://www.digitalt
 | `reports/`, `research_notes/` | Cited research on soil, machine and crane simulation, and the open 3D-asset survey |
 | `phase0/` | Platform tests on the DGX Spark: Newton vs Chrono soil benchmark, Chrome WebGPU, Isaac Sim. See [`phase0/RESULTS.md`](phase0/RESULTS.md) |
 | `phase1/` | SimReady → web pipeline (USD physics extractor, GLB checks, CoACD colliders) and the three.js + Jolt site. See [`phase1/RESULTS.md`](phase1/RESULTS.md) |
-| `phase2/` | Newton soil servers: `excavator_server.py` (excavator with hydraulic-style actuators loading a dump truck) and `soil_server.py` (kinematic-bucket baseline). See [`phase2/RESULTS.md`](phase2/RESULTS.md) |
+| `phase2/` | Newton soil servers: `excavator_server.py` (excavator with hydraulic-style actuators loading a dump truck, real-time soil zone in `soil_zone.py`) and `soil_server.py` (kinematic-bucket baseline). See [`phase2/RESULTS.md`](phase2/RESULTS.md) |
 | `assets/` | Open asset library: registry, licenses, converted machines and build scripts. See [`assets/README.md`](assets/README.md) |
 
 ## Quick start
@@ -72,8 +72,8 @@ Only licenses that allow redistribution, modification and commercial use are acc
 
 ## Roadmap
 
-- Real-time soil: a moving particle zone around the tool with a heightfield elsewhere
-- Fuller bucket loads and operator-realistic cycles; a deeper soil bed for full-depth cuts
+- A deeper soil bed for full-depth cuts (cheap now that resting soil is a heightfield); fuller bucket loads and operator-realistic cycles
+- Cut the fixed per-step MPM overhead so hard cuts keep real time too
 - Measured ZX200 masses, swing torque and pressure logs for validation
 - Excavator hydraulic cylinders and bucket linkage rigged (meshes are in the OPERA packages; joints are missing)
 - Cohesive and wet soils; calibration against lab and field data

@@ -328,3 +328,62 @@ Browser (`test_excavator.py`, `logs/zx200_browser_test.json`, screenshots `logs/
 - **Masses are estimates.** Hitachi or ZX200 owners with weighed components or pressure logs can turn this into a validated model (see CONTRIBUTING).
 - **Shallow test bed:** a 0.5 m sand layer. A deeper bed (more particles, slower) would allow full-depth cuts and is needed to judge fill factors against field data (90–110 % for loose sand).
 - **Swing is still the old 65 kN·m relief value.** The real ZX200 swing torque should be checked.
+
+# Phase 2f: real-time soil (moving particle zone, heightfield elsewhere)
+
+The ZX200 cycle ran at 0.43× real time with the full 266k-particle bed. It now runs at **1.12× real time** with the same digging behaviour: only the soil near the bucket is MPM particles. `soil_zone.py`, used by `excavator_server.py`.
+
+## Where the time went
+
+Profiled at the 8 s mark of the old bench (`SolverImplicitMPM` section timers):
+
+| Part | ms per 60 Hz frame |
+|---|---|
+| MPM step (266k particles, 60 iterations) | 32.3 (strain solve 18.4, colliders 7) |
+| Rigid arm (MuJoCo GPU, CUDA graph) | 0.95 |
+| Measurements and stream (30 Hz) | 0.3 |
+
+Two Newton details shaped the design:
+
+- **Inactive particles still cost.** With the default sparse grid, voxels are allocated for every particle, active or not. Parking inactive particles at a single point made the step 13× slower (all of them binned into one cell). They are parked instead in a compact block, about 26 per voxel.
+- **About 8 ms per step is fixed overhead.** Even one solver iteration costs about 8 ms (per-step grid build and the re-captured inner solver graph). Newton's capturable mode (rebuildable sparse grid) was slower here: 32–36 ms, because collider and solve kernels run over the reserved capacity. Halving the active particles therefore saves only the iteration part.
+
+## How it works
+
+- **Dormant soil.** Resting soil is stored as a particle count per 8 cm column, over two regions: the truck bed, and the pit with its slopes and the ground around it. That keeps mass exact. A column's top is floor + count × 1 cm.
+- **Heightfield collider.** One Warp mesh holds a top quad per column, plus vertical walls between columns and at region borders. Wall winding makes each normal point to the lower side. Active sand rests on dormant columns and against them. Columns with no dormant soil sit at their floor, the lowest ground under them, so on slopes the mesh is buried and Newton's most-penetrated-collider rule ignores it.
+- **Wake.** A dormant column wakes when it is within 0.5 m of the bucket's bounding box and its top is no more than 0.6 m below the bucket. Its count becomes fresh particles on a 4 cm lattice, stacked on the real ground under each sub-column.
+- **Sleep.** A column sleeps when it is outside 0.8 m and all its particles are slower than 4 cm/s. Its particles are added back to the count and parked.
+- **Pool.** The pool is 120k particles. Updates run at 15 Hz and take about 0.2 ms.
+- **Display.** The pit and truck heightmaps include dormant columns. Dormant spill on slopes and ground is streamed as grains, one per particle, as before.
+- **Leaks.** Particles that fall through the ground are removed and counted as lost (17 in 130 s, about 2 kg). The leak itself predates the zone: the full-bed server loses particles at the same static-collider seams (pit corner, slope toes), where they then fell forever.
+
+## Result (`python bench_zone.py`, `logs/zone_bench.json`; 130 s auto cycle, same as the Phase 2e bench)
+
+| | Full bed (2e) | Moving zone |
+|---|---|---|
+| Real-time factor | 0.43 | **1.12** |
+| Frame cost, mean / dig stages / p95 | 47 ms / – / – | 14.7 / 16.3 / 18.9 ms |
+| Active particles, dig mean / max | 266k | 41k / 60k |
+| Passes in 130 s | 4 | 4 |
+| Per pass to the truck | 864, 926, 1060, 1007 kg | 867, 898, 1023, 951 kg |
+| Mean per pass | 964 kg (75 % of rated) | 935 kg (73 %) |
+
+The first pass follows the full-bed run closely: same forces through the drag, and 885 kg against 864 kg delivered. Pass loads stay within 3 %.
+
+The wake margin was compared at 0.8 m (72k active while digging) and 0.5 m (59k). The loads matched (956 vs 950 kg), so the smaller margin is the default. Those two runs were made before the ground region existed, while slope spill stayed active and slowed frames to about 21 ms.
+
+Browser (`test_excavator.py`, `logs/zone_browser_test.json`):
+- Two loads, 873 kg and 926 kg, in 56 s.
+- Server 0.83–1.49× real time over the cycle, at least 1.0 outside the hardest cuts.
+- Site at 60 fps.
+- Stall flags work for the floor and for 40 % relief.
+- No console errors.
+- The panel shows the active particle count.
+
+## Limits
+
+- **Dormant soil is rigid.** It doesn't fail. The 0.5 m margin covers the failure wedge of the cuts made here, but deeper or wider cuts may need a larger margin; pass loads are the check.
+- **Digging stages sit near the budget.** They average 16.3 ms against 16.7 ms, with p95 at 18.9 ms, so hard cuts briefly drop below real time. The fixed per-step MPM overhead (about 8 ms) is the next target, either a lighter Newton configuration or a capturable step that stays fast.
+- **Stream size is about 35 Mbit/s,** mostly grains. Dormant spill could be sent as a heightmap instead.
+- **The bed is still 0.5 m deep.** A deeper bed now costs little: only the zone's columns get taller.

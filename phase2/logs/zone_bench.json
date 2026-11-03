@@ -1,0 +1,1 @@
+{"wake_margin": 0.5, "sleep_margin": 0.8, "sim_s": 130.0, "realtime_factor": 1.124, "frame_ms_mean": 14.73, "frame_ms_dig_mean": 16.32, "frame_ms_p95": 18.86, "active_dig_mean": 40757, "active_max": 59942, "passes": 4, "per_pass_kg": [867, 898, 1023, 951], "mean_pass_kg": 935, "truck_kg": 4733, "zone": {"woken": 26771, "slept": 41320, "lost": 17, "pool_short": 0}, "skipped": []}

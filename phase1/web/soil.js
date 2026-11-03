@@ -348,6 +348,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   const stats = { frames: 0, bytes: 0, lastT: performance.now(), fps: 0, mbps: 0 };
   const debug = (window.__soilDebug = { messages: 0, frames: 0, badMagic: 0, lastError: null });
   let stages = [];
+  let zoneMode = false;
 
   function readHeightmap(dv, buf, o) {
     const nx = dv.getUint16(o, true);
@@ -442,7 +443,11 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
           } else bucketControls();
         }
         stages = hello.stages ?? [];
-        statusEl.textContent = `Connected · ${kind === "excavator" ? "excavator arm" : "kinematic bucket"} · ${hello.particles.toLocaleString()} particles, ${Math.round(hello.voxel * 100)} cm grid`;
+        const soilText = hello.zone
+          ? `moving soil zone (${hello.particles.toLocaleString()}-particle pool)`
+          : `${hello.particles.toLocaleString()} particles`;
+        statusEl.textContent = `Connected · ${kind === "excavator" ? "excavator arm" : "kinematic bucket"} · ${soilText}, ${Math.round(hello.voxel * 100)} cm grid`;
+        zoneMode = !!hello.zone;
         return;
       }
       try {
@@ -525,6 +530,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       ["Server step", `${f.stepMs.toFixed(1)} ms (${f.rtf.toFixed(2)}× real time)`],
       ["Stream", `${stats.fps.toFixed(0)} frames/s · ${stats.mbps.toFixed(1)} Mbit/s`],
     ];
+    if (zoneMode) rows.push(["Active soil", `${f.particles.toLocaleString()} particles near the bucket`]);
     const stalled = [];
     if (f.kind === "excavator") {
       rows.push(["Auto stage", f.stage === 255 ? "manual" : stages[(f.stage + 1) % stages.length] ?? f.stage]);
