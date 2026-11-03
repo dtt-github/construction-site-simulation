@@ -387,3 +387,83 @@ Browser (`test_excavator.py`, `logs/zone_browser_test.json`):
 - **Digging stages sit near the budget.** They average 16.3 ms against 16.7 ms, with p95 at 18.9 ms, so hard cuts briefly drop below real time. The fixed per-step MPM overhead (about 8 ms) is the next target, either a lighter Newton configuration or a capturable step that stays fast.
 - **Stream size is about 35 Mbit/s,** mostly grains. Dormant spill could be sent as a heightmap instead.
 - **The bed is still 0.5 m deep.** A deeper bed now costs little: only the zone's columns get taller.
+
+# Phase 2g: real hydraulics (cylinders and bucket linkage)
+
+Boom, stick and bucket are now driven by the ZX200's cylinders instead of joint-space actuators with fixed torque caps (`hydraulics.py`). Speed and force now depend on the pose and the direction, as on the machine. The cylinders and the bucket linkage are drawn in the browser.
+
+## Data
+
+From the Hitachi ZAXIS 200 brochure:
+
+| | Value |
+|---|---|
+| Boom cylinders | 2 × bore 120 mm, rod 85 mm |
+| Arm cylinder | bore 135 mm, rod 95 mm |
+| Bucket cylinder | bore 115 mm, rod 80 mm |
+| Implement relief | 34.3 MPa (36.3 MPa power boost) |
+| Swing relief | 30.4 MPa |
+| Main pumps | 2 × 194 L/min |
+
+**Pin positions.** The OPERA package ships cylinder and linkage meshes that its URDF doesn't use. Its link meshes are in the URDF link frames, so pin positions come from a Hough vote on the pin bosses: faces whose normals are perpendicular to the pin axis vote along their normals, and bore centres stand out. Where several bosses were candidates, the one whose cylinder travel over the URDF joint limits matches Hitachi's stroke was kept:
+
+| Cylinder | Travel in the model | Published stroke |
+|---|---|---|
+| Boom | 1.28 m | 1.26 m |
+| Arm | 1.465 m | 1.475 m |
+| Bucket (through the four-bar) | 1.04 m | 1.06 m |
+
+The bucket's guide link (0.561 m) and side link (0.583 m) are measured from their own meshes.
+
+## Model
+
+- **Joint torque.** τ = F · dL/dq, where L(q) is the pin-to-pin cylinder length. For the bucket, L comes through the four-bar: guide link from the arm, side link from the bucket, both meeting the rod at one pin.
+- **Relief.** The cap is p_relief × head area when pushing and p_relief × rod-side area when pulling, multiplied by the current moment arm. It is set per frame, so each direction has its own limit and both change with pose. The relief slider now acts at runtime; before, its value was frozen into the recorded CUDA graph.
+- **Flow.** A lever opens its spool. Cylinder speed is spool flow divided by the area being filled; boom and arm get both pumps, the bucket one. Open spools share the 388 L/min. Joint speed is cylinder speed divided by dL/dq.
+- **Gauges.** They show the loaded side's pressure as a fraction of 34.3 MPa. The panel also lists each cylinder's pressure in bar and which side is loaded.
+
+## Check against published forces
+
+Forces at the teeth at relief, with the pin to tooth tip at 1.50 m:
+
+| | Model, 34.3 MPa | Model, power boost | Hitachi (dealer listings) |
+|---|---|---|---|
+| Bucket digging force | 149 kN | 158 kN | 151–158 kN |
+| Arm crowd force (bucket in line) | 96 kN | 102 kN | 109–114 kN |
+
+## Results
+
+`bench_zone.py`, `logs/hyd_bench.json`; 130 s auto cycle:
+
+| | Joint actuators (2f) | Cylinders |
+|---|---|---|
+| Real-time factor | 1.12 | 1.07 |
+| Per pass to the truck | 867, 898, 1023, 951 kg | 976, 1022, 1146, 1044 kg |
+| Mean per pass | 935 kg (73 % of rated) | **1047 kg (82 %)** |
+
+The arm is stronger than the old 160 kN·m cap: up to 420 kN·m at mid-stroke. It cuts through more of the drag, so passes are fuller.
+
+Typical pressures in a pass:
+- Boom rod side at relief (−343 bar) while it presses the bucket down during the drag.
+- Arm at 100–190 bar while dragging.
+- Bucket cylinder at about 160 bar holding the curled load during the swing.
+- Boom at 60–90 bar holding the arm up.
+
+Hold test: 2 cm sag, boom at 64 bar.
+
+Browser (`test_excavator.py`, `logs/hyd_browser_test.json`):
+- Loads of 987 kg and 1056 kg in 50 s, at 60 fps with no errors.
+- Bucket on the floor: boom and stick at −343 bar, flagged as stalled.
+- At 40 % relief: the stick stalls at 137 bar, which is 40 % of 343.
+
+Screenshots: `logs/hyd_lift.png`, `logs/hyd_linkage.png`, `logs/hyd_arm_cylinder.png`.
+
+**Also fixed:** the auto cycle's swing hunted between lanes at the start of each pass (±25° at relief). When the pass count rose, the start of the lower→approach segment was re-evaluated for the next lane. This was in the old version too.
+
+## Limits
+
+- **The boom nears toggle at its lowest position.** The moment arm drops toward zero in the last 0.3 rad of boom-down travel; speed commands use a 5 cm floor there.
+- **The bucket is weak near full curl.** The moment arm is about 5 cm while the curled bucket is carried, which is real four-bar behaviour. The load is held at about 160 bar.
+- **No line or port relief.** The real valve has overload reliefs above 34.3 MPa that let an externally loaded cylinder yield. Here one relief value caps both pushing and holding.
+- **Swing is still a joint motor** at 65 kN·m. Swing relief and motor displacement would make it physical.
+- **The rod meshes are slightly short.** Near full extension a few cm of gap shows between rod and barrel.

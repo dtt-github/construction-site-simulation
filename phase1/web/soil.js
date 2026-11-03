@@ -11,6 +11,7 @@ const HM_HEADER_BYTES = 16;
 const P_HEADER_BYTES = 20;
 const MAGIC_SOIL = 0x4c494f53; // "SOIL"
 const MAGIC_EXC = 0x32435845; // "EXC2"
+const MAGIC_EXC3 = 0x33435845; // "EXC3": EXC2 + hydraulic cylinder and linkage poses, cylinder pressures
 
 export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, layerStatic, panel, view }) {
   const params = new URLSearchParams(location.search);
@@ -200,7 +201,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
 
   // excavator (excavator_server.py): links built from the hello geometry (boxes), replaced by the real
   // machine's meshes when the server names a glTF model whose link frames match its physics links
-  const arm = { links: {}, base: null, truckSurface: null, tracks: null, model: false };
+  const arm = { links: {}, parts: {}, base: null, truckSurface: null, tracks: null, model: false };
   function buildExcavator(geom) {
     for (const name of ["house", "boom", "stick", "bucket"]) {
       const g = new THREE.Group();
@@ -268,6 +269,14 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       }
       arm.tracks.clear();
       arm.tracks.add(crawler);
+      // hydraulic cylinders (barrel, rod) and bucket linkage plates, placed by pose each frame
+      for (const name of model.parts ?? []) {
+        const g = new THREE.Group();
+        g.add(linkMeshes(name));
+        g.visible = false;
+        scene.add(g);
+        arm.parts[name] = g;
+      }
       arm.model = true;
     } catch (err) {
       console.warn("excavator: model has unexpected structure, drawing boxes", err);
@@ -380,8 +389,8 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     const dv = new DataView(buf);
     const magic = dv.getUint32(0, true);
     const f32 = (o, n) => Array.from({ length: n }, (_, k) => dv.getFloat32(o + 4 * k, true));
-    const f = { kind: magic === MAGIC_EXC ? "excavator" : "bucket" };
-    if (magic !== MAGIC_SOIL && magic !== MAGIC_EXC) {
+    const f = { kind: magic === MAGIC_EXC || magic === MAGIC_EXC3 ? "excavator" : "bucket" };
+    if (magic !== MAGIC_SOIL && magic !== MAGIC_EXC && magic !== MAGIC_EXC3) {
       debug.badMagic++;
       return;
     }
@@ -409,6 +418,15 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       [f.fill, f.cut, f.fee, f.relief, f.truck, f.capacity] = f32(o, 6); o += 24;
       f.stage = dv.getUint8(o); o += 1;
       o += (4 - (o % 4)) % 4;
+      if (magic === MAGIC_EXC3) {
+        const n = dv.getUint32(o, true); o += 4;
+        f.parts = [];
+        for (let k = 0; k < n; k++) {
+          f.parts.push({ pos: f32(o, 3), quat: f32(o + 12, 4) });
+          o += 28;
+        }
+        f.cylBar = f32(o, 3); o += 12; // + head side, - rod side
+      }
     }
     readTail(dv, buf, o, f);
     latest.frame = f;
@@ -511,6 +529,14 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
         obj.position.set(...link.pos);
         obj.quaternion.set(...link.quat);
       }
+      const names = Object.keys(arm.parts);
+      (f.parts ?? []).forEach((p, k) => {
+        const obj = arm.parts[names[k]];
+        if (!obj) return;
+        obj.visible = true;
+        obj.position.set(...p.pos);
+        obj.quaternion.set(...p.quat);
+      });
     }
 
     const now = performance.now();
@@ -546,6 +572,10 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
         }
       });
       rows.push(["Joints", f.q.map((v) => `${((v * 180) / Math.PI).toFixed(0)}°`).join(" · ")]);
+      if (f.cylBar) {
+        const side = (v) => `${Math.abs(v).toFixed(0)} bar ${v >= 0 ? "head" : "rod"}`;
+        rows.push(["Cylinders", ["boom", "arm", "bucket"].map((n, k) => `${n} ${side(f.cylBar[k])}`).join(" · ")]);
+      }
       rows.push(["Stall", stalled.length ? `<strong class="stall">${stalled.join(", ")} at relief</strong>` : "–"]);
     } else {
       rows.push(["Moving grains", g.count.toLocaleString()]);

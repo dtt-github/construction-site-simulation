@@ -42,6 +42,18 @@ MACHINES = {
         "urdf": "zx200_description/urdf/zx200.xacro",
         "package": "zx200_description",
         "name": "Hitachi ZX200 hydraulic excavator (20 t class)",
+        # meshes the URDF leaves out: hydraulic cylinders and the bucket linkage, each in its own frame
+        # (head pin / first pin at the origin). Added as free nodes; the simulator places them.
+        "parts": {
+            "boom_barrel": "zx200-boom-cyl1.dae",
+            "boom_rod": "zx200-boom-cyl2.dae",
+            "arm_barrel": "zx200-arm-cyl1.dae",
+            "arm_rod": "zx200-arm-cyl2.dae",
+            "bucket_barrel": "zx200-bucket-cyl1.dae",
+            "bucket_rod": "zx200-bucket-cyl2.dae",
+            "side_link": "zx200-part1.dae",
+            "guide_link": "zx200-part2.dae",
+        },
     },
     "ic120": {
         "repo": "pwri-opera/ic120_ros2",
@@ -220,8 +232,18 @@ def build(key):
             add_link(j["child"], name, j["origin"])
 
     add_link(root_link, key, np.eye(4))
+    for part, filename in cfg.get("parts", {}).items():
+        scene.graph.update(frame_from=key, frame_to=part, matrix=np.eye(4))
+        mesh = trimesh.load(resolve_mesh(pkg_dir, f"package://{cfg['package']}/meshes/{filename}"), force="scene")
+        for gname, geom in mesh.geometry.items():
+            shrink_textures(geom)
+            tri_count += len(geom.faces)
+            for node in mesh.graph.geometry_nodes.get(gname, []):
+                scene.add_geometry(geom, node_name=f"{part}/{gname}/{node}", geom_name=f"{part}_{gname}", parent_node_name=part, transform=mesh.graph.get(node)[0])
     OUT.mkdir(parents=True, exist_ok=True)
     glb = scene.export(file_type="glb")
+    for part in cfg.get("parts", {}):
+        joint_extras[part] = {"free_part": True}  # placed by the simulator; static viewers hide it
     glb = add_extras(glb, joint_extras, cfg)
     out = OUT / f"opera_{key}.glb"
     out.write_bytes(glb)

@@ -18,6 +18,7 @@ export async function addShowcase({ THREE, scene, loader, addStatic, terrainHeig
     root.position.set(x, terrainHeight(x, z) + (y ?? 0), z);
     root.rotation.y = THREE.MathUtils.degToRad(item.yaw ?? 0);
     root.traverse((o) => {
+      if (o.userData?.free_part) o.visible = false; // cylinders and links the physics server places
       if (o.isMesh) o.castShadow = o.receiveShadow = true;
       const j = o.userData?.urdf_joint;
       if (j && j.type !== "fixed" && !(item.animate_skip ?? []).includes(j.name)) {

@@ -2,13 +2,19 @@
 
 Replaces the kinematic bucket of soil_server.py with a Hitachi ZX200 (20 t class) standing at the pit
 edge: swing, boom, stick and bucket with the geometry, joint frames and limits of the PWRI OPERA URDF and
-a curved bucket with teeth traced from its mesh. Each joint is driven by a hydraulic-style actuator:
+a curved bucket with teeth traced from its mesh. Boom, stick and bucket are driven by the ZX200's
+hydraulic cylinders (hydraulics.py: real bores, pins from the OPERA meshes, bucket four-bar linkage):
 
-  * flow limit     - the operator lever sets a joint speed; a reference angle moves at that speed
-  * stiff servo    - PD torque pulls the joint to the reference (cylinders are nearly rigid)
-  * relief valve   - torque is capped at the relief limit; the reference can't run more than
-                     tau_max / Kp ahead of the joint, so a joint that meets more resistance than its
-                     relief limit slows down and stalls instead of pushing through
+  * flow           - a lever opens its spool; the cylinder speed is flow / piston area of the side
+                     being filled (the two pumps are shared between open spools), and the joint speed
+                     follows from the cylinder's moment arm dL/dq at the current pose
+  * stiff servo    - PD torque pulls the joint to a reference that moves at that speed (cylinders are
+                     nearly rigid)
+  * relief valve   - the torque is capped at relief pressure x piston area x moment arm, separately
+                     for pushing (head side) and pulling (rod side); the reference can't run further
+                     ahead than that torque can pull, so a joint that meets more resistance slows down
+                     and stalls instead of pushing through. Swing is a joint-space motor with a fixed
+                     torque limit.
 
 The arm is a Newton articulation solved with MuJoCo; its bucket is a dynamic MPM collider, so the
 sand pushes back on the arm (two-way coupling as in Newton's mpm_twoway_coupling example).
@@ -54,6 +60,7 @@ from soil_server import (
     heightmap_kernel,
     mckyes_n_gamma,
 )
+import hydraulics as hyd
 from soil_zone import CELL, LAYER_PER_PARTICLE, SPACING, SoilZones
 
 # ------------------------------------------------------------------ machine (zone frame, Z up)
@@ -97,13 +104,15 @@ INERTIA = {"house": (10518.0, 17319.0, 20667.0), "boom": (1028.0, 3635.0, 2661.0
 JOINTS = ["swing", "boom", "stick", "bucket"]
 LINKS = ["house", "boom", "stick", "bucket"]
 GLB_NODES = {"house": "body_link", "boom": "boom_link", "stick": "arm_link", "bucket": "bucket_link"}
+PARTS = ("boom_barrel", "boom_rod", "arm_barrel", "arm_rod", "bucket_barrel", "bucket_rod", "side_link", "guide_link")  # GLB nodes placed by pose
 # limits (rad, from the URDF), max speed (rad/s), relief torque (N m), servo gains. In URDF angles a
 # positive boom angle lowers the boom, positive stick folds it in and positive bucket curls, so the
 # operator levers (raise / out / dump positive) drive those three joints with the opposite sign.
 LIMITS = {"swing": (-3.0, 3.0), "boom": (-1.137, 1.0), "stick": (0.594, 2.687), "bucket": (-0.622, 2.372)}
 LEVER_SIGN = np.array([1.0, -1.0, -1.0, -1.0])
-VMAX = {"swing": 0.8, "boom": 0.35, "stick": 0.5, "bucket": 0.9}
-TAU_MAX = {"swing": 65e3, "boom": 450e3, "stick": 160e3, "bucket": 120e3}
+# swing: a joint-space actuator (swing motor); boom, stick and bucket are driven by their cylinders
+# (hydraulics.py), whose flow and relief set the joint speed and torque limits for each pose
+SWING_VMAX, SWING_TAU = 0.8, 65e3
 KP = {"swing": 2.0e6, "boom": 3.0e7, "stick": 8.0e6, "bucket": 1.5e6}
 KD = {"swing": 8.0e5, "boom": 3.0e6, "stick": 6.0e5, "bucket": 4.0e4}
 
@@ -155,6 +164,21 @@ def swing_vec(psi, v):
     """Rotate a vector about +z by the swing angle."""
     c, s = math.cos(psi), math.sin(psi)
     return np.array([v[0] * c - v[1] * s, v[0] * s + v[1] * c, v[2]])
+
+
+def quat_from_matrix(R):
+    """Rotation matrix -> quaternion (x, y, z, w)."""
+    w = math.sqrt(max(1.0 + R[0, 0] + R[1, 1] + R[2, 2], 1e-12)) / 2
+    if w > 0.1:
+        return np.array([(R[2, 1] - R[1, 2]) / (4 * w), (R[0, 2] - R[2, 0]) / (4 * w), (R[1, 0] - R[0, 1]) / (4 * w), w])
+    k = int(np.argmax(np.diag(R)))
+    i, j = (k + 1) % 3, (k + 2) % 3
+    v = np.zeros(4)
+    v[k] = math.sqrt(max(1.0 + R[k, k] - R[i, i] - R[j, j], 1e-12)) / 2
+    v[i] = (R[i, k] + R[k, i]) / (4 * v[k])
+    v[j] = (R[j, k] + R[k, j]) / (4 * v[k])
+    v[3] = (R[j, i] - R[i, j]) / (4 * v[k])
+    return v
 
 
 def pitch(v, b):
@@ -276,27 +300,25 @@ def hydraulics_kernel(
     q_ref: wp.array[float],
     kp: wp.array[float],
     kd: wp.array[float],
-    tau_max: wp.array[float],
+    tau_lo: wp.array[float],
+    tau_hi: wp.array[float],
     q_lo: wp.array[float],
     q_hi: wp.array[float],
-    relief: float,
     dt: float,
     joint_f: wp.array[float],
-    pressure: wp.array[float],
+    torque: wp.array[float],
 ):
     j = wp.tid()
     q = joint_q[j]
-    tmax = tau_max[j] * relief
     # flow: the reference advances at lever speed, within the joint limits ...
     r = wp.clamp(q_ref[j] + v_cmd[j] * dt, q_lo[j], q_hi[j])
     # ... but can't get further ahead of the joint than the relief torque can pull (stall, no windup)
-    lag = tmax / kp[j]
-    r = wp.clamp(r, q - lag, q + lag)
+    r = wp.clamp(r, q + tau_lo[j] / kp[j], q + tau_hi[j] / kp[j])
     # the reference never leaves the stroke, even when load back-drives the joint past it
     r = wp.clamp(r, q_lo[j], q_hi[j])
     q_ref[j] = r
-    tau = wp.clamp(kp[j] * (r - q) + kd[j] * (v_cmd[j] - joint_qd[j]), -tmax, tmax)
-    pressure[j] = wp.abs(tau) / tau_max[j]
+    tau = wp.clamp(kp[j] * (r - q) + kd[j] * (v_cmd[j] - joint_qd[j]), tau_lo[j], tau_hi[j])
+    torque[j] = tau
     # cylinder end stop: beyond the stroke a stiff mechanical stop pushes back, not limited by the relief valve
     over = wp.max(q - q_hi[j], 0.0) - wp.max(q_lo[j] - q, 0.0)
     if over != 0.0:
@@ -573,13 +595,15 @@ class ExcavatorSim:
 
         # actuator parameters on the GPU
         arr = lambda d: wp.array([float(d[j]) for j in JOINTS], dtype=float)  # noqa: E731
-        self.kp, self.kd, self.tau_max = arr(KP), arr(KD), arr(TAU_MAX)
+        self.kp, self.kd = arr(KP), arr(KD)
+        self.tau_lo, self.tau_hi = wp.zeros(4, dtype=float), wp.zeros(4, dtype=float)
+        self.linkage = hyd.Linkage(self.link_frames, pitch)
+        self.vmax = self.nominal_vmax()
         self.q_lo = wp.array([LIMITS[j][0] for j in JOINTS], dtype=float)
         self.q_hi = wp.array([LIMITS[j][1] for j in JOINTS], dtype=float)
-        self.vmax = np.array([VMAX[j] for j in JOINTS])
         self.v_cmd = wp.zeros(4, dtype=float)
         self.q_ref = wp.zeros(4, dtype=float)
-        self.pressure = wp.zeros(4, dtype=float)
+        self.torque = wp.zeros(4, dtype=float)
         self.truck_hm = wp.zeros(TRUCK_NX * TRUCK_NY, dtype=float)
         self.bucket_poly = wp.array(BUCKET_SHELL.astype(np.float32), dtype=wp.vec2)
         self.truck_counter = wp.zeros(1, dtype=int)
@@ -626,6 +650,10 @@ class ExcavatorSim:
         self.q = self.q0.copy()
         self.qd = np.zeros(4)
         self.press = np.zeros(4)
+        self.tau = np.zeros(4)
+        self.cyl_p = np.zeros(3)
+        self.cyl_head = np.ones(3, dtype=bool)
+        self.cyl_pts, self.cyl_L, self.cyl_J = self.linkage.state(self.q0)
         self.truck_kg = 0.0
         self.truck_hm_np = np.full(TRUCK_NX * TRUCK_NY, BED_FLOOR_Z, dtype=np.float32)
         self.force = np.zeros(3)
@@ -692,18 +720,19 @@ class ExcavatorSim:
     LANES = (0.0, 9.0, -9.0, 17.0, -17.0)
     LANE_STAGES = ("approach", "penetrate", "drag", "drag-curl", "curl", "lift")
 
-    def _stage_psi(self, wp_):
+    def _stage_psi(self, wp_, start=False):
         """Waypoint swing angle (deg): dig-side stages shift to the current pass's lane; the final
-        'lower' stage already heads for the next pass's lane."""
+        'lower' stage already heads for the next pass's lane. As the start of the next segment (after
+        the pass count went up) 'lower' is in the current lane."""
         if wp_[0] in self.LANE_STAGES:
             return wp_[1] + self.LANES[self.passes % len(self.LANES)]
         if wp_[0] == "lower":
-            return wp_[1] + self.LANES[(self.passes + 1) % len(self.LANES)]
+            return wp_[1] + self.LANES[(self.passes + (0 if start else 1)) % len(self.LANES)]
         return wp_[1]
 
-    def _waypoint_q(self, wp_):
+    def _waypoint_q(self, wp_, start=False):
         r, phi = wp_[2], wp_[4]
-        return ik(math.radians(self._stage_psi(wp_)), r, self._stage_z(wp_), math.radians(phi))
+        return ik(math.radians(self._stage_psi(wp_, start)), r, self._stage_z(wp_), math.radians(phi))
 
     def _auto_control(self):
         """Track the cycle: move a target along the current segment only while the arm keeps up."""
@@ -713,10 +742,10 @@ class ExcavatorSim:
         self.stage_name = b[0]
         q_end = self._waypoint_q(b)
         speed = b[5] if len(b) > 5 else 1.0
-        seg_time = max(np.max(np.abs(self._waypoint_q(a) - q_end) / (self.vmax * speed)), 0.5)
+        seg_time = max(np.max(np.abs(self._waypoint_q(a, start=True) - q_end) / (self.vmax * speed)), 0.5)
         s = self.auto_s
         za, zb = self._stage_z(a), self._stage_z(b)
-        pa, pb = self._stage_psi(a), self._stage_psi(b)
+        pa, pb = self._stage_psi(a, start=True), self._stage_psi(b)
         mix = [pa + s * (pb - pa), a[2] + s * (b[2] - a[2]), za + s * (zb - za), a[4] + s * (b[4] - a[4])]
         q_goal = ik(math.radians(mix[0]), mix[1], mix[2], math.radians(mix[3]))  # straight bucket-pin path
         err = q_goal - self.q
@@ -741,6 +770,41 @@ class ExcavatorSim:
             if self.auto_stage == 0:
                 self.passes += 1
 
+    # -------------------------------------------------------------- hydraulics
+    def link_frames(self, q):
+        """Link frame origins and pitches in the house frame, for the cylinder pins."""
+        p1, p2, b3 = chain(q)
+        b1 = BOOM_PITCH + q[1]
+        return {"house": (np.zeros(3), 0.0), "boom": (BOOM_ORIGIN, b1), "stick": (p1, b3 - BUCKET_PITCH - q[3]), "bucket": (p2, b3)}
+
+    def nominal_vmax(self):
+        """Joint speeds at full lever, mid stroke (for planning the auto cycle)."""
+        mid = np.array([0.0] + [0.5 * (LIMITS[j][0] + LIMITS[j][1]) for j in JOINTS[1:]])
+        _, _, J = self.linkage.state(mid)
+        v = hyd.cylinder_velocity(np.array([1.0, 0.0, 0.0]), J)[0], hyd.cylinder_velocity(np.array([0.0, 1.0, 0.0]), J)[1], hyd.cylinder_velocity(np.array([0.0, 0.0, 1.0]), J)[2]
+        return np.array([SWING_VMAX, *np.abs(np.array(v) / J)])
+
+    def _hydraulics(self):
+        """Levers -> joint speed commands and torque limits for this frame, from the cylinders."""
+        self.cyl_pts, self.cyl_L, self.cyl_J = self.linkage.state(self.q)
+        spool = self.levers * LEVER_SIGN  # desired joint direction and opening
+        v_cyl = hyd.cylinder_velocity(spool[1:], self.cyl_J)
+        J = np.where(np.abs(self.cyl_J) < hyd.J_MIN, np.copysign(hyd.J_MIN, self.cyl_J), self.cyl_J)
+        v_cmd = np.concatenate([[spool[0] * SWING_VMAX], v_cyl / J])
+        lo, hi = hyd.torque_limits(self.cyl_J, hyd.P_RELIEF * self.relief)
+        tau = SWING_TAU * self.relief
+        self.v_cmd.assign(v_cmd.astype(np.float32))
+        self.tau_lo.assign(np.concatenate([[-tau], lo]).astype(np.float32))
+        self.tau_hi.assign(np.concatenate([[tau], hi]).astype(np.float32))
+
+    def part_poses(self):
+        """Zone-frame poses (xyz, quaternion xyzw) of the cylinder barrels, rods and linkage plates."""
+        psi = self.q[0]
+        pts = {k: house_to_zone(psi, v) for k, v in self.cyl_pts.items()}
+        axis_y = swing_vec(psi, np.array([0.0, -1.0, 0.0]))  # the house's +y (pin axes)
+        frames = hyd.part_frames(pts, axis_y)
+        return [(frames[name][0], quat_from_matrix(frames[name][1])) for name in PARTS]
+
     # -------------------------------------------------------------- stepping
     def _rigid_substeps(self):
         # even substep count: state_0/state_1 end where they started, so a captured graph stays valid
@@ -751,8 +815,8 @@ class ExcavatorSim:
             wp.launch(
                 hydraulics_kernel,
                 dim=4,
-                inputs=[self.state_0.joint_q, self.state_0.joint_qd, self.v_cmd, self.q_ref, self.kp, self.kd, self.tau_max, self.q_lo, self.q_hi, self.relief, self.sim_dt],
-                outputs=[self.control.joint_f, self.pressure],
+                inputs=[self.state_0.joint_q, self.state_0.joint_qd, self.v_cmd, self.q_ref, self.kp, self.kd, self.tau_lo, self.tau_hi, self.q_lo, self.q_hi, self.sim_dt],
+                outputs=[self.control.joint_f, self.torque],
             )
             self.collision.collide(self.state_0, self.contacts)
             self.solver.step(self.state_0, self.state_1, self.control, self.contacts, self.sim_dt)
@@ -761,7 +825,7 @@ class ExcavatorSim:
     def step(self):
         if self.auto:
             self._auto_control()
-        self.v_cmd.assign((self.levers * LEVER_SIGN * self.vmax).astype(np.float32))
+        self._hydraulics()
 
         wp.synchronize()
         t0 = time.perf_counter()
@@ -787,7 +851,10 @@ class ExcavatorSim:
 
         self.q = self.state_0.joint_q.numpy()[:4].astype(float)
         self.qd = self.state_0.joint_qd.numpy()[:4].astype(float)
-        self.press = self.pressure.numpy().astype(float)
+        self.tau = self.torque.numpy().astype(float)
+        self.cyl_p, self.cyl_head = hyd.pressures(self.tau[1:], self.cyl_J)
+        # gauges: loaded-side pressure as a fraction of the nominal relief setting
+        self.press = np.concatenate([[abs(self.tau[0]) / SWING_TAU], self.cyl_p / hyd.P_RELIEF])
 
     BUCKET_LOCAL_BOX = (
         np.array([min(BUCKET_SHELL[:, 0].min(), TOOTH_TIP[0]) - PLATE, -BUCKET_W / 2 - PLATE, min(BUCKET_SHELL[:, 1].min(), TOOTH_TIP[1]) - PLATE]),
@@ -878,6 +945,7 @@ class ExcavatorSim:
             "model": {
                 "file": "assets/machinery/opera_zx200.glb",
                 "links": GLB_NODES,
+                "parts": list(PARTS),
                 "crawler": {"node": "track_link", "pos": list(self.to_three(SWING_POS - swing_vec(CRAWLER_YAW, CRAWLER_SWING))), "quat": list(self.quat_to_three(rot_z(CRAWLER_YAW)))},
             },
             # static parts in world (three.js) coordinates
@@ -901,7 +969,7 @@ class ExcavatorSim:
         f = self.force
         header = struct.pack(
             "<4sIfffI",
-            b"EXC2", frame_no, self.sim_time, self.step_ms, min(self.frame_dt * 1000 / max(self.step_ms, 1e-3), 99.0), self.zones.n_active,
+            b"EXC3", frame_no, self.sim_time, self.step_ms, min(self.frame_dt * 1000 / max(self.step_ms, 1e-3), 99.0), self.zones.n_active,
         )
         arm = struct.pack(
             "<4f4f4f3f6fB",
@@ -924,6 +992,10 @@ class ExcavatorSim:
         p_header = struct.pack("<I4f", len(qp), *lo, span)
         body = header + links + arm
         body += b"\0" * ((-len(body)) % 4)  # keep the heightmap 4-byte aligned
+        # cylinders: barrel, rod and linkage plate poses, then loaded-side pressure (bar, + head side)
+        parts = self.part_poses()
+        body += struct.pack("<I", len(parts)) + b"".join(struct.pack("<3f4f", *self.to_three(p), *self.quat_to_three(qt)) for p, qt in parts)
+        body += struct.pack("<3f", *(np.where(self.cyl_head, 1.0, -1.0) * self.cyl_p / 1e5))
         return body + hm_header + hm.tobytes() + thm_header + thm.tobytes() + p_header + qp.tobytes()
 
     def stats(self):
@@ -934,6 +1006,8 @@ class ExcavatorSim:
             "q_deg": [round(math.degrees(v), 1) for v in self.q],
             "qd": [round(v, 3) for v in self.qd],
             "pressure": [round(v, 2) for v in self.press],
+            "cyl_bar": [round(float(v) / 1e5 * (1 if h else -1)) for v, h in zip(self.cyl_p, self.cyl_head)],
+            "cyl_m": [round(float(v), 3) for v in self.cyl_L],
             "force_kN": [round(v / 1000, 1) for v in self.force],
             "fill_kg": round(self.fill_kg),
             "cut_m": round(self.cut_depth, 3),
@@ -953,7 +1027,7 @@ async def serve(sim, host, port):
 
     async def handler(ws):
         clients.add(ws)
-        await ws.send(json.dumps({"type": "hello", "kind": "excavator", "particles": sim.n_particles, "zone": True, "voxel": sim.voxel, "joints": JOINTS, "limits": LIMITS, "vmax": VMAX, "tau_max": TAU_MAX, "geometry": sim.geometry(), "stages": [c[0] for c in sim.CYCLE]}))
+        await ws.send(json.dumps({"type": "hello", "kind": "excavator", "particles": sim.n_particles, "zone": True, "voxel": sim.voxel, "joints": JOINTS, "limits": LIMITS, "vmax": dict(zip(JOINTS, sim.vmax.round(3).tolist())), "relief_mpa": hyd.P_RELIEF / 1e6, "geometry": sim.geometry(), "stages": [c[0] for c in sim.CYCLE]}))
         try:
             async for msg in ws:
                 try:

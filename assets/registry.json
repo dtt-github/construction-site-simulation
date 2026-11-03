@@ -733,7 +733,7 @@
    "share_alike": false,
    "author": "Public Works Research Institute, Japan (PWRI), OPERA project",
    "attribution": "\"Hitachi ZX200 hydraulic excavator (20 t class)\" description package by the Public Works Research Institute, Japan (PWRI), OPERA project, licensed under Apache-2.0",
-   "modifications": "Collada meshes combined into one glTF with a node per URDF link at its joint origin; Z-up converted to Y-up; textures limited to 2048 px; joints written to node extras (assets/build_machines.py)",
+   "modifications": "Collada meshes combined into one glTF with a node per URDF link at its joint origin; Z-up converted to Y-up; textures limited to 2048 px; joints written to node extras; hydraulic cylinder and bucket-linkage meshes (not in the URDF) added as free nodes for the simulator to place (assets/build_machines.py)",
    "realism": "high",
    "articulated": true,
    "real_world": {
