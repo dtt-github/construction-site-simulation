@@ -20,9 +20,10 @@ ap = argparse.ArgumentParser()
 ap.add_argument("passes", type=int, nargs="?", default=8)
 ap.add_argument("--out", default=None)
 ap.add_argument("--pool", type=int, default=ex.POOL)
+ap.add_argument("--soil", choices=list(ex.soils.SOILS), default=ex.soils.DEFAULT_SOIL)
 args = ap.parse_args()
 
-sim = ex.ExcavatorSim(pool=args.pool)
+sim = ex.ExcavatorSim(pool=args.pool, soil=args.soil)
 sim.set_trench()
 sim.auto = True
 rows, ms, peak, truck = [], [], 0, 0.0

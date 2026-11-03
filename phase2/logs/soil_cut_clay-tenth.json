@@ -1,0 +1,46 @@
+[
+ {
+  "soil": "clay-tenth",
+  "height_m": 0.6,
+  "crest_move_m": 0.003,
+  "moved_frac": 0.0,
+  "face_toe_runout_m": -0.02,
+  "critical_height_m": [
+   0.66,
+   0.95
+  ]
+ },
+ {
+  "soil": "clay-tenth",
+  "height_m": 0.8,
+  "crest_move_m": 0.013,
+  "moved_frac": 0.0,
+  "face_toe_runout_m": -0.01,
+  "critical_height_m": [
+   0.66,
+   0.95
+  ]
+ },
+ {
+  "soil": "clay-tenth",
+  "height_m": 1.0,
+  "crest_move_m": 0.168,
+  "moved_frac": 0.232,
+  "face_toe_runout_m": 0.14,
+  "critical_height_m": [
+   0.66,
+   0.95
+  ]
+ },
+ {
+  "soil": "clay-tenth",
+  "height_m": 1.2,
+  "crest_move_m": 0.415,
+  "moved_frac": 0.302,
+  "face_toe_runout_m": 0.43,
+  "critical_height_m": [
+   0.66,
+   0.95
+  ]
+ }
+]

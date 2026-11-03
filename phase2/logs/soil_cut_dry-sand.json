@@ -1,0 +1,13 @@
+[
+ {
+  "soil": "dry-sand",
+  "height_m": 0.5,
+  "crest_move_m": 0.287,
+  "moved_frac": 0.143,
+  "face_toe_runout_m": 1.06,
+  "critical_height_m": [
+   0.0,
+   0.0
+  ]
+ }
+]

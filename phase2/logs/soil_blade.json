@@ -1,0 +1,134 @@
+[
+ {
+  "soil": "dry-sand",
+  "depth_m": 0.2,
+  "force_N": 8402,
+  "mckyes_N": 2919,
+  "ratio": 2.88,
+  "N_gamma": 5.22,
+  "N_c": 11.03,
+  "N_ca": 2.71,
+  "beta_deg": 14.54
+ },
+ {
+  "soil": "dry-sand",
+  "depth_m": 0.3,
+  "force_N": 14422,
+  "mckyes_N": 6569,
+  "ratio": 2.2,
+  "N_gamma": 5.22,
+  "N_c": 11.03,
+  "N_ca": 2.71,
+  "beta_deg": 14.54
+ },
+ {
+  "soil": "dry-sand",
+  "depth_m": 0.4,
+  "force_N": 22208,
+  "mckyes_N": 11678,
+  "ratio": 1.9,
+  "N_gamma": 5.22,
+  "N_c": 11.03,
+  "N_ca": 2.71,
+  "beta_deg": 14.54
+ },
+ {
+  "soil": "moist-sand",
+  "depth_m": 0.2,
+  "force_N": 13026,
+  "mckyes_N": 7114,
+  "ratio": 1.83,
+  "N_gamma": 5.22,
+  "N_c": 10.98,
+  "N_ca": 2.84,
+  "beta_deg": 15.18
+ },
+ {
+  "soil": "moist-sand",
+  "depth_m": 0.3,
+  "force_N": 20908,
+  "mckyes_N": 13069,
+  "ratio": 1.6,
+  "N_gamma": 5.22,
+  "N_c": 10.99,
+  "N_ca": 2.81,
+  "beta_deg": 15.07
+ },
+ {
+  "soil": "moist-sand",
+  "depth_m": 0.4,
+  "force_N": 31772,
+  "mckyes_N": 20622,
+  "ratio": 1.54,
+  "N_gamma": 5.22,
+  "N_c": 10.99,
+  "N_ca": 2.8,
+  "beta_deg": 14.99
+ },
+ {
+  "soil": "loam",
+  "depth_m": 0.2,
+  "force_N": 31545,
+  "mckyes_N": 18512,
+  "ratio": 1.7,
+  "N_gamma": 3.1,
+  "N_c": 7.72,
+  "N_ca": 2.19,
+  "beta_deg": 19.5
+ },
+ {
+  "soil": "loam",
+  "depth_m": 0.3,
+  "force_N": 45344,
+  "mckyes_N": 29272,
+  "ratio": 1.55,
+  "N_gamma": 3.1,
+  "N_c": 7.72,
+  "N_ca": 2.18,
+  "beta_deg": 19.41
+ },
+ {
+  "soil": "loam",
+  "depth_m": 0.4,
+  "force_N": 58638,
+  "mckyes_N": 41033,
+  "ratio": 1.43,
+  "N_gamma": 3.1,
+  "N_c": 7.72,
+  "N_ca": 2.18,
+  "beta_deg": 19.36
+ },
+ {
+  "soil": "clay",
+  "depth_m": 0.2,
+  "force_N": 47451,
+  "mckyes_N": 28071,
+  "ratio": 1.69,
+  "N_gamma": 0.84,
+  "N_c": 3.43,
+  "N_ca": 1.07,
+  "beta_deg": 32.55
+ },
+ {
+  "soil": "clay",
+  "depth_m": 0.3,
+  "force_N": 69216,
+  "mckyes_N": 42536,
+  "ratio": 1.63,
+  "N_gamma": 0.84,
+  "N_c": 3.43,
+  "N_ca": 1.07,
+  "beta_deg": 32.47
+ },
+ {
+  "soil": "clay",
+  "depth_m": 0.4,
+  "force_N": 87828,
+  "mckyes_N": 57285,
+  "ratio": 1.53,
+  "N_gamma": 0.84,
+  "N_c": 3.43,
+  "N_ca": 1.06,
+  "beta_deg": 32.41
+ }
+]

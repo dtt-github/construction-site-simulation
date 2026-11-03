@@ -357,6 +357,7 @@ class SoilZones:
         self.mesh = wp.Mesh(points=self.mesh_points, indices=wp.array(tris.ravel(), dtype=int), velocities=wp.zeros(len(pts), dtype=wp.vec3))
         self.rng = np.random.default_rng(1)
         self.counters = {"woken": 0, "slept": 0, "avalanche": 0, "lost": 0, "pool_short": 0}
+        self.on_spawn = None  # callback(slots: wp.array[int]) after dormant soil is woken into those particles
 
     def region_mask(self, name):
         return self.col_region == self.names.index(name)
@@ -494,10 +495,13 @@ class SoilZones:
             slots = free[: len(pos)]
             self.active_np[slots] = True
             ext = st.mpm
+            slots_wp = wp.array(slots.astype(np.int32), dtype=int)
             wp.launch(
                 spawn_kernel, dim=len(slots),
-                inputs=[wp.array(slots.astype(np.int32), dtype=int), wp.array(pos.astype(np.float32), dtype=wp.vec3), self.particle_volume, self.model.particle_flags, mm.particle_flags, mm.material_particle_flags, mm.material_particle_volume, st.particle_q, st.particle_qd, ext.particle_qd_grad, ext.particle_elastic_strain, ext.particle_Jp, ext.particle_stress, ext.particle_transform],
+                inputs=[slots_wp, wp.array(pos.astype(np.float32), dtype=wp.vec3), self.particle_volume, self.model.particle_flags, mm.particle_flags, mm.material_particle_flags, mm.material_particle_volume, st.particle_q, st.particle_qd, ext.particle_qd_grad, ext.particle_elastic_strain, ext.particle_Jp, ext.particle_stress, ext.particle_transform],
             )
+            if self.on_spawn is not None:
+                self.on_spawn(slots_wp)
             self.count_np[wake] = keep[wake]
             self.woken_tick[wake] = self.tick
             self.count.assign(self.count_np.astype(np.int32))

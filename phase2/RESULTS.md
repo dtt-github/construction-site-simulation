@@ -676,3 +676,65 @@ Throughput on the normal cycle goes from 174 to 191 t/h. Passes are now 15–18 
 - The clearance treats the load as a flat top at 1.5× its mean depth, not its real shape.
 - The house inertia used for the stopping distance is one value, but the true inertia changes with arm pose.
 - The dump does not yet start before the swing has stopped, as it often does in practice.
+
+## Soils: dry sand, moist sand, loam and clay
+
+The pit can now be dug in four soils (`soils.py`), chosen with `--soil` or live from the browser's soil selector (the server rebuilds the pit in about 2 s). Until now everything was dry sand.
+
+| Preset | Density | Friction (φ) | Cohesion c | Tensile | Remoulded | Stands for |
+|---|---|---|---|---|---|---|
+| Dry sand | 1600 kg/m³ | 0.75 (37°) | 0 | 0 | – | the calibrated sand of phases 0–2 |
+| Moist sand | 1750 kg/m³ | 0.75 (37°) | 2 kPa (0.9 kPa in the solver, see below) | 0.5 kPa | 70 % | capillary ("apparent") cohesion of a few kPa |
+| Loam | 1850 kg/m³ | 0.55 (29°) | 12 kPa | 2 kPa | 20 % | sandy clay loam, firm: c′ ≈ 10–15 kPa, φ′ ≈ 28–30° |
+| Clay | 1950 kg/m³ | 0.05 (3°) | 45 kPa | 8 kPa | 30 % | firm clay, undrained as dug: cᵤ 40–75 kPa (ISO 14688-2, BS 5930) |
+
+**How cohesion enters the solver.** Newton's implicit MPM yields on a Drucker–Prager cone, √J₂ ≤ `yield_stress` + μ (p + pₜ), with pₜ = `tensile_yield_ratio` × `yield_pressure`. I derived this from the solver's stress projection and its tensor-to-vector map. With μ taken as tan φ, as for the sand, `yield_stress` is the cohesion c. (The `hardening` option is for snow: fresh soil would start with zero strength, so it stays off.)
+
+**Check 1: unsupported vertical cuts** (`soil_calibrate.py cut`, plane strain, 8 cm grid, as in the excavator). The critical height of a vertical cut is 2.67–3.83 · c/γ · tan(45° + φ/2) (Terzaghi with tension cracks, to the limit-analysis upper bound).
+
+| Soil | Predicted critical height | Stands | Fails |
+|---|---|---|---|
+| Moist sand at the nominal 2 kPa | 0.62–0.89 m | 1.4 m | 2.0 m: **about 2× too strong** |
+| Moist sand at 0.9 kPa in the solver | 0.62–0.89 m | 0.8 m | 1.0 m |
+| Loam | 2.99–4.28 m | 2.0 m | starts at 3 m, slumps by 4–5 m |
+| Clay at c/10 (heights scale with c/γ) | 0.66–0.95 m | 0.8 m | 1.0 m |
+| Dry sand | 0 | – | 0.5 m face runs out 1 m |
+
+Loam and clay match without tuning. At sand-like friction the Drucker–Prager cone is stronger than Mohr–Coulomb, so moist sand gets a calibrated solver cohesion (`mpm_cohesion`) next to its nominal value. Logs: `logs/soil_cut_*.json`.
+
+**Check 2: cutting force** (`soil_calibrate.py blade`). A vertical blade, 0.96 m wide, is pushed at 0.5 m/s, and the force is compared with McKyes' fundamental earthmoving equation including its cohesion term (`soils.mckyes`). Log: `logs/soil_blade.json`.
+
+| Soil | 0.2 m cut | 0.3 m | 0.4 m |
+|---|---|---|---|
+| Dry sand | 8.4 kN, 2.9× McKyes | 14.4 kN, 2.2× | 22.2 kN, 1.9× |
+| Moist sand | 13.0 kN, 1.8× | 20.9 kN, 1.6× | 31.8 kN, 1.5× |
+| Loam | 31.5 kN, 1.7× | 45.3 kN, 1.6× | 58.6 kN, 1.4× |
+| Clay | 47.5 kN, 1.7× | 69.2 kN, 1.6× | 87.8 kN, 1.5× |
+
+- **Cohesion term:** it scales right. The ratio to McKyes is the same 1.4–1.8 with and without cohesion, so the excess comes from the 8 cm grid and the soil–blade friction, as Phase 0 found for sand.
+- **Test setup:** the bed is held by a rough end wall, because a cohesive bed otherwise slides along the floor as one block. Forces are averaged over the early cut, before the heap ahead adds surcharge.
+- **Server reference:** the excavator's McKyes reference force (`mckyes_kN` in `stats()`) now includes the cohesion term, and the horizontal share of the tool force.
+
+**Three things the first cohesive runs got wrong:**
+- **Strands instead of cracks.** MPM's tension cap is perfectly plastic, so cohesive soil drew out into strands instead of cracking. The fix is `soil_bond_kernel`: each particle's cohesion and tensile strength fall toward the remoulded fraction (1/sensitivity) as it opens up plastically, at Jp − 1 up to 0.1. Newton only tracks per-particle Jp with particle stress warm-starting, so cohesive soils use `warmstart_mode = "particles"` (no measurable cost). The damage stays while a particle is awake. Soil woken from the undisturbed bed starts intact.
+- **A clay lump stuck in the bucket.** Once healing was allowed, dug clay compacted into one 45 kPa lump wedged in the curved shell, and it rode back to the pit. With damage that stays, plus an operator move, the clay comes out. The move: if more than 25 % of a full bucket is still in after the dump, rap the bucket against its dump stop, up to 2.5 s (`_shake`, `shakes` in `stats()`).
+- **Overfilled buckets.** Cohesive soil does not flow off, so a slab stood on the mouth while the operator, counting only the shell, kept dragging. In cohesive soils the operator now counts the heap on and ahead of the mouth too, and curls at 75 % of the rated load.
+
+The dormant zone wakes steep faces so they can fail. For a cohesive soil it now only wakes faces higher than 0.8 × the lower critical height, so trench walls in loam and clay stand.
+
+**Auto cycle, 130 s per soil** (`SOIL=… bench_zone.py 130`, `logs/zone_bench_<soil>.json`):
+
+| Soil | Passes | Per pass (mean) | Of rated 0.8 m³ | Real-time factor | Skipped stages |
+|---|---|---|---|---|---|
+| Dry sand | 7 | 1017 kg | 79 % | 1.18 | 0 |
+| Moist sand | 7 | 1275 kg | 91 % | 1.20 | 0 |
+| Loam | 7 | 1528 kg (2.1 t → 0.4 t over the run) | 103 % | 1.18 | 0 |
+| Clay | 5 | 2219 kg | 142 % | 1.16 | 2 (in the last pass) |
+
+**Limits:**
+- **Overfill:** clay buckets carry 140–165 % of rating, and loam's first passes about 140 %. Handbook fill factors are about 100–110 % for loam and 85–100 % for clay. Curling earlier barely helps: the curl itself lifts a cohesive wedge with the bucket. This is the next calibration target, against measured bucket fill.
+- **Clay shaking:** it adds 2–3.5 s to each clay pass.
+- **No adhesion:** soil–steel adhesion is not modelled, so sticky clay holds only by geometry and friction.
+- **Healing:** soil does not regain strength over time, and the load in the truck becomes intact again only when it sleeps.
+- **Unvalidated values:** the presets are typical published values, not one measured site. Moist sand's cohesion depends strongly on its water content.
+

@@ -54,9 +54,9 @@ from soil_server import (
     SURFACE_MAX_SPEED,
     ZONE_HALF,
     heightmap_kernel,
-    mckyes_n_gamma,
 )
 import hydraulics as hyd
+import soils
 from soil_zone import CELL, LAYER_PER_PARTICLE, SPACING, SoilZones
 
 # ------------------------------------------------------------------ machine (zone frame, Z up)
@@ -84,12 +84,23 @@ BUCKET_SHELL = np.array([
     (0.68, 0.94), (0.88, 0.86), (1.075, 0.78),
 ])
 BUCKET_W, PLATE = 1.06, 0.10
+HEAP_DEPTH = 0.5  # m beyond the mouth chord that the auto operator counts as heaped in the bucket
+
+
+def _heaped_profile():
+    """Shell profile closed by the mouth chord pushed HEAP_DEPTH outward: the bucket and the heap on it."""
+    a, b = BUCKET_SHELL[0], BUCKET_SHELL[-1]
+    n = np.array([b[1] - a[1], a[0] - b[0]]) / np.linalg.norm(b - a)
+    if np.dot(n, BUCKET_SHELL.mean(axis=0) - a) > 0:
+        n = -n
+    return np.vstack([BUCKET_SHELL, b + HEAP_DEPTH * n, a + HEAP_DEPTH * n])
 TOOTH_Y, TOOTH_TIP = (-0.45, -0.22, 0.0, 0.22, 0.45), np.array([1.25, 0.83])
 BUCKET_EDGE = np.array([TOOTH_TIP[0], 0.0, TOOTH_TIP[1]])  # cutting edge (tooth tips), bucket frame
 _MOUTH = BUCKET_SHELL[-1] - BUCKET_SHELL[0]
 MOUTH_ANGLE = math.atan2(_MOUTH[1], _MOUTH[0])  # chord direction in the bucket frame
-# rating: Hitachi ZX200-6 standard bucket, 0.80 m3 ISO heaped, in sand at 1600 kg/m3
-BUCKET_RATED_KG = 0.80 * 1600.0
+# rating: Hitachi ZX200-6 standard bucket, 0.80 m3 ISO heaped (1280 kg in sand at 1600 kg/m3)
+BUCKET_RATED_M3 = 0.80
+BUCKET_RATED_KG = BUCKET_RATED_M3 * 1600.0
 
 # masses: ZX200-6 operating weight ~20 t; upper structure incl. 4.6 t counterweight, boom, arm and a
 # 0.8 m3 bucket estimated from published class figures. Centres of mass and inertias (link frames) are
@@ -446,6 +457,24 @@ def bucket_profile_fill_kernel(
         wp.atomic_add(counter, 0, 1)
 
 
+@wp.kernel
+def soil_bond_kernel(jp: wp.array[float], cohesion: float, tensile_ratio: float, crack: float, remoulded: float, bond: wp.array[float], yield_stress: wp.array[float], tensile_yield_ratio: wp.array[float]):
+    """Cohesive soil breaks up instead of stretching: its bond falls toward the remoulded fraction as a
+    particle opens up plastically (Jp > 1) by `crack`. The damage stays while the particle is awake: dug
+    clods pressed together in the bucket do not knit back into one lump (in-situ soil woken from the
+    dormant bed starts intact)."""
+    i = wp.tid()
+    b = wp.min(bond[i], remoulded + (1.0 - remoulded) * wp.clamp(1.0 - (jp[i] - 1.0) / crack, 0.0, 1.0))
+    bond[i] = b
+    yield_stress[i] = cohesion * b
+    tensile_yield_ratio[i] = tensile_ratio * b
+
+
+@wp.kernel
+def reset_bond_kernel(slots: wp.array[int], bond: wp.array[float]):
+    bond[slots[wp.tid()]] = 1.0
+
+
 # ------------------------------------------------------------------ simulation
 class ExcavatorSim:
     # auto cycle: (stage, swing deg, bucket-pin radius from the swing axis, pin height, bucket angle deg
@@ -462,8 +491,12 @@ class ExcavatorSim:
         ("swing back", 0, 6.0, 2.6 + DIG_Z, -95),  # lowers while swinging, once clear of the truck
     ]
 
-    def __init__(self, voxel=0.08, ppc=2, density=1600.0, friction=0.75, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY):
+    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY):
         wp.init()
+        self.kwargs = {"voxel": voxel, "ppc": ppc, "soil": soil, "iterations": iterations, "fps": fps, "pool": pool, "mpm_every": mpm_every}
+        self.soil = soil
+        material = soils.SOILS[soil]
+        density, friction = material["density"], material["friction"]
         iterations = iterations or MPM_ITERATIONS[mpm_every]
         self.frame_dt = 1.0 / fps
         self.mpm_every = mpm_every
@@ -570,12 +603,14 @@ class ExcavatorSim:
             dim_x=side, dim_y=side, dim_z=int(math.ceil(pool / side**2)),
             cell_x=SPACING, cell_y=SPACING, cell_z=SPACING,
             mass=self.particle_mass, jitter=0.0, radius_mean=self.radius,
-            custom_attributes={"mpm:friction": friction},
+            custom_attributes=soils.mpm_attributes(soil),
         )
         self.sand_model = sb.finalize()
         self.n_particles = self.sand_model.particle_count
         self.zones = SoilZones([TRUCK_REGION, GROUND_REGION], self.n_particles, SPACING**3)
         z = self.zones
+        # dormant faces lower than a cohesive soil's critical height stand; only higher ones are woken to fail
+        z.AVALANCHE_DROP = max(SoilZones.AVALANCHE_DROP, 0.8 * soils.critical_height(soil)[0])
         ground = z.region_mask("ground")
         in_pit = ground & (z.col_x < 6.75) & (z.col_y < 6.25)
         fill = np.floor((BED_TOP - z.col_floor) / LAYER_PER_PARTICLE / 4) * 4
@@ -588,6 +623,8 @@ class ExcavatorSim:
         cfg.max_iterations = iterations
         cfg.critical_fraction = 0.0
         cfg.strain_basis = "P0"
+        if "mpm:yield_stress" in soils.mpm_attributes(soil):
+            cfg.warmstart_mode = "particles"  # keeps per-particle stress and plastic volume (Jp) for cracking
         self.mpm = SolverImplicitMPM(self.sand_model, config=cfg)
         # colliders: static shapes, the stick and bucket, and the dormant soil columns
         collide = [bid for bid in range(self.model.body_count) if bid in (stick, bucket)]
@@ -603,7 +640,21 @@ class ExcavatorSim:
         # rigid contacts: bucket and stick against the hard pit floor (the sand acts through MPM)
         self.collision = newton.CollisionPipeline(self.model)
         self.contacts = self.collision.contacts()
-        self.n_gamma = mckyes_n_gamma(math.atan(friction), math.atan(0.4))
+        # McKyes reference force for the current cut: factors at a 0.3 m cut (they change little with depth)
+        f_ref, fac = soils.mckyes(density, material["cohesion"], 0.3, BUCKET_W, math.atan(friction), math.atan(0.4))
+        self.n_gamma, self.n_c = fac["N_gamma"], fac["N_c"]
+        self.fee_scale = math.cos(math.atan(0.4))  # horizontal part of the tool force (vertical tool)
+        self.cohesion = material["cohesion"]
+        attrs = soils.mpm_attributes(soil)
+        self.bond = (attrs["mpm:yield_stress"], attrs["mpm:tensile_yield_ratio"], soils.CRACK_STRAIN, material["remoulded"]) if "mpm:yield_stress" in attrs else None
+        self.bond_state = wp.ones(self.n_particles, dtype=float)  # 1 intact .. remoulded, per particle
+        if self.bond is not None:
+            self.zones.on_spawn = lambda slots: wp.launch(reset_bond_kernel, dim=slots.shape[0], inputs=[slots, self.bond_state])
+        # curl now: sand heaped to 110 % of rated inside the shell (the rest flows off). A cohesive soil is
+        # counted with the heap standing on and ahead of the mouth, which does not flow off and grows during
+        # the curl, so the operator curls at 75 % of rated: thinner bites, as in sticky ground
+        self.heap_check = material["cohesion"] > 0.0
+        self.full_kg = (self.COHESIVE_CURL if self.heap_check else 1.1) * BUCKET_RATED_M3 * density
 
         # actuator parameters on the GPU
         arr = lambda d: wp.array([float(d[j]) for j in JOINTS], dtype=float)  # noqa: E731
@@ -619,6 +670,7 @@ class ExcavatorSim:
         self.torque = wp.zeros(4, dtype=float)
         self.truck_hm = wp.zeros(TRUCK_NX * TRUCK_NY, dtype=float)
         self.bucket_poly = wp.array(BUCKET_SHELL.astype(np.float32), dtype=wp.vec2)
+        self.heap_poly = wp.array(_heaped_profile().astype(np.float32), dtype=wp.vec2)
         self.truck_counter = wp.zeros(1, dtype=int)
 
         self.hm = wp.zeros(HM_NX * HM_NY, dtype=float)
@@ -643,6 +695,7 @@ class ExcavatorSim:
         self.sand.body_f = wp.empty_like(self.state_0.body_f)
         self.zones.attach(self.sand_model, self.sand, self.mpm)
         self.zones.reset(self.bed_counts)
+        self.bond_state.fill_(1.0)
         self.zone_frame = 0
         self.sand_forces = wp.zeros_like(self.state_0.body_f)
         self.imp_ids.fill_(-1)
@@ -660,6 +713,7 @@ class ExcavatorSim:
         self.stage_time = 0.0
         self.auto_wait = 0.0
         self.low_prev, self.low_rate, self.swing_held, self.arm_held = None, 0.0, 0.0, 0.0
+        self.shaking, self.shakes = None, 0
         self.stage_name = "manual"
         self.sim_time = 0.0
         self.step_ms = 0.0
@@ -766,7 +820,6 @@ class ExcavatorSim:
     # curl as soon as the bucket is full instead of finishing the planned drag
     EASE_PRESSURE = 0.9  # fraction of relief on the arm or bucket cylinder that counts as stalling
     EASE_RATE, EASE_MAX = 0.4, 0.8  # m/s the dig path rises while stalled; most it rises in one pass
-    FULL_KG = 1.1 * BUCKET_RATED_KG  # curl now: heaped to 110 % of rated
 
     def _pin_pose(self):
         """Current bucket pin as a cycle waypoint (swing deg, radius, height, mouth angle deg)."""
@@ -775,7 +828,9 @@ class ExcavatorSim:
 
     def _bucket_fill(self):
         self.fill_counter.zero_()
-        wp.launch(bucket_profile_fill_kernel, dim=self.n_particles, inputs=[self.sand.particle_q, self.bucket_xform(), self.bucket_poly, BUCKET_W / 2, self.fill_counter])
+        # what an operator sees: in a cohesive soil, the load in the bucket and heaped on it (or pushed ahead)
+        poly = self.heap_poly if self.heap_check else self.bucket_poly
+        wp.launch(bucket_profile_fill_kernel, dim=self.n_particles, inputs=[self.sand.particle_q, self.bucket_xform(), poly, BUCKET_W / 2, self.fill_counter])
         return float(self.fill_counter.numpy()[0]) * self.particle_mass
 
     def _jump_to(self, stage):
@@ -874,6 +929,24 @@ class ExcavatorSim:
                 lever = math.copysign(min(abs(lever) if abs(v) <= 0.15 else 1.0, v_ok / SWING_VMAX), lever)
         return lever
 
+    COHESIVE_CURL = 0.75  # of the rated load, counted with the heap
+    SHAKE_IF = 0.25  # fraction of a full bucket still in it after the dump that makes the operator shake it out
+    SHAKE_S, SHAKE_PERIOD = 2.5, 0.32  # most time spent shaking; one rap: dump to the stop, then a short curl back
+
+    def _shake(self):
+        """Rap the bucket against its dump stop (full dump lever, then a short curl), as an operator does to
+        free clay stuck in the bucket, until it is nearly empty or SHAKE_S is up."""
+        self.shaking += self.frame_dt
+        phase = (self.shaking % self.SHAKE_PERIOD) / self.SHAKE_PERIOD
+        self.levers = np.zeros(4)
+        self.levers[3] = 1.0 if phase < 0.6 else -0.7  # lever sign: + dumps
+        if self.auto_frame % 6 == 0 and (self.shaking > self.SHAKE_S or self._bucket_fill() < 0.1 * self.full_kg):
+            self.shaking = None
+            self.auto_stage = (self.auto_stage + 1) % len(self.CYCLE)
+            self.auto_s, self.stage_time, self.auto_wait, self.seg_from = 0.0, 0.0, 0.0, None
+            self.low_prev, self.low_rate = None, 0.0
+        self.auto_frame += 1
+
     def _auto_control(self):
         """Track the cycle: move a target along the current segment only while the arm keeps up."""
         n = len(self.CYCLE)
@@ -883,10 +956,12 @@ class ExcavatorSim:
         digging = b[0] in self.DIG_STAGES
         if digging and self.auto_frame % 6 == 0:
             self.auto_fill = self._bucket_fill()
-            if self.auto_fill >= self.FULL_KG and b[0] != "curl":
+            if self.auto_fill >= self.full_kg and b[0] != "curl":
                 self.early_curls += 1
                 self._jump_to("curl")
                 return self._auto_control()
+        if self.shaking is not None:
+            return self._shake()
         self.auto_frame += 1
         ease_a = self.ease if a[0] in self.DIG_STAGES else 0.0
         ease_b = self.ease if digging else 0.0
@@ -964,7 +1039,14 @@ class ExcavatorSim:
         if timed_out:
             self.skipped.append({"t": round(self.sim_time, 2), "stage": b[0], "max_err_rad": round(float(np.max(np.abs(err))), 3)})
             self.auto_wait = 0.0
-        if timed_out or (self.auto_s >= 1.0 and np.max(np.abs(q_end - self.q)) < 0.06):
+        # close enough to the waypoint; after running 1.5 s past plan, an arm holding a heavy load at relief
+        # (that cannot quite reach the pose) is let go on instead of timing out
+        tol = 0.06 if self.stage_time < seg_all + 1.5 else 0.15
+        if timed_out or (self.auto_s >= 1.0 and np.max(np.abs(q_end - self.q)) < tol):
+            if b[0] == "dump" and self._bucket_fill() > self.SHAKE_IF * self.full_kg:
+                self.shaking = 0.0  # sticky load still in the bucket: shake it out before swinging back
+                self.shakes += 1
+                return
             self.auto_stage = (self.auto_stage + 1) % n
             self.auto_s = 0.0
             self.stage_time = 0.0
@@ -1050,6 +1132,8 @@ class ExcavatorSim:
             # the rigid frames in between reuse the last sand impulses as a constant force
             wp.launch(subtract_body_force, dim=self.model.body_count, inputs=[self.mpm_dt, self.state_0.body_q, self.state_0.body_qd, self.sand_forces, self.model.body_inv_inertia, self.model.body_inv_mass, self.sand.body_q, self.sand.body_qd])
             self.mpm.step(self.sand, self.sand, contacts=None, control=None, dt=self.mpm_dt)
+            if self.bond is not None:
+                wp.launch(soil_bond_kernel, dim=self.n_particles, inputs=[self.sand.mpm.particle_Jp, *self.bond, self.bond_state, self.sand_model.mpm.yield_stress, self.sand_model.mpm.tensile_yield_ratio])
             self._collect_impulses()
         wp.synchronize()
         ms = (time.perf_counter() - t0) * 1000
@@ -1124,7 +1208,8 @@ class ExcavatorSim:
         surface = float(self.hm_np[iy * HM_NX + ix_ahead]) if 0 <= ix < HM_NX and 0 <= iy < HM_NY else 0.0
         surface = min(surface, BED_TOP)
         self.cut_depth = max(surface - edge[2], 0.0)
-        self.fee_ref = self.density * G * self.cut_depth**2 * BUCKET_W * self.n_gamma
+        d = self.cut_depth
+        self.fee_ref = (self.density * G * d * d * self.n_gamma + self.cohesion * d * self.n_c) * BUCKET_W * self.fee_scale
         return moving
 
     @staticmethod
@@ -1177,7 +1262,8 @@ class ExcavatorSim:
 
     def hello(self):
         """First message to a client: machine, limits and scene geometry."""
-        return {"type": "hello", "kind": "excavator", "particles": self.n_particles, "zone": True, "voxel": self.voxel, "joints": JOINTS, "limits": LIMITS, "vmax": dict(zip(JOINTS, self.vmax.round(3).tolist())), "relief_mpa": hyd.P_RELIEF / 1e6, "geometry": self.geometry(), "stages": [c[0] for c in self.CYCLE]}
+        return {"type": "hello", "kind": "excavator", "particles": self.n_particles, "zone": True, "voxel": self.voxel, "joints": JOINTS, "limits": LIMITS, "vmax": dict(zip(JOINTS, self.vmax.round(3).tolist())), "relief_mpa": hyd.P_RELIEF / 1e6, "geometry": self.geometry(), "stages": [c[0] for c in self.CYCLE],
+                "soil": {"name": self.soil, **soils.SOILS[self.soil], "options": [{"name": k, "label": v["label"]} for k, v in soils.SOILS.items()]}}
 
     def frame_bytes(self, frame_no, moving):
         bq = self.state_0.body_q.numpy()
@@ -1218,6 +1304,7 @@ class ExcavatorSim:
         return {
             "t": round(self.sim_time, 2),
             "stage": self.stage_name,
+            "soil": self.soil,
             "step_ms": round(self.step_ms, 2),
             "q_deg": [round(math.degrees(v), 1) for v in self.q],
             "qd": [round(v, 3) for v in self.qd],
@@ -1227,6 +1314,7 @@ class ExcavatorSim:
             "swing_inertia": round(self.swing_inertia),
             "swing_held_s": round(self.swing_held, 1),
             "arm_held_s": round(self.arm_held, 1),
+            "shakes": self.shakes,
             "cyl_m": [round(float(v), 3) for v in self.cyl_L],
             "force_kN": [round(v / 1000, 1) for v in self.force],
             "fill_kg": round(self.fill_kg),
@@ -1246,6 +1334,7 @@ async def serve(sim, host, port):
     import websockets
 
     clients = set()
+    pending_soil = []  # a soil change asked for by a client: the pit is rebuilt between frames
 
     async def handler(ws):
         clients.add(ws)
@@ -1262,21 +1351,40 @@ async def serve(sim, host, port):
                 elif kind == "auto":
                     sim.auto = bool(cmd.get("on", True))
                     sim.auto_stage, sim.auto_s, sim.passes = 0, 0.0, 0
-                    sim.ease, sim.seg_from = 0.0, None
+                    sim.ease, sim.seg_from, sim.shaking = 0.0, None, None
                     if not sim.auto:
                         sim.set_levers(0, 0, 0, 0)
                 elif kind == "relief":
                     sim.relief = float(np.clip(cmd.get("value", 1.0), 0.1, 1.5))
                 elif kind == "reset":
                     sim.reset()
+                elif kind == "soil" and cmd.get("soil") in soils.SOILS:
+                    pending_soil.append(cmd["soil"])
         finally:
             clients.discard(ws)
 
     async def sim_loop():
+        nonlocal sim
         frame = 0
         next_send = 0.0
         wall0 = time.perf_counter()
         while True:
+            if pending_soil:
+                soil = pending_soil[-1]
+                pending_soil.clear()
+                if soil != sim.soil:
+                    print(f"switching soil to {soil}", flush=True)
+                    auto, relief = sim.auto, sim.relief
+                    sim = ExcavatorSim(**{**sim.kwargs, "soil": soil})
+                    sim.auto, sim.relief = auto, relief  # the operator's settings carry over to the new pit
+                    next_send = 0.0
+                    wall0 = time.perf_counter()
+                    hello = json.dumps(sim.hello())
+                    for ws in list(clients):
+                        try:
+                            await ws.send(hello)
+                        except Exception:  # noqa: BLE001
+                            clients.discard(ws)
             sim.step()
             if sim.sim_time < next_send - 1.0:
                 next_send = 0.0
@@ -1336,8 +1444,9 @@ def main():
     ap.add_argument("--trench", action="store_true", help="auto cycle digs one lane, deeper each pass")
     ap.add_argument("--pool", type=int, default=POOL, help="particle capacity of the soil zone")
     ap.add_argument("--mpm-every", type=int, default=MPM_EVERY, help="frames per MPM step (1: sand at 60 Hz)")
+    ap.add_argument("--soil", choices=list(soils.SOILS), default=soils.DEFAULT_SOIL, help="soil preset (soils.py)")
     args = ap.parse_args()
-    sim = ExcavatorSim(voxel=args.voxel, iterations=args.iterations, pool=args.pool, mpm_every=args.mpm_every)
+    sim = ExcavatorSim(voxel=args.voxel, iterations=args.iterations, pool=args.pool, mpm_every=args.mpm_every, soil=args.soil)
     if args.trench:
         sim.set_trench()
     res = None

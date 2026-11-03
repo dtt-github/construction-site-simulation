@@ -107,7 +107,9 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       <input id="lever-${l.key}" type="range" min="-1" max="1" step="0.05" value="0">
       <div class="gauge" aria-label="${l.label} cylinder pressure"><div id="gauge-${l.key}"></div></div>`
       ).join("") +
-      `<label for="relief">Relief pressure <output id="relief-out">100%</output></label>
+      `<label for="soil-type">Soil</label>
+      <select id="soil-type" aria-label="Soil type"></select>
+      <label for="relief">Relief pressure <output id="relief-out">100%</output></label>
       <input id="relief" type="range" min="30" max="100" step="5" value="100">
       <p class="hint">Keys: ←/→ swing, W/S boom, A/D stick, Q/E bucket (hold). Levers spring back when released.</p>`;
     for (const l of LEVERS) {
@@ -131,6 +133,11 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       l.slider = s;
       l.show = show;
     }
+    const soilSel = controlsEl.querySelector("#soil-type");
+    soilSel.addEventListener("change", () => {
+      statusEl.textContent = `Switching the pit to ${soilSel.selectedOptions[0].textContent.toLowerCase()}…`;
+      send({ type: "soil", soil: soilSel.value });
+    });
     const relief = controlsEl.querySelector("#relief");
     relief.addEventListener("input", () => {
       controlsEl.querySelector("#relief-out").textContent = `${relief.value}%`;
@@ -165,7 +172,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   }
 
   // ------------------------------------------------------------ scene objects
-  const sandColor = new THREE.Color("#c9a774");
+  const sandColor = new THREE.Color("#c9a774"); // the soil preset's colours replace these (hello.soil)
   let surface = null; // created on first frame (size comes from the server)
   let hmInfo = null;
 
@@ -452,7 +459,32 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     }
     stages = hello.stages ?? [];
     zoneMode = !!hello.zone;
+    if (hello.soil) setSoil(hello.soil);
   }
+
+  // soil preset (excavator_server.py / soils.py): colours of the pit, truck load and grains, and the selector
+  function recolor(mesh, color) {
+    const col = mesh.geometry.attributes.color;
+    const c = new THREE.Color();
+    for (let v = 0; v < col.count; v++) {
+      c.copy(color).multiplyScalar(0.9 + 0.2 * Math.random());
+      col.setXYZ(v, c.r, c.g, c.b);
+    }
+    col.needsUpdate = true;
+  }
+  function setSoil(soil) {
+    sandColor.set(soil.color);
+    grains.material.color.set(soil.grain);
+    if (surface) recolor(surface, sandColor);
+    if (arm.truckSurface) recolor(arm.truckSurface, sandColor.clone().multiplyScalar(0.92));
+    const sel = controlsEl.querySelector("#soil-type");
+    if (sel && soil.options) {
+      sel.innerHTML = soil.options.map((o) => `<option value="${o.name}">${o.label}</option>`).join("");
+      sel.value = soil.name;
+    }
+    soilLabel = soil.label;
+  }
+  let soilLabel = null;
 
   // ------------------------------------------------------------ recorded replay (no server)
   let replay = null; // { frames: [{t, buf}], t0, k }
@@ -531,7 +563,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
         const soilText = hello.zone
           ? `moving soil zone (${hello.particles.toLocaleString()}-particle pool)`
           : `${hello.particles.toLocaleString()} particles`;
-        statusEl.textContent = `Connected · ${kind === "excavator" ? "excavator arm" : "kinematic bucket"} · ${soilText}, ${Math.round(hello.voxel * 100)} cm grid`;
+        statusEl.textContent = `Connected · ${kind === "excavator" ? "excavator arm" : "kinematic bucket"} · ${soilLabel ? soilLabel.toLowerCase() + ", " : ""}${soilText}, ${Math.round(hello.voxel * 100)} cm grid`;
         return;
       }
       try {
@@ -578,7 +610,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
 
     if (f.truckHm) {
       const t = f.truckHm;
-      if (!arm.truckSurface) arm.truckSurface = makeSurface(t.nx, t.ny, t.x0, t.z0, t.cell, new THREE.Color("#b8925f"));
+      if (!arm.truckSurface) arm.truckSurface = makeSurface(t.nx, t.ny, t.x0, t.z0, t.cell, sandColor.clone().multiplyScalar(0.92));
       const tp = arm.truckSurface.geometry.attributes.position;
       for (let k = 0; k < t.heights.length; k++) tp.array[k * 3 + 1] = t.heights[k];
       tp.needsUpdate = true;

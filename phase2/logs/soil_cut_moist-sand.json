@@ -1,0 +1,35 @@
+[
+ {
+  "soil": "moist-sand",
+  "height_m": 0.6,
+  "crest_move_m": 0.005,
+  "moved_frac": 0.0,
+  "face_toe_runout_m": -0.02,
+  "critical_height_m": [
+   0.62,
+   0.89
+  ]
+ },
+ {
+  "soil": "moist-sand",
+  "height_m": 0.8,
+  "crest_move_m": 0.029,
+  "moved_frac": 0.0,
+  "face_toe_runout_m": -0.0,
+  "critical_height_m": [
+   0.62,
+   0.89
+  ]
+ },
+ {
+  "soil": "moist-sand",
+  "height_m": 1.0,
+  "crest_move_m": 0.848,
+  "moved_frac": 0.119,
+  "face_toe_runout_m": 0.59,
+  "critical_height_m": [
+   0.62,
+   0.89
+  ]
+ }
+]

@@ -5,9 +5,11 @@ pass delivered to the truck.
 
     ../phase0/.venv-newton/bin/python bench_zone.py              # 130 s, default margins
     ../phase0/.venv-newton/bin/python bench_zone.py 130 0.8 1.1  # seconds, wake and sleep margins (m)
+    SOIL=clay ../phase0/.venv-newton/bin/python bench_zone.py    # another soil preset (soils.py)
 """
 
 import json
+import os
 import sys
 import time
 
@@ -19,7 +21,7 @@ from soil_zone import SoilZones
 secs = float(sys.argv[1]) if len(sys.argv) > 1 else 130.0
 if len(sys.argv) > 3:
     SoilZones.WAKE_MARGIN, SoilZones.SLEEP_MARGIN = float(sys.argv[2]), float(sys.argv[3])
-sim = ex.ExcavatorSim()
+sim = ex.ExcavatorSim(soil=os.environ.get("SOIL", ex.soils.DEFAULT_SOIL))
 sim.auto = True
 ms, stages, active, truck_at_pass = [], [], [], []
 t0 = time.perf_counter()

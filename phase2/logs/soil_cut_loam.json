@@ -1,0 +1,46 @@
+[
+ {
+  "soil": "loam",
+  "height_m": 2.0,
+  "crest_move_m": 0.015,
+  "moved_frac": 0.0,
+  "face_toe_runout_m": -0.02,
+  "critical_height_m": [
+   2.99,
+   4.28
+  ]
+ },
+ {
+  "soil": "loam",
+  "height_m": 3.0,
+  "crest_move_m": 0.124,
+  "moved_frac": 0.143,
+  "face_toe_runout_m": 0.01,
+  "critical_height_m": [
+   2.99,
+   4.28
+  ]
+ },
+ {
+  "soil": "loam",
+  "height_m": 4.0,
+  "crest_move_m": 0.251,
+  "moved_frac": 0.708,
+  "face_toe_runout_m": 0.08,
+  "critical_height_m": [
+   2.99,
+   4.28
+  ]
+ },
+ {
+  "soil": "loam",
+  "height_m": 5.0,
+  "crest_move_m": 1.258,
+  "moved_frac": 0.824,
+  "face_toe_runout_m": 0.67,
+  "critical_height_m": [
+   2.99,
+   4.28
+  ]
+ }
+]
