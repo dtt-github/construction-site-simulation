@@ -8,7 +8,7 @@ By contributing you agree that your contribution is licensed under the same term
 
 | Area | Examples | Where |
 |---|---|---|
-| **Real-world validation data** | Bucket/blade force measurements with soil properties; excavator joint pressures and cycle logs; wheel/track–soil tests; crane load and sway measurements | Open an issue with the *Validation data* template |
+| **Real-world validation data** | Bucket/blade force measurements with soil properties; excavator joint pressures and cycle logs; wheel/track–soil tests; crane load and sway measurements | Open an issue with the [*Validation data*](https://github.com/dtt-github/construction-site-simulation/issues/new?template=validation_data.yml) template |
 | **3D assets of real machinery** | Excavators, dump trucks, loaders, dozers, cranes, mixers with separate moving parts, correct dimensions and masses | Follow the [asset policy](assets/README.md), then open a PR or the *Asset submission* issue |
 | **Physics models** | Soil models (cohesive soils, moisture, compaction), hydraulics (pumps, valves, cylinders), cable/rope models for cranes, tyre–soil contact | PRs to `phase2/` (server) or new modules |
 | **Calibration** | Fitting soil parameters to lab tests (triaxial, direct shear), fitting hydraulic models to machine data | PRs plus a short write-up in the relevant `RESULTS.md` |
@@ -16,6 +16,10 @@ By contributing you agree that your contribution is licensed under the same term
 | **Benchmarks** | Reproducible scenes with reference results (e.g. a standard bucket pass) | `benchmarks/` (to be created) |
 
 If you're unsure where something fits, open an issue first.
+
+### Validation data
+
+The weakest part of the simulator is validation against real machines. If you have measured data, even partial, please use the [*Validation data* issue form](https://github.com/dtt-github/construction-site-simulation/issues/new?template=validation_data.yml). It asks for the machine, the data type (bucket/blade forces, cylinder pressures, swing torque, cycle times, soil tests), soil properties with test methods, the sensor setup and sample rate, and the licence. CC-BY-4.0 or CC0 let us publish the data with the benchmarks; private sharing with the maintainers is also possible.
 
 ## How to contribute code
 
