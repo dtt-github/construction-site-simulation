@@ -128,6 +128,8 @@ USE_MUJOCO_CPU = False  # GPU MuJoCo, with the rigid substeps recorded as one CU
 # moving soil zone (soil_zone.py): only soil near the bucket is MPM particles, the rest is dormant columns
 POOL = 150_000  # particle capacity; the 2 m fill is about 1.5 million particles
 ZONE_EVERY = 4  # frames between wake/sleep updates (15 Hz)
+MPM_EVERY = 2  # frames per MPM step: sand at 30 Hz (the stream rate), the machine at 60 Hz
+MPM_ITERATIONS = {1: 60, 2: 150}  # the longer step needs more solver iterations to hold the same load
 
 # soil: the pit is filled with sand to BED_TOP (2 m on a 2.35 m deep pit with 1:1.5 sides), held by
 # walls on the -x / -y sides and by the sloped sides elsewhere. Resting sand is shown as a heightmap
@@ -461,9 +463,12 @@ class ExcavatorSim:
         ("lower", 0, 6.0, 2.6 + DIG_Z, -95),
     ]
 
-    def __init__(self, voxel=0.08, ppc=2, density=1600.0, friction=0.75, iterations=60, fps=60.0, pool=POOL):
+    def __init__(self, voxel=0.08, ppc=2, density=1600.0, friction=0.75, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY):
         wp.init()
+        iterations = iterations or MPM_ITERATIONS[mpm_every]
         self.frame_dt = 1.0 / fps
+        self.mpm_every = mpm_every
+        self.mpm_dt = self.frame_dt * mpm_every  # sand impulses act on the machine over one MPM step
         self.sim_dt = self.frame_dt / RIGID_SUBSTEPS
         self.voxel = voxel
         self.density = density
@@ -872,7 +877,7 @@ class ExcavatorSim:
         # even substep count: state_0/state_1 end where they started, so a captured graph stays valid
         for _ in range(RIGID_SUBSTEPS):
             self.state_0.clear_forces()
-            wp.launch(compute_body_forces, dim=self.imp_ids.shape[0], inputs=[self.frame_dt, self.imp_ids, self.imp, self.imp_pos, self.collider_body, self.state_0.body_q, self.model.body_com, self.state_0.body_f])
+            wp.launch(compute_body_forces, dim=self.imp_ids.shape[0], inputs=[self.mpm_dt, self.imp_ids, self.imp, self.imp_pos, self.collider_body, self.state_0.body_q, self.model.body_com, self.state_0.body_f])
             self.sand_forces.assign(self.state_0.body_f)
             wp.launch(
                 hydraulics_kernel,
@@ -903,9 +908,11 @@ class ExcavatorSim:
         if self.zone_frame % ZONE_EVERY == 0:
             self.zones.update(self.bucket_box())
         self.zone_frame += 1
-        wp.launch(subtract_body_force, dim=self.model.body_count, inputs=[self.frame_dt, self.state_0.body_q, self.state_0.body_qd, self.sand_forces, self.model.body_inv_inertia, self.model.body_inv_mass, self.sand.body_q, self.sand.body_qd])
-        self.mpm.step(self.sand, self.sand, contacts=None, control=None, dt=self.frame_dt)
-        self._collect_impulses()
+        if self.zone_frame % self.mpm_every == 0:
+            # the rigid frames in between reuse the last sand impulses as a constant force
+            wp.launch(subtract_body_force, dim=self.model.body_count, inputs=[self.mpm_dt, self.state_0.body_q, self.state_0.body_qd, self.sand_forces, self.model.body_inv_inertia, self.model.body_inv_mass, self.sand.body_q, self.sand.body_qd])
+            self.mpm.step(self.sand, self.sand, contacts=None, control=None, dt=self.mpm_dt)
+            self._collect_impulses()
         wp.synchronize()
         ms = (time.perf_counter() - t0) * 1000
         self.step_ms = ms if self.sim_time == 0 else 0.9 * self.step_ms + 0.1 * ms
@@ -1174,15 +1181,16 @@ def main():
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--voxel", type=float, default=0.08)
-    ap.add_argument("--iterations", type=int, default=60, help="MPM solver iterations; 30 lets carried sand creep out of the bucket")
+    ap.add_argument("--iterations", type=int, default=None, help="MPM solver iterations (default 150 at 30 Hz, 60 at 60 Hz); too few let carried sand creep out of the bucket")
     ap.add_argument("--bench", type=float, default=None)
     ap.add_argument("--hold-test", action="store_true")
     ap.add_argument("--stall-test", action="store_true")
     ap.add_argument("--out", default=None)
     ap.add_argument("--trench", action="store_true", help="auto cycle digs one lane, deeper each pass")
     ap.add_argument("--pool", type=int, default=POOL, help="particle capacity of the soil zone")
+    ap.add_argument("--mpm-every", type=int, default=MPM_EVERY, help="frames per MPM step (1: sand at 60 Hz)")
     args = ap.parse_args()
-    sim = ExcavatorSim(voxel=args.voxel, iterations=args.iterations, pool=args.pool)
+    sim = ExcavatorSim(voxel=args.voxel, iterations=args.iterations, pool=args.pool, mpm_every=args.mpm_every)
     if args.trench:
         sim.set_trench()
     res = None

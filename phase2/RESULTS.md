@@ -384,7 +384,7 @@ Browser (`test_excavator.py`, `logs/zone_browser_test.json`):
 ## Limits
 
 - **Dormant soil is rigid.** It doesn't fail. The 0.5 m margin covers the failure wedge of the cuts made here, but deeper or wider cuts may need a larger margin; pass loads are the check.
-- **Digging stages sit near the budget.** They average 16.3 ms against 16.7 ms, with p95 at 18.9 ms, so hard cuts briefly drop below real time. The fixed per-step MPM overhead (about 8 ms) is the next target, either a lighter Newton configuration or a capturable step that stays fast.
+- **Digging stages sit near the budget.** They average 16.3 ms against 16.7 ms, with p95 at 18.9 ms, so hard cuts briefly drop below real time. The fixed per-step MPM overhead (about 8 ms) is the next target, either a lighter Newton configuration or a capturable step that stays fast. (Done: the sand now steps at 30 Hz; see "Sand at 30 Hz, machine at 60 Hz".)
 - **Stream size is about 35 Mbit/s,** mostly grains. Dormant spill could be sent as a heightmap instead.
 - **The bed is still 0.5 m deep.** A deeper bed now costs little: only the zone's columns get taller.
 
@@ -538,3 +538,43 @@ Trench, 8 passes (`bench_trench.py 8`, `logs/trench_bench.json`):
 The early curl fires on passes 3 to 8. Loads still reach 1.6–1.75 t, about 130 % of rated, because sand from the cut face keeps pouring in while the bucket curls. Whether a real 0.8 m³ bucket heaps that much in loose sand is a question for field data.
 
 The normal cycle is unchanged (`logs/deep_bench.json`): 1.095× real time, 1072 kg per pass, no skips.
+
+## Sand at 30 Hz, machine at 60 Hz
+
+Dig frames ran at 17–19 ms against the 16.7 ms budget. Profiling a dig frame (`nsys` with graph nodes, Newton's section timers, `cProfile`):
+- **The MPM step is host-bound.** The GPU is busy about 12.6 ms of a 23 ms frame under the profiler. The rest is Python issuing about 1500 kernels, and 16 device-to-host readbacks per frame that make CPU and GPU wait on each other. The strain solve's graph is re-captured every step, because the sparse grid changes shape.
+- **The solver never stops early.** All 60 Gauss-Seidel iterations run every step (3.9 ms of `gs_solve` in 445 launches).
+
+What did not work:
+
+| Tried | Dig frame | First-pass load | |
+|---|---|---|---|
+| Default (60 Hz, 60 iterations) | 17.8–19.2 ms | 1096 kg | |
+| Rebuildable grid, whole step in one CUDA graph (64k cells, 512 leaves) | 56 ms (102 ms uncaptured) | 736 kg | slower and different physics |
+| Keep the solver graph alive one step longer | 18.3 ms | 1095 kg | the wait moves to the next readback |
+| `gs-soa` / `gs-batched` solver | 16.9 / 17.8 ms | 1099 / 1100 kg | within run-to-run noise |
+| `jacobi` solver | 14.4 ms | 963 kg | −12 % load |
+| 40 iterations | 16.0 ms | 892 kg | −19 % load |
+| `Q1` collider basis | 14.9 ms | 71 kg | sand passes through the bucket |
+
+**What works: one MPM step every two frames.** The server streams at 30 Hz anyway. The sand steps at 1/30 s; the machine keeps its 60 Hz rigid steps and feels the last sand impulses as a constant force over the two frames (`MPM_EVERY = 2`; the impulse-to-force and collider-velocity kernels use the MPM step). Per frame this halves the fixed host cost. The longer step needs more solver iterations to hold the load (first pass: 653 kg at 60, 928 kg at 100, 1056 kg at 150), so it runs 150 (`MPM_ITERATIONS`). The bucket tip moves about 5 cm per MPM step, under the 8 cm voxel. `--mpm-every 1` restores the old behaviour (with 60 iterations).
+
+| | 60 Hz sand | 30 Hz sand |
+|---|---|---|
+| Normal cycle, real-time factor (`bench_zone.py 130`) | 1.095 | **1.325** |
+| Normal cycle, dig frame mean | 16.8 ms | **13.9 ms** |
+| Normal cycle, per pass | 1104, 1038, 1170, 977 kg (mean 1072) | 1057, 1005, 1184, 933 kg (mean 1045) |
+| Trench, 8 passes, real-time factor (`bench_trench.py 8`) | 0.975 | **1.199** |
+| Trench, frame mean per pass | 15.3–19.8 ms | 11.5–15.1 ms |
+| Trench, per pass | 1097–1751 kg, 0 skips | 1061, 1413, 1607, 1735, 1774, 1832, 1500, 1176 kg, 0 skips |
+| Trench at x = 0 | 1.73 m deep, 42–45° sides | 1.72 m deep, 43–45° sides |
+
+Logs: `logs/zone_bench_mpm30.json`, `logs/trench_bench_mpm30.json`.
+
+**Costs:**
+- Loads are 2.5 % lower on the normal cycle (1045 kg against 1072 kg).
+- Frames alternate between about 3 ms (rigid only) and 25–30 ms (with MPM), so p95 is 31 ms. The server paces on the average and streams at 30 Hz, so this does not show.
+- More grains leak through collider seams and are culled below the floor: 555 in 130 s (was 28), 936 in the trench run (was 2). At 0.1 kg each that is 56 kg and 94 kg over the run.
+- The demo replay was recorded at 60 Hz sand and is kept.
+
+Load depends on the iteration count at both step sizes, so the solver is not fully converged in either case. Converged loads, and whether field data supports them, remain to be checked.
