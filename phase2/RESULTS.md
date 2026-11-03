@@ -143,3 +143,59 @@ Controls: Boom / Stick / Bucket levers (spring back on release) or keys W/S, A/D
 - **No swing or travel.** The upper structure doesn't rotate and the tracks don't move; the machine body is cosmetic.
 - **Simplified arm contact.** Arm links collide only with the pit floor and the sand, not with the pit walls or each other.
 - **0.73× real time** with the full 266k-particle bed.
+
+---
+
+# Phase 2c: swing and truck loading (full dig–swing–load cycle)
+
+## What changed
+
+| Part | Detail |
+|---|---|
+| Swing | 4th joint about the vertical axis between the undercarriage and a new house body (8 t: house, counterweight, cab). Hydraulic-style like the others: 0.8 rad/s flow limit, 65 kN·m relief torque, so the swing accelerates at a torque-limited rate |
+| Dump truck | Rigid tipper parked on the machine's right at ground level. Bed 4.2 × 2.3 × 1.0 m, floor 1.75 m above ground, rated 15 t. The bed plates are MPM colliders (sand lands in it) and rigid colliders (the bucket can hit it) |
+| Spill surfaces | Ground slabs behind the machine and beside the pit, plus sloped pit sides (1V:1.5H, matching the site terrain) on the machine and truck sides, so spilled sand lands where the ground actually is. The two vertical containment walls on those sides were removed |
+| Bucket | Back fully closed (only the mouth is open). Plates 10 cm thick so the 8 cm MPM grid can't leak sand through them |
+| Joint limits | Boom raise to 69° and bucket curl to −120°, about real machine ranges; needed to lift over the truck sides |
+| Auto cycle | approach → penetrate → drag → curl → lift → swing to truck → dump → raise → swing back → lower. Each pass digs 15 cm deeper (up to 45 cm), like an operator working down |
+| Streaming | `EXC2` frames: 4 link poses, 4 joint states, truck load and capacity, and a second heightmap (10 cm) for the sand in the bed. Grains are streamed when moving or lying outside the pit and bed (spill) |
+| Browser | House swings with the arm; tracks and truck drawn from server geometry; truck-bed sand surface; Swing lever (←/→); "Truck load x t of 15 t" readout |
+
+## Measured
+
+Headless, 60 s auto (`logs/load_bench.json`), 0.67× real time:
+
+| Pass | Bucket after curl | Delivered to truck | Truck total |
+|---|---|---|---|
+| 1 | 611 kg | 524 kg | 0.52 t |
+| 2 (15 cm deeper) | 505 kg (stick at 65 % relief) | 512 kg | 1.04 t |
+
+- **Cycle time:** about 27 s (a real 20 t excavator loading a truck: about 15–20 s).
+- **Swing:** at its relief torque while accelerating and braking, as in a real swing circuit.
+- **Payload:** 500–600 kg per pass against a bucket rated about 0.86 m³ (~1.4 t). The dig path is short, and sand spills during lift and swing (visible as falling grains). A fuller bucket needs a longer drag and a gentler swing profile.
+
+Browser (`test_excavator.py`, `logs/load_test.json`):
+
+| Check | Result |
+|---|---|
+| Auto cycle | Truck 0 → 0.52 t after the first pass; second pass under way |
+| Manual swing (hold ←) | −37° → +13° in 3 s |
+| Floor stall at full relief | Boom and stick flagged at relief |
+| Speed | 0.53–0.93× real time; stream 11–26 frames/s; site 60 fps; no console errors |
+
+Headless stall test with the swing joint (`logs/exc_stall.json`): at full relief the arm stops on the hard floor (boom and stick at 100 %, speed 0). At 35 % it stalls in the sand with 687 kg in the bucket.
+
+Screenshots: `logs/load_drag.png`, `logs/load_lift.png`, `logs/load_swing.png`, `logs/load_dump.png`, `logs/load_after_two_loads.png`.
+
+## Lessons
+
+- A loaded bucket swung back while lowering jams against the truck side. The cycle needs separate raise → swing → lower steps.
+- Interpolating the dig stages in joint space bends the drag path; interpolate the bucket-pin path (task space) instead.
+- MPM collider cost grows with the number of large colliders near the sand. Two big slope boxes added ~6 ms; removing the two vertical walls they replaced brought it back to ~19.5 ms idle.
+- A forgotten server on the GPU halves throughput. Stop servers between runs; the stale one here was stopped through its background task, since killing GPU processes directly was blocked by the sandbox.
+
+## Limits
+
+- **Static truck.** It doesn't drive away or tip. Reset soil empties it.
+- **Spill on other sides.** Sand spilled on the −x/−y sides or beyond the slabs falls to the pit-floor level.
+- **Speed.** 0.5–0.9× real time with the full bed and a browser attached.

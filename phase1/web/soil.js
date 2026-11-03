@@ -1,15 +1,16 @@
 // Phase 2 soil client: shows the Newton MPM sand streamed from the Spark in the site.
 // Works with two servers:
 //   soil_server.py       ("SOIL" frames) - a kinematic bucket steered by position sliders
-//   excavator_server.py  ("EXC1" frames) - a joint-driven excavator arm with hydraulic-style
-//                                           actuators, steered with levers like a real machine
+//   excavator_server.py  ("EXC2" frames) - a joint-driven excavator (swing, boom, stick, bucket)
+//                                           with hydraulic-style actuators, steered with levers,
+//                                           loading a dump truck parked beside it
 // Draws the sand surface from the streamed heightmap, the moving grains as points and the
 // bucket / arm, and mirrors the surface into a Jolt heightfield so site props rest on the dug ground.
 
 const HM_HEADER_BYTES = 16;
 const P_HEADER_BYTES = 20;
 const MAGIC_SOIL = 0x4c494f53; // "SOIL"
-const MAGIC_EXC = 0x31435845; // "EXC1"
+const MAGIC_EXC = 0x32435845; // "EXC2"
 
 export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic, panel, view }) {
   const params = new URLSearchParams(location.search);
@@ -46,7 +47,7 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
   autoBtn.addEventListener("click", () => setAuto(!auto));
   box.querySelector("#soil-reset").addEventListener("click", () => send({ type: "reset" }));
   box.querySelector("#soil-view").addEventListener("click", () =>
-    kind === "excavator" ? view(22.5, 6.5, 22, 27, -1.2, 12) : view(29.5, 3.5, 17.5, 24, -2.2, 12)
+    kind === "excavator" ? view(17.5, 10, 18.5, 27.5, -0.5, 9.5) : view(29.5, 3.5, 17.5, 24, -2.2, 12)
   );
 
   function bucketControls() {
@@ -70,8 +71,9 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
   }
 
   // Excavator: three spring-return levers (or keys), relief pressure, cylinder pressure gauges.
-  const levers = { boom: 0, stick: 0, bucket: 0 };
+  const levers = { swing: 0, boom: 0, stick: 0, bucket: 0 };
   const LEVERS = [
+    { key: "swing", label: "Swing", neg: "right", pos: "left", keys: ["arrowright", "arrowleft"] },
     { key: "boom", label: "Boom", neg: "lower", pos: "raise", keys: ["s", "w"] },
     { key: "stick", label: "Stick", neg: "in", pos: "out", keys: ["a", "d"] },
     { key: "bucket", label: "Bucket", neg: "curl", pos: "dump", keys: ["q", "e"] },
@@ -90,7 +92,7 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
       ).join("") +
       `<label for="relief">Relief pressure <output id="relief-out">100%</output></label>
       <input id="relief" type="range" min="30" max="100" step="5" value="100">
-      <p class="hint">Keys: W/S boom, A/D stick, Q/E bucket (hold). Levers spring back when released.</p>`;
+      <p class="hint">Keys: ←/→ swing, W/S boom, A/D stick, Q/E bucket (hold). Levers spring back when released.</p>`;
     for (const l of LEVERS) {
       const s = controlsEl.querySelector(`#lever-${l.key}`);
       const out = controlsEl.querySelector(`#lever-${l.key}-out`);
@@ -132,7 +134,9 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
     };
     window.addEventListener("keydown", (e) => {
       const k = e.key.toLowerCase();
-      if (!keyLever(k) || held.has(k) || e.target.tagName === "INPUT" && e.target.type !== "range") return;
+      if (!keyLever(k) || (e.target.tagName === "INPUT" && e.target.type !== "range")) return;
+      e.preventDefault(); // arrow keys would otherwise move the focused slider or scroll the panel
+      if (held.has(k)) return;
       held.add(k);
       applyKeys();
     });
@@ -184,30 +188,36 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
   scene.add(bucket);
 
   // excavator (excavator_server.py): links built from the hello geometry
-  const arm = { links: {}, base: null };
+  const arm = { links: {}, base: null, truckSurface: null };
   function buildExcavator(geom) {
-    for (const name of ["boom", "stick", "bucket"]) {
+    for (const name of ["house", "boom", "stick", "bucket"]) {
       const g = new THREE.Group();
-      for (const b of geom[name]) addBox(g, b.size, b.center, name === "bucket" ? steel : paint);
+      geom[name].forEach((b, i) => addBox(g, b.size, b.center, name === "bucket" ? steel : name === "house" && i === 2 ? glass : paint));
       g.visible = false;
       scene.add(g);
       arm.links[name] = g;
     }
-    // machine body: tracks, house, cab, counterweight (cosmetic; faces the pit along -x)
+    // undercarriage and dump truck (static, world coordinates)
     const base = new THREE.Group();
-    const [px, py, pz] = geom.base.pin;
-    const gy = geom.base.ground_y;
-    for (const side of [-1, 1]) addBox(base, [4.6, 0.9, 0.7], [px + 1.9, gy + 0.45, pz + side * 1.2], dark);
-    addBox(base, [3.6, 1.1, 2.6], [px + 2.1, gy + 1.55, pz], paint);
-    addBox(base, [1.0, 1.0, 2.6], [px + 3.8, gy + 1.6, pz], steel);
-    addBox(base, [1.3, 1.5, 1.0], [px + 0.9, gy + 2.85, pz - 0.75], paint);
-    addBox(base, [1.32, 0.9, 0.9], [px + 0.9, gy + 2.9, pz - 0.75], glass);
-    addBox(base, [0.8, 0.9, 0.8], [px + 0.2, py - 0.2, pz], paint); // boom foot
+    geom.tracks.forEach((b) => addBox(base, b.size, b.center, dark));
+    const truckPaint = new THREE.MeshStandardMaterial({ color: "#b5452f", metalness: 0.3, roughness: 0.6 });
+    geom.truck_bed.forEach((b) => addBox(base, b.size, b.center, truckPaint));
+    geom.truck_body.forEach((b, i) => addBox(base, b.size, b.center, i === 1 ? truckPaint : dark));
+    const tire = new THREE.CylinderGeometry(1, 1, 1, 24);
+    for (const w of geom.truck_wheels) {
+      const m = new THREE.Mesh(tire, dark);
+      m.scale.set(w.radius, w.width, w.radius);
+      m.rotation.x = Math.PI / 2; // axle across the truck (three z)
+      m.position.set(...w.center);
+      m.castShadow = true;
+      base.add(m);
+    }
     scene.add(base);
     arm.base = base;
+    arm.capacity = geom.truck_capacity_kg;
   }
 
-  function makeSurface(nx, ny, x0, z0, cell) {
+  function makeSurface(nx, ny, x0, z0, cell, color = sandColor) {
     const geo = new THREE.BufferGeometry();
     const pos = new Float32Array(nx * ny * 3);
     const col = new Float32Array(nx * ny * 3);
@@ -217,7 +227,7 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
         const v = iy * nx + ix;
         pos[v * 3] = x0 + ix * cell;
         pos[v * 3 + 2] = z0 - iy * cell;
-        c.copy(sandColor).multiplyScalar(0.9 + 0.2 * Math.random());
+        c.copy(color).multiplyScalar(0.9 + 0.2 * Math.random());
         col.set([c.r, c.g, c.b], v * 3);
       }
     }
@@ -282,8 +292,7 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
   const debug = (window.__soilDebug = { messages: 0, frames: 0, badMagic: 0, lastError: null });
   let stages = [];
 
-  function readTail(dv, buf, o, f) {
-    // heightmap + moving grains, shared by both frame kinds
+  function readHeightmap(dv, buf, o) {
     const nx = dv.getUint16(o, true);
     const ny = dv.getUint16(o + 2, true);
     const x0 = dv.getFloat32(o + 4, true);
@@ -294,7 +303,13 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
     o += nx * ny * 2;
     const heights = new Float32Array(nx * ny);
     for (let k = 0; k < raw.length; k++) heights[k] = raw[k] / 1000 - 1 - 2.5;
-    f.hm = { nx, ny, x0, z0, cell, heights };
+    return [{ nx, ny, x0, z0, cell, heights }, o];
+  }
+
+  function readTail(dv, buf, o, f) {
+    // pit heightmap (+ truck-bed heightmap for the excavator) + moving grains
+    [f.hm, o] = readHeightmap(dv, buf, o);
+    if (f.kind === "excavator") [f.truckHm, o] = readHeightmap(dv, buf, o);
     const count = dv.getUint32(o, true);
     const lo = [dv.getFloat32(o + 4, true), dv.getFloat32(o + 8, true), dv.getFloat32(o + 12, true)];
     const span = dv.getFloat32(o + 16, true);
@@ -325,15 +340,15 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
       [f.fill, f.cut, f.fee] = f32(o, 3); o += 12;
     } else {
       f.links = {};
-      for (const name of ["boom", "stick", "bucket"]) {
+      for (const name of ["house", "boom", "stick", "bucket"]) {
         f.links[name] = { pos: f32(o, 3), quat: f32(o + 12, 4) };
         o += 28;
       }
-      f.q = f32(o, 3); o += 12;
-      f.qd = f32(o, 3); o += 12;
-      f.press = f32(o, 3); o += 12;
+      f.q = f32(o, 4); o += 16;
+      f.qd = f32(o, 4); o += 16;
+      f.press = f32(o, 4); o += 16;
       f.force = f32(o, 3); o += 12;
-      [f.fill, f.cut, f.fee, f.relief] = f32(o, 4); o += 16;
+      [f.fill, f.cut, f.fee, f.relief, f.truck, f.capacity] = f32(o, 6); o += 24;
       f.stage = dv.getUint8(o); o += 1;
       o += (4 - (o % 4)) % 4;
     }
@@ -403,6 +418,14 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
     grains.geometry.attributes.position.needsUpdate = true;
     grains.geometry.setDrawRange(0, g.count);
 
+    if (f.truckHm) {
+      const t = f.truckHm;
+      if (!arm.truckSurface) arm.truckSurface = makeSurface(t.nx, t.ny, t.x0, t.z0, t.cell, new THREE.Color("#b8925f"));
+      const tp = arm.truckSurface.geometry.attributes.position;
+      for (let k = 0; k < t.heights.length; k++) tp.array[k * 3 + 1] = t.heights[k];
+      tp.needsUpdate = true;
+      arm.truckSurface.geometry.computeVertexNormals();
+    }
     if (f.kind === "bucket") {
       bucket.visible = true;
       bucket.position.set(...f.pos);
@@ -456,6 +479,7 @@ export function startSoil({ THREE, scene, Jolt, jolt, bodyInterface, layerStatic
     rows.push(["Soil force on bucket", `${kN(Math.hypot(f.force[0], f.force[2]))} horiz · ${kN(f.force[1])} vert`]);
     rows.push(["McKyes reference", f.cut > 0.01 ? `${kN(f.fee)} at ${(f.cut * 100).toFixed(0)} cm cut` : "–"]);
     rows.push(["Bucket load", `${f.fill.toFixed(0)} kg`]);
+    if (f.kind === "excavator") rows.push(["Truck load", `${(f.truck / 1000).toFixed(2)} t of ${(f.capacity / 1000).toFixed(0)} t (${Math.round((100 * f.truck) / f.capacity)}%)`]);
     statsEl.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     window.__soil = { lastFrame: f, stats: { ...stats }, stalled };
   }

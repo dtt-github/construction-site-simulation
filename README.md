@@ -8,7 +8,7 @@ A physics-based construction site built on NVIDIA's free SimReady OpenUSD assets
 | `reports/`, `research_notes/` | Full cited research report on soil, machine and crane simulation |
 | `phase0/` | Platform tests on the DGX Spark: Newton vs Chrono soil benchmark, Chrome WebGPU, Isaac Sim 6.2 container. See `phase0/RESULTS.md` |
 | `phase1/` | SimReady → web pipeline (USD physics extractor, GLB checks, CoACD colliders) and the three.js + Jolt site with terrain and machine motors. See `phase1/RESULTS.md` |
-| `phase2/` | Newton soil servers streaming to the site over WebSocket: `excavator_server.py` (joint-driven excavator arm with hydraulic-style actuators, two-way sand coupling) and `soil_server.py` (kinematic bucket baseline). See `phase2/RESULTS.md` |
+| `phase2/` | Newton soil servers streaming to the site over WebSocket: `excavator_server.py` (excavator with swing, boom, stick and bucket on hydraulic-style actuators, two-way sand coupling, loading a dump truck) and `soil_server.py` (kinematic bucket baseline). See `phase2/RESULTS.md` |
 
 ## Quick start (on the DGX Spark)
 
