@@ -8,14 +8,14 @@ A physics-based construction site built on NVIDIA's free SimReady OpenUSD assets
 | `reports/`, `research_notes/` | Full cited research report on soil, machine and crane simulation |
 | `phase0/` | Platform tests on the DGX Spark: Newton vs Chrono soil benchmark, Chrome WebGPU, Isaac Sim 6.2 container. See `phase0/RESULTS.md` |
 | `phase1/` | SimReady → web pipeline (USD physics extractor, GLB checks, CoACD colliders) and the three.js + Jolt site with terrain and machine motors. See `phase1/RESULTS.md` |
-| `phase2/` | Newton soil server (MPM sand + bucket) streaming to the site over WebSocket. See `phase2/RESULTS.md` |
+| `phase2/` | Newton soil servers streaming to the site over WebSocket: `excavator_server.py` (joint-driven excavator arm with hydraulic-style actuators, two-way sand coupling) and `soil_server.py` (kinematic bucket baseline). See `phase2/RESULTS.md` |
 
 ## Quick start (on the DGX Spark)
 
 ```bash
 # environments (see phase0/RESULTS.md): uv venv phase0/.venv-newton && uv pip install -p phase0/.venv-newton "newton[examples]" playwright
 phase1/fetch_assets.sh                                         # SimReady USD + GLBs (not in git)
-phase0/.venv-newton/bin/python phase2/soil_server.py &         # soil server, ws://127.0.0.1:8765
+(cd phase2 && ../phase0/.venv-newton/bin/python excavator_server.py &)   # soil + excavator server, ws://127.0.0.1:8765
 python3 -m http.server 8731 --bind 127.0.0.1 --directory phase1
 # open http://127.0.0.1:8731/web/index.html in Chrome (on the Spark add --enable-unsafe-webgpu --enable-features=Vulkan)
 ```

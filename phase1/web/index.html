@@ -47,6 +47,11 @@
   fieldset.machine label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
   fieldset.machine output { color: var(--fg); font-family: var(--mono); }
   input[type=range] { width: 100%; accent-color: var(--accent); }
+  .gauge { height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 4px; }
+  .gauge > div { height: 100%; width: 0; background: var(--ok); transition: width 0.1s; }
+  .gauge > div.high { background: var(--accent); }
+  .gauge > div.relief { background: var(--bad); }
+  .stall { color: var(--bad); }
   footer { color: var(--muted); font-size: 11px; border-top: 1px solid var(--line); padding-top: 8px; }
   footer a { color: var(--accent); }
 </style>

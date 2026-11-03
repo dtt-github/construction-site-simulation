@@ -21,4 +21,5 @@ phase1/glb/
 .claude/
 
 # Server runtime logs
-phase2/logs/server*.log
+phase2/logs/*.log
+phase2/logs/*.txt
