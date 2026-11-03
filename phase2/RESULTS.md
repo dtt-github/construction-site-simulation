@@ -465,7 +465,7 @@ Screenshots: `logs/hyd_lift.png`, `logs/hyd_linkage.png`, `logs/hyd_arm_cylinder
 - **The boom nears toggle at its lowest position.** The moment arm drops toward zero in the last 0.3 rad of boom-down travel; speed commands use a 5 cm floor there.
 - **The bucket is weak near full curl.** The moment arm is about 5 cm while the curled bucket is carried, which is real four-bar behaviour. The load is held at about 160 bar.
 - **No line or port relief.** The real valve has overload reliefs above 34.3 MPa that let an externally loaded cylinder yield. Here one relief value caps both pushing and holding.
-- **Swing is still a joint motor** at 65 kN·m. Swing relief and motor displacement would make it physical.
+- **Swing is still a joint motor** at 65 kN·m. Swing relief and motor displacement would make it physical. (Done: see "Hydraulic swing, port reliefs and an operator-style cycle".)
 - **The rod meshes are slightly short.** Near full extension a few cm of gap shows between rod and barrel.
 
 ## Recorded replay for the static demo
@@ -578,3 +578,54 @@ Logs: `logs/zone_bench_mpm30.json`, `logs/trench_bench_mpm30.json`.
 - The demo replay was recorded at 60 Hz sand and is kept.
 
 Load depends on the iteration count at both step sizes, so the solver is not fully converged in either case. Converged loads, and whether field data supports them, remain to be checked.
+
+## Hydraulic swing, port reliefs and an operator-style cycle
+
+**Swing drive** (`hydraulics.py`). It replaces the 0.8 rad/s, 65 kN·m joint motor with the ZX200's swing circuit:
+- **Data:** 13.3 min⁻¹ swing speed and 68.9 kN·m swing torque (ZX200-3 and ZX210-6 spec listings), with the brochure's 30.4 MPa swing relief.
+- **Displacement:** that torque at that relief means 2.27 L/rad at the house (motor plus reduction). At 13.3 min⁻¹ it needs 189 L/min, about one of the two 194 L/min pumps, so the published figures agree with each other.
+- **Speed:** swing speed is flow over displacement, and the swing now shares the pumps with the cylinders.
+- **Torque:** capped at the relief both ways. The cross-over reliefs also brake the house when the lever returns to neutral.
+
+**Port reliefs.** The pump feeds the side the spool opens, up to the main relief (34.3 MPa). The other side, or both with the spool closed, holds an outside load up to the port relief, then gives way. The port relief is set to 39.2 MPa, a typical value for this class; it is not confirmed for the ZX200.
+
+**Swing test** (lever full toward the truck with the boom raised, then released at 90°):
+
+| | |
+|---|---|
+| 0 → 90° | 1.67 s, reaching 1.42 rad/s (peak 1.46; rated 1.39) |
+| Braking on the cross-over relief after release | 68.9 kN·m, stops 45° later after about 1.1 s; settles back 2° |
+| Inertia this implies | about 54,000 kg·m² (boom raised, bucket empty); 81,000 kg·m² measured in the cycle with a loaded bucket and the arm out |
+| Swing alone / with full boom raise | 1.46 / 0.95 rad/s: the pumps are shared |
+
+**Operator-style auto cycle.** At the faster swing, the old cycle moved its target at constant speed and paused whenever the house lagged in acceleration, so swings still took 3.3–3.6 s. The auto operator now:
+- **Swings like an operator:** full lever until the house would coast onto the target on the reliefs, then neutral. The stopping distance comes from the house inertia, measured online while the swing runs at relief. The other joints follow the swing's progress.
+- **Plans with direction-aware speeds:** a cylinder filling its rod side runs faster. The old plan used one speed per joint, so it overrated boom raise by 2× and underrated bucket dump.
+- **Uses feed-forward outside the cut:** the lever opens to what the planned pace needs, and the error only corrects it. Feed-forward is only used while the plan advances; otherwise a joint pushed ahead of a held plan cancels its own correction. In the cut, the lever still follows the error only. With feed-forward there, penetrate, drag and drag-curl timed out.
+
+| Stage (s) | Before | Now |
+|---|---|---|
+| Lift | 2.70 | 2.35 |
+| Swing to truck | 3.63 | 2.18–2.38 |
+| Dump | 3.32 | 2.00 |
+| Raise | 3.88 | 2.67 |
+| Swing back | 3.27 | 2.37 |
+| Whole pass | 24.4–25.4 | 19.1–20.9 |
+
+| | Before | Now |
+|---|---|---|
+| Normal cycle, passes in 130 s (`bench_zone.py 130`, `logs/zone_bench_swing.json`) | 4 (5281 kg) | **6 (6290 kg)** |
+| Normal cycle, per pass | mean 1045 kg | 1001, 969, 1141, 897, 1044, 1242 kg (mean 1049) |
+| Normal cycle, real-time factor | 1.325 | 1.286 |
+| Trench, 8 passes (`bench_trench.py 8`, `logs/trench_bench_swing.json`) | 204.5 s | **166.4 s**, 0 skips |
+| Trench, per pass | 24.4–27.4 s | 19.1–22.8 s; 1034–1758 kg (12.1 t in all, unchanged) |
+| Trench at x = 0 | 1.72 m deep, 43–45° sides | 1.74 m, 42–46° |
+
+Throughput on the normal cycle goes from 146 to 174 t/h. The cycle is still slower than a skilled operator's 15–18 s for a 90° truck load: lift and swing do not overlap yet, and dig stages wait on tracking.
+
+`stats()` adds `swing_bar` and the measured `swing_inertia`.
+
+**Limits:**
+- The port relief value (39.2 MPa) and the house inertia need ZX200 data.
+- The swing settles back 2° after braking: the servo pulls back to its reference. A blocked real motor rebounds less, about the oil's compressibility.
+- No swing parking brake, and no swing priority or flow-summation logic between the two pumps.

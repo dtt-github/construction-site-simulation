@@ -4,6 +4,9 @@ Data
   * cylinders (Hitachi ZAXIS 200 brochure): boom 2 x bore 120 / rod 85 mm, arm 135 / 95 mm,
     bucket 115 / 80 mm; implement relief 34.3 MPa (36.3 MPa power boost), swing relief 30.4 MPa;
     two main pumps of 194 L/min each
+  * swing: 13.3 min^-1 and 68.9 kN m (ZX200-3 and ZX210-6 spec listings). At the 30.4 MPa swing relief that
+    torque means 2.27 L/rad at the house, and 13.3 min^-1 then takes 189 L/min, about one pump
+  * port (overload) reliefs: 39.2 MPa, typical for this class; not confirmed for the ZX200
   * pin positions: found in the PWRI OPERA ZX200 meshes (zx200_ros2, Apache-2.0) by voting for the
     bore axes of the pin bosses; each mesh is in its URDF link frame (x forward, z up, pins along y).
     Over the URDF joint limits they give cylinder travels of 1.28 m (boom), 1.465 m (arm) and 1.04 m
@@ -17,8 +20,12 @@ Model
     pressure) gives the joint torque tau = F * dL/dq (virtual work)
   * relief: the head side is limited to p_relief * A_head (pushing), the rod side to p_relief * A_rod
     (pulling), so the torque limits depend on the pose and the direction
+  * port reliefs: the pump feeds the side the spool opens, capped by the main relief; the other side
+    (or both, with the spool closed) holds an outside load up to the port relief, then gives way
   * flow: a lever opens its spool in proportion; the cylinder speed is flow / area of the side being
     filled, and when the open spools ask for more than the two pumps deliver, all are slowed alike
+  * swing: a fixed-displacement motor through the swing reduction; speed = flow / displacement, torque
+    capped at the swing relief both ways (cross-over reliefs: they also brake the house in neutral)
   * the bucket cylinder drives the bucket through a four-bar: guide link (arm pin G) and side link
     (bucket pin K) meet the cylinder rod at pin C
 """
@@ -29,6 +36,12 @@ import numpy as np
 
 P_RELIEF = 34.3e6  # Pa, implement circuit
 P_POWER_BOOST = 36.3e6
+P_PORT = 39.2e6  # Pa, port (overload) reliefs on the cylinder lines
+P_SWING = 30.4e6  # Pa, swing relief
+SWING_TORQUE = 68.9e3  # N m at the house
+SWING_SPEED = 13.3 * 2 * math.pi / 60  # rad/s
+SWING_DISP = SWING_TORQUE / P_SWING  # m3/rad at the house (motor displacement x reduction)
+SWING_FLOW = SWING_SPEED * SWING_DISP  # m3/s at full lever
 PUMP_FLOW = 2 * 194.0 / 60000.0  # m3/s, two main pumps
 LINKS = ("house", "boom", "stick", "bucket")
 
@@ -98,12 +111,16 @@ class Linkage:
         return pts, L, J
 
 
-def torque_limits(J, p_relief):
-    """Joint torque range (lo, hi) the relief valves allow for each cylinder joint."""
+def torque_limits(J, p_relief, spool=(0.0, 0.0, 0.0), p_port=P_PORT):
+    """Joint torque range (lo, hi) the relief valves allow for each cylinder joint: the side the spool
+    feeds is capped by the main relief, the other side (both, with the spool closed) by the port relief."""
     lo, hi = np.zeros(3), np.zeros(3)
+    p_port = max(p_port, p_relief)
     for k, name in enumerate(CYLINDERS):
         a_head, a_rod = area(name)
-        push, pull = p_relief * a_head * J[k], -p_relief * a_rod * J[k]
+        extend, retract = spool[k] * J[k] > 0, spool[k] * J[k] < 0
+        push = (p_relief if extend else p_port) * a_head * J[k]
+        pull = -(p_relief if retract else p_port) * a_rod * J[k]
         lo[k], hi[k] = min(push, pull), max(push, pull)
     return lo, hi
 
@@ -111,20 +128,27 @@ def torque_limits(J, p_relief):
 J_MIN = 0.05  # m/rad: moment arm floor for speed commands near a stroke end (the boom nears toggle there)
 
 
-def cylinder_velocity(spool, J):
-    """Spool openings (-1..1, sign = desired joint direction) -> cylinder speeds (m/s), with the pumps
-    shared between the open spools."""
+def speeds(spool, J):
+    """Spool openings [swing, boom, arm, bucket] (-1..1, sign = desired joint direction) -> swing speed
+    (rad/s) and cylinder speeds (m/s), with the pumps shared between the open spools."""
     v, flow = np.zeros(3), np.zeros(3)
     for k, (name, c) in enumerate(CYLINDERS.items()):
         a_head, a_rod = area(name)
-        extend = spool[k] * J[k] > 0
+        extend = spool[k + 1] * J[k] > 0
         a = a_head if extend else a_rod
-        flow[k] = abs(spool[k]) * c[4]
-        v[k] = math.copysign(flow[k] / a, spool[k] * J[k])
-    total = flow.sum()
+        flow[k] = abs(spool[k + 1]) * c[4]
+        v[k] = math.copysign(flow[k] / a, spool[k + 1] * J[k])
+    omega = spool[0] * SWING_SPEED
+    total = flow.sum() + abs(spool[0]) * SWING_FLOW
     if total > PUMP_FLOW:
         v *= PUMP_FLOW / total
-    return v
+        omega *= PUMP_FLOW / total
+    return omega, v
+
+
+def cylinder_velocity(spool, J):
+    """Cylinder speeds (m/s) for boom, arm and bucket spool openings, the swing closed."""
+    return speeds([0.0, *spool], J)[1]
 
 
 def pressures(tau, J):

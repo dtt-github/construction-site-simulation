@@ -108,7 +108,7 @@ LIMITS = {"swing": (-3.0, 3.0), "boom": (-1.137, 1.0), "stick": (0.594, 2.687), 
 LEVER_SIGN = np.array([1.0, -1.0, -1.0, -1.0])
 # swing: a joint-space actuator (swing motor); boom, stick and bucket are driven by their cylinders
 # (hydraulics.py), whose flow and relief set the joint speed and torque limits for each pose
-SWING_VMAX, SWING_TAU = 0.8, 65e3
+SWING_VMAX, SWING_TAU = hyd.SWING_SPEED, hyd.SWING_TORQUE  # 13.3 min^-1, 68.9 kN m (hydraulics.py)
 KP = {"swing": 2.0e6, "boom": 3.0e7, "stick": 8.0e6, "bucket": 1.5e6}
 KD = {"swing": 8.0e5, "boom": 3.0e6, "stick": 6.0e5, "bucket": 4.0e4}
 
@@ -612,6 +612,7 @@ class ExcavatorSim:
         self.tau_lo, self.tau_hi = wp.zeros(4, dtype=float), wp.zeros(4, dtype=float)
         self.linkage = hyd.Linkage(self.link_frames, pitch)
         self.vmax = self.nominal_vmax()
+        self.vmax_dir = (self.nominal_vmax(-1.0), self.vmax)  # joint moving down, up
         self.q_lo = wp.array([LIMITS[j][0] for j in JOINTS], dtype=float)
         self.q_hi = wp.array([LIMITS[j][1] for j in JOINTS], dtype=float)
         self.v_cmd = wp.zeros(4, dtype=float)
@@ -655,6 +656,7 @@ class ExcavatorSim:
         self.passes = 0
         self.skipped = []
         self.ease, self.seg_from, self.auto_frame, self.auto_fill, self.early_curls = 0.0, None, 0, 0.0, 0
+        self.swing_inertia = self.SWING_INERTIA_GUESS
         self._z_cache = {}
         self.stage_time = 0.0
         self.auto_wait = 0.0
@@ -780,6 +782,19 @@ class ExcavatorSim:
         self.auto_s, self.stage_time, self.auto_wait = 0.0, 0.0, 0.0
         self.seg_from = self._pin_pose()
 
+    SWING_INERTIA_GUESS = 55e3  # kg m2 about the swing axis, until measured (boom raised, bucket empty)
+    SWING_STAGE_DEG = 20  # stages that turn the house further than this are swung like an operator does
+
+    def _swing_lever(self, target):
+        """Operator swing: full lever, then neutral once the house would coast to the target on the
+        cross-over reliefs; small corrections once it has nearly stopped."""
+        err, v = target - self.q[0], self.qd[0]
+        brake = SWING_TAU * self.relief / self.swing_inertia
+        stop = v * v / (2 * brake) * 1.1 + 0.02
+        if abs(v) > 0.15:
+            return math.copysign(1.0, err) if (err * v < 0 or abs(err) > stop) else 0.0
+        return float(np.clip(4.0 * err / SWING_VMAX, -0.5, 0.5))
+
     def _auto_control(self):
         """Track the cycle: move a target along the current segment only while the arm keeps up."""
         n = len(self.CYCLE)
@@ -805,13 +820,29 @@ class ExcavatorSim:
         else:
             pa, ra, za, fa = self._stage_psi(a, start=True), a[2], self._stage_z(a) + ease_a, a[4]
         q_start = ik(math.radians(pa), ra, za, math.radians(fa))
-        seg_time = max(np.max(np.abs(q_start - q_end) / (self.vmax * speed)), 0.5)
+        dq = q_end - q_start
+        v_dir = np.where(dq > 0, self.vmax_dir[1], self.vmax_dir[0])
+        seg_time = max(np.max(np.abs(dq) / (v_dir * speed)), 0.5)
         zb = self._stage_z(b) + ease_b
         pb = self._stage_psi(b)
         mix = [pa + s * (pb - pa), ra + s * (b[2] - ra), za + s * (zb - za), fa + s * (b[4] - fa)]
         q_goal = ik(math.radians(mix[0]), mix[1], mix[2], math.radians(mix[3]))  # straight bucket-pin path
+        swinging = abs(pb - pa) > self.SWING_STAGE_DEG
+        if swinging:
+            # the other joints follow the swing's progress instead of a clock
+            s = float(np.clip((math.degrees(self.q[0]) - pa) / (pb - pa), 0.0, 1.0))
+            mix = [pa + s * (pb - pa), ra + s * (b[2] - ra), za + s * (zb - za), fa + s * (b[4] - fa)]
+            q_goal = ik(math.radians(mix[0]), mix[1], mix[2], math.radians(mix[3]))
         err = q_goal - self.q
-        self.levers = np.clip(4.0 * err / self.vmax, -speed, speed) * LEVER_SIGN
+        # lever: the opening the planned pace needs (feed-forward), corrected by the tracking error; in the
+        # cut the lever follows the error only, so the bucket's progress is set by what the sand lets through
+        # (only while the plan advances: a joint pushed ahead of a held plan would cancel its own correction)
+        ff = dq / seg_time / v_dir if s < 1.0 and not digging and self.auto_wait == 0.0 else 0.0
+        self.levers = np.clip(ff + 4.0 * err / self.vmax, -speed, speed) * LEVER_SIGN
+        if swinging:
+            self.levers[0] = self._swing_lever(math.radians(pb)) * speed * LEVER_SIGN[0]
+            err[0] = 0.0
+            self.auto_s = s
         # stalled in the cut (arm or bucket at relief and falling behind): raise the dig path
         if digging and max(self.press[2], self.press[3]) >= self.EASE_PRESSURE * self.relief and np.max(np.abs(err)) > 0.05:
             self.ease = min(self.ease + self.EASE_RATE * self.frame_dt, self.EASE_MAX)
@@ -844,21 +875,22 @@ class ExcavatorSim:
         b1 = BOOM_PITCH + q[1]
         return {"house": (np.zeros(3), 0.0), "boom": (BOOM_ORIGIN, b1), "stick": (p1, b3 - BUCKET_PITCH - q[3]), "bucket": (p2, b3)}
 
-    def nominal_vmax(self):
-        """Joint speeds at full lever, mid stroke (for planning the auto cycle)."""
+    def nominal_vmax(self, sign=1.0):
+        """Joint speeds at full lever, mid stroke, moving each joint in the direction of `sign`
+        (for planning the auto cycle: a cylinder filling its rod side runs faster)."""
         mid = np.array([0.0] + [0.5 * (LIMITS[j][0] + LIMITS[j][1]) for j in JOINTS[1:]])
         _, _, J = self.linkage.state(mid)
-        v = hyd.cylinder_velocity(np.array([1.0, 0.0, 0.0]), J)[0], hyd.cylinder_velocity(np.array([0.0, 1.0, 0.0]), J)[1], hyd.cylinder_velocity(np.array([0.0, 0.0, 1.0]), J)[2]
+        v = [hyd.cylinder_velocity(sign * np.eye(3)[k], J)[k] for k in range(3)]
         return np.array([SWING_VMAX, *np.abs(np.array(v) / J)])
 
     def _hydraulics(self):
         """Levers -> joint speed commands and torque limits for this frame, from the cylinders."""
         self.cyl_pts, self.cyl_L, self.cyl_J = self.linkage.state(self.q)
         spool = self.levers * LEVER_SIGN  # desired joint direction and opening
-        v_cyl = hyd.cylinder_velocity(spool[1:], self.cyl_J)
+        omega, v_cyl = hyd.speeds(spool, self.cyl_J)  # swing and cylinders share the pumps
         J = np.where(np.abs(self.cyl_J) < hyd.J_MIN, np.copysign(hyd.J_MIN, self.cyl_J), self.cyl_J)
-        v_cmd = np.concatenate([[spool[0] * SWING_VMAX], v_cyl / J])
-        lo, hi = hyd.torque_limits(self.cyl_J, hyd.P_RELIEF * self.relief)
+        v_cmd = np.concatenate([[omega], v_cyl / J])
+        lo, hi = hyd.torque_limits(self.cyl_J, hyd.P_RELIEF * self.relief, spool[1:])
         tau = SWING_TAU * self.relief
         self.v_cmd.assign(v_cmd.astype(np.float32))
         self.tau_lo.assign(np.concatenate([[-tau], lo]).astype(np.float32))
@@ -918,12 +950,17 @@ class ExcavatorSim:
         self.step_ms = ms if self.sim_time == 0 else 0.9 * self.step_ms + 0.1 * ms
         self.sim_time += self.frame_dt
 
+        qd_prev = self.qd
         self.q = self.state_0.joint_q.numpy()[:4].astype(float)
         self.qd = self.state_0.joint_qd.numpy()[:4].astype(float)
         self.tau = self.torque.numpy().astype(float)
+        # house inertia about the swing axis, measured while the swing runs at relief (for the auto operator)
+        acc = (self.qd[0] - qd_prev[0]) / self.frame_dt
+        if abs(self.tau[0]) > 0.95 * SWING_TAU * self.relief and abs(acc) > 0.3 and acc * self.tau[0] > 0:
+            self.swing_inertia += 0.1 * (abs(self.tau[0] / acc) - self.swing_inertia)
         self.cyl_p, self.cyl_head = hyd.pressures(self.tau[1:], self.cyl_J)
         # gauges: loaded-side pressure as a fraction of the nominal relief setting
-        self.press = np.concatenate([[abs(self.tau[0]) / SWING_TAU], self.cyl_p / hyd.P_RELIEF])
+        self.press = np.concatenate([[abs(self.tau[0]) / SWING_TAU], self.cyl_p / hyd.P_RELIEF])  # swing: of its 30.4 MPa relief
 
     BUCKET_LOCAL_BOX = (
         np.array([min(BUCKET_SHELL[:, 0].min(), TOOTH_TIP[0]) - PLATE, -BUCKET_W / 2 - PLATE, min(BUCKET_SHELL[:, 1].min(), TOOTH_TIP[1]) - PLATE]),
@@ -1080,6 +1117,8 @@ class ExcavatorSim:
             "qd": [round(v, 3) for v in self.qd],
             "pressure": [round(v, 2) for v in self.press],
             "cyl_bar": [round(float(v) / 1e5 * (1 if h else -1)) for v, h in zip(self.cyl_p, self.cyl_head)],
+            "swing_bar": round(float(self.tau[0]) / hyd.SWING_DISP / 1e5),  # signed by torque direction
+            "swing_inertia": round(self.swing_inertia),
             "cyl_m": [round(float(v), 3) for v in self.cyl_L],
             "force_kN": [round(v / 1000, 1) for v in self.force],
             "fill_kg": round(self.fill_kg),

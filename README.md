@@ -20,7 +20,7 @@ Initiated and maintained by **[DigitalTwin Technology GmbH](https://www.digitalt
 | Site | 128 m terrain with pad, haul road, stockpile and a 2.5 m excavation pit; 40+ physics props from NVIDIA SimReady (CC BY 4.0) with checked masses and colliders |
 | Real machines (open-licensed) | Hitachi ZX200 excavator, Hitachi IC120 crawler carrier, Komatsu D37PXi dozer (articulated, from the PWRI OPERA project, Apache-2.0); 35 m tower crane, cones, barrels and jersey barriers (Gazebo, CC0) |
 | Soil | The pit filled with 2 m of MPM sand (Newton implicit MPM) on the GPU, two-way coupled to the machine; only soil near the bucket is particles, resting soil elsewhere is a heightfield, and cut faces slump to the angle of repose. The sand steps at 30 Hz and the machine at 60 Hz; the dig cycle runs at 1.3× real time, and a trench dug in one lane (1.2×) reaches 1.7 m with 43–45° sides |
-| Excavator | The real Hitachi ZX200 (OPERA URDF geometry and joint limits, curved bucket with teeth) driven by its real hydraulic cylinders (Hitachi bores, 34.3 MPa relief, pump flow shared between functions, bucket four-bar linkage), so force and speed vary with pose and the machine slows and stalls under load. Digging force at the teeth 149 kN against 151–158 kN published. Full dig–swing–load cycle into a dump truck, 1047 kg per pass (82 % of the 0.8 m³ bucket's rating) |
+| Excavator | The real Hitachi ZX200 (OPERA URDF geometry and joint limits, curved bucket with teeth) driven by its real hydraulic cylinders (Hitachi bores, 34.3 MPa main relief and port reliefs, pump flow shared between functions, bucket four-bar linkage) and swing motor (13.3 min⁻¹, 68.9 kN·m, braking on its cross-over reliefs), so force and speed vary with pose and the machine slows and stalls under load. Digging force at the teeth 149 kN against 151–158 kN published. Full dig–swing–load cycle into a dump truck, 1047 kg per pass (82 % of the 0.8 m³ bucket's rating) |
 | Browser client | Levers and keyboard control, cylinder pressure gauges, stall warnings, live truck load; 60 fps |
 | Validation | Bucket forces compared with the McKyes/Reece earthmoving equation; field data wanted (see below) |
 
@@ -75,7 +75,7 @@ Only licenses that allow redistribution, modification and commercial use are acc
 - Operator models beyond the scripted cycle (learned or recorded operator inputs), and checking heaped bucket loads against field data
 - Converged soil solves: loads still depend on the MPM iteration count
 - Measured ZX200 masses, swing torque and pressure logs for validation
-- Line and port reliefs and a physical swing motor; measured pressure logs to validate the hydraulics
+- Overlapping lift and swing in the operator model; measured pressure logs, port relief and house inertia to validate the hydraulics
 - Cohesive and wet soils; calibration against lab and field data
 - Wheel loader, articulated dump truck, mobile and tower crane dynamics with ropes
 - Multi-user sessions and operator training scenarios
