@@ -760,3 +760,66 @@ Clay passes no longer need shaking: the smaller load comes out on the dump. That
 - **Healing:** soil does not regain strength over time, and the load in the truck becomes intact again only when it sleeps.
 - **Unvalidated values:** the presets are typical published values, not one measured site. Moist sand's cohesion depends strongly on its water content.
 
+
+## Validation 1: granular column collapse
+
+The first check of the soil model against measurements, not just theory. Why these references and how they rank against other datasets is in [`reports/Soil excavation validation datasets.md`](../reports/Soil%20excavation%20validation%20datasets.md).
+
+**The experiments:**
+- **Aluminium rods (true 2D):** Nguyen, Bui & Fukagawa, "Failure Mechanism of True 2D Granular Flows" ([arXiv 1512.05180](https://arxiv.org/abs/1512.05180)).
+  - Setup: 48 collapses of aluminium-rod columns (5 cm long rods), 50–200 mm high and 25–200 mm wide, each repeated at least twice. A true plane-strain material: unit weight 20.4 kN/m³, φ 21.9°, c = 0. The same material is the standard 2D benchmark that SPH and MPM codes validate against.
+  - Fitted laws: final runout (d∞ − d0)/d0 = 3.25 a^0.96 for 0.65 ≤ a ≤ 1.5, and 3.80 a^0.73 above. Final height h∞ = h0 up to a = 0.65, then h0/h∞ = 1.42 a^(2/3).
+- **Sand (quasi-2D):** Lube, Huppert, Sparks & Freundt 2005 (Phys. Rev. E 72, 041301), sands, sugar and rice in a channel. Runout (d∞ − d0)/d0 = 1.2 a below a = 1.8 and 1.9 a^(2/3) above 2.8, nearly independent of the material.
+
+**The test** (`soil_calibrate.py column`, log `logs/soil_column.json`):
+- **Geometry:** a column d0 = 2–4 m wide, held by a gate against a frictionless wall between frictionless side walls, on a rough floor.
+- **Sequence:** the column settles for 1 s, then the gate is removed at once.
+- **Scaling:** the soil model has no length scale, so the lab columns scale up to 2–12 m tall (25–150 cells), with times scaling as √length.
+- **Runout is a range.** The front of the deposit is a sheet thinner than one particle, so runout is reported between d∞ (where the deposit stops being one particle thick) and d_far (its farthest connected particle).
+
+**Results, aluminium rods** (φ 21.9° as solver friction tan φ = 0.40), at the excavator's MPM step (1/30 s) and at 1/120 s:
+
+| a = h0/d0 | Runout, experiment | Runout, sim at 1/30 s (d∞ … d_far) | Runout, sim at 1/120 s | Final height h∞/h0, experiment | Sim at 1/120 s |
+|---|---|---|---|---|---|
+| 0.5 | 1.66 | 0.94 … 1.30 | 1.10 … 1.72 | 1.00 | 0.99 |
+| 1 | 3.23 | 1.92 … 2.64 | 2.16 … 3.32 | 0.71 | 0.66 (−7 %) |
+| 1.5 | 4.76 | 2.96 … 3.80 | 3.16 … 4.84 | 0.54 | 0.50 (−7 %) |
+| 2 | 6.26 | 3.76 … 4.76 | 4.40 … 6.16 | 0.45 | 0.39 (−13 %) |
+| 3 | 8.40 | 5.40 … 6.92 | 6.48 … 8.76 | 0.34 | 0.26 (−24 %) |
+| 4 | 10.35 | 6.36 … 8.24 | 7.72 … 10.92 | 0.28 | 0.21 (−27 %) |
+| 6 | 13.77 | – | 10.36 … 13.80 | 0.22 | 0.15 (−29 %) |
+
+(The sim's a differs slightly from the nominal value, because a is taken from the settled height; references are evaluated at the sim's a.)
+
+**Results, dry sand** (φ 37°, solver friction 0.75) against Lube et al.:
+
+| a | Runout, experiment | Sim at 1/30 s | Sim at 1/120 s |
+|---|---|---|---|
+| 0.5 | 0.60 | 0.44 … 0.58 | 0.50 … 0.54 |
+| 1 | 1.20 | 0.84 … 1.00 | 1.00 … 1.16 |
+| 1.5 | 1.80 | 1.36 … 1.52 | 1.52 … 1.72 |
+| 3 | 3.94 | 2.76 … 2.96 | 3.04 … 3.56 |
+| 4 | 4.76 | 3.24 … 3.52 | 3.80 … 4.36 |
+| 6 | 6.21 | – | 4.92 … 5.56 |
+
+**What this says:**
+- **Runout converges to the experiments as the time step shrinks.** At 1/120 s the measured runout for the rods lies within the sim's range at every aspect ratio except a = 2, where it is 1.6 % beyond. The farthest connected particle is within −2 to +6 % of it. For sand it is within −3 to −10 %. At the excavator's 1/30 s step, runout is 0–22 % short on the farthest particle and 20–41 % short on the solid front: the implicit time stepping takes too much energy out of a fast flow.
+  - **Check:** the a = 2 rods column at 1/30, 1/60, 1/120 and 1/240 s gives d_far 4.76, 5.68, 6.16 and 6.84, against 6.26 measured.
+- **Final height is too low for tall columns,** by 7 % at a ≈ 1 up to 29 % at a = 6, and the error does not shrink with the time step. Wall friction (0 to 1) changes it by under 4 %.
+  - Raising the solver friction to 0.50 brings the height within ±8 %, but shortens runout by 20 %. So no single friction matches both.
+  - That points at the material model: a rate-independent Drucker–Prager cone with no difference between friction at rest and in flow. Neither the solver nor the excavator has a rate-dependent μ(I) or static-versus-flowing friction.
+- **Short columns are right.** Up to a ≈ 0.65 the top of the column stays put, as in the experiments: rods 0.99, sand 1.00.
+- **Self-weight compaction is a solver artefact.** Held behind the gate, a column sinks under its own weight more than any real granular material would (about 1 %). The amount depends on the solver:
+
+  | Column height | Iterations | Time step | Settlement |
+  |---|---|---|---|
+  | 2 m | 150 | 1/30 s | 6 % |
+  | 8 m | 150 | 1/30 s | 24 % |
+  | 8 m | 600 | 1/30 s | 11 % |
+  | 8 m | 150 | 1/120 s | 2.5 % |
+
+  The rheology solve does not converge in tall columns at the large step. The tests above use the settled height as h0. In the excavator only the top 1–2 m of soil is particles, so the error is about 5 %.
+
+**What it means for the excavator:**
+- **Sim settings:** the MPM step of 1/30 s, chosen for speed in Phase 2, costs accuracy in fast flows, such as soil spilling off the bucket or out of the truck, and in packing. A 1/60 s step would recover about half the runout error (d_far −8 % at a = 2) at roughly twice the MPM cost.
+- **Next physics step:** final pile shapes need a material with friction that differs between rest and flow, or rate-dependent μ(I).
