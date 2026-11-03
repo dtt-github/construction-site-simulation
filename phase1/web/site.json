@@ -613,5 +613,153 @@
   "scaffold_rolling_steel_a01",
   "vehicleSupport_scissor_lift_c01",
   "vehicle_forklift_orange_a01"
+ ],
+ "showcase": [
+  {
+   "id": "opera_zx200",
+   "file": "assets/machinery/opera_zx200.glb",
+   "pos": [
+    3,
+    0,
+    -17
+   ],
+   "yaw": 0,
+   "collider": "parts",
+   "animate_skip": [
+    "bucket_end_joint"
+   ]
+  },
+  {
+   "id": "opera_ic120",
+   "file": "assets/machinery/opera_ic120.glb",
+   "pos": [
+    16,
+    0,
+    -17
+   ],
+   "yaw": 180,
+   "collider": "parts"
+  },
+  {
+   "id": "opera_d37pxi",
+   "file": "assets/machinery/opera_d37pxi.glb",
+   "pos": [
+    24,
+    0,
+    -16
+   ],
+   "yaw": 0,
+   "collider": "parts"
+  },
+  {
+   "id": "gazebo_tower_crane",
+   "file": "assets/site/gazebo_tower_crane.glb",
+   "pos": [
+    -17,
+    0,
+    -6
+   ],
+   "yaw": 0,
+   "collider": [
+    6.5,
+    35,
+    6.5
+   ]
+  },
+  {
+   "id": "gazebo_jersey_barrier",
+   "file": "assets/site/gazebo_jersey_barrier.glb",
+   "pos": [
+    20,
+    0,
+    4.6
+   ],
+   "yaw": 0,
+   "collider": [
+    4.07,
+    1.14,
+    0.81
+   ]
+  },
+  {
+   "id": "gazebo_jersey_barrier",
+   "file": "assets/site/gazebo_jersey_barrier.glb",
+   "pos": [
+    24.2,
+    0,
+    4.6
+   ],
+   "yaw": 0,
+   "collider": [
+    4.07,
+    1.14,
+    0.81
+   ]
+  },
+  {
+   "id": "gazebo_jersey_barrier",
+   "file": "assets/site/gazebo_jersey_barrier.glb",
+   "pos": [
+    28.4,
+    0,
+    4.6
+   ],
+   "yaw": 0,
+   "collider": [
+    4.07,
+    1.14,
+    0.81
+   ]
+  },
+  {
+   "id": "gazebo_construction_cone",
+   "file": "assets/site/gazebo_construction_cone.glb",
+   "pos": [
+    -13,
+    0,
+    15
+   ],
+   "yaw": 0
+  },
+  {
+   "id": "gazebo_construction_cone",
+   "file": "assets/site/gazebo_construction_cone.glb",
+   "pos": [
+    -11,
+    0,
+    15
+   ],
+   "yaw": 0
+  },
+  {
+   "id": "gazebo_construction_cone",
+   "file": "assets/site/gazebo_construction_cone.glb",
+   "pos": [
+    -9,
+    0,
+    15
+   ],
+   "yaw": 0
+  },
+  {
+   "id": "gazebo_construction_barrel",
+   "file": "assets/site/gazebo_construction_barrel.glb",
+   "pos": [
+    17.5,
+    0,
+    6.5
+   ],
+   "yaw": 0
+  },
+  {
+   "id": "gazebo_construction_barrel",
+   "file": "assets/site/gazebo_construction_barrel.glb",
+   "pos": [
+    30.5,
+    0,
+    6.5
+   ],
+   "yaw": 0
+  }
  ]
 }

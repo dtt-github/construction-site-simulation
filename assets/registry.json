@@ -1,0 +1,1111 @@
+{
+ "schema": "see assets/README.md",
+ "allowed_licenses": [
+  "CC0-1.0",
+  "CC-BY-3.0",
+  "CC-BY-4.0",
+  "CC-BY-SA-3.0",
+  "CC-BY-SA-4.0",
+  "MIT",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "Apache-2.0",
+  "Public-Domain"
+ ],
+ "assets": [
+  {
+   "id": "simready_barrier_fence_metal_a02",
+   "name": "barrier fence metal a02",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/barrier_fence_metal_a02.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/barrier_fence_metal_a02.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/barrier_fence_metal_a02.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/barrier_fence_metal_a02",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"barrier_fence_metal_a02\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (15 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 15,
+    "mass_source": "steel crowd-control barrier, ~1.2 m; catalogue 13-17 kg"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_barrier_wall_plastic_orange_a03",
+   "name": "barrier wall plastic orange a03",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/barrier_wall_plastic_orange_a03.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/barrier_wall_plastic_orange_a03.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/barrier_wall_plastic_orange_a03.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/barrier_wall_plastic_orange_a03",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"barrier_wall_plastic_orange_a03\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (28 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 28,
+    "mass_source": "empty water-fillable barrier, 1.8 x 2.0 m; catalogue 25-30 kg"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_barrier_gate_safety_a02",
+   "name": "barrier gate safety a02",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/barrier_gate_safety_a02.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/barrier_gate_safety_a02.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/barrier_gate_safety_a02.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/barrier_gate_safety_a02",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"barrier_gate_safety_a02\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (60 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 60,
+    "mass_source": "6 m swing safety gate assembly; estimate"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_scaffold_rolling_steel_a01",
+   "name": "scaffold rolling steel a01",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/scaffold_rolling_steel_a01.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/scaffold_rolling_steel_a01.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/scaffold_rolling_steel_a01.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/scaffold_rolling_steel_a01",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"scaffold_rolling_steel_a01\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (95 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 95,
+    "mass_source": "2 m rolling steel scaffold tower section; catalogue 80-110 kg"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_ladder_step_aluminium_a06",
+   "name": "ladder step aluminium a06",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/ladder_step_aluminium_a06.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/ladder_step_aluminium_a06.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/ladder_step_aluminium_a06.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/ladder_step_aluminium_a06",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"ladder_step_aluminium_a06\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (7 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 7,
+    "mass_source": "1.75 m aluminium step ladder; catalogue 6-8 kg"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_ladder_extention_fiberglass_a03",
+   "name": "ladder extention fiberglass a03",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/ladder_extention_fiberglass_a03.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/ladder_extention_fiberglass_a03.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/ladder_extention_fiberglass_a03.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/ladder_extention_fiberglass_a03",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"ladder_extention_fiberglass_a03\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (18 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 18,
+    "mass_source": "3.7 m fibreglass extension ladder; catalogue 16-20 kg"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_construction_wheelbarrow_metal_a01",
+   "name": "construction wheelbarrow metal a01",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/construction_wheelbarrow_metal_a01.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/construction_wheelbarrow_metal_a01.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/construction_wheelbarrow_metal_a01.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/construction_wheelbarrow_metal_a01",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"construction_wheelbarrow_metal_a01\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (18 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 18,
+    "mass_source": "steel wheelbarrow; catalogue 15-20 kg"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_construction_firstAidPoint_trolley_a01",
+   "name": "construction firstAidPoint trolley a01",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/construction_firstAidPoint_trolley_a01.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/construction_firstAidPoint_trolley_a01.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/construction_firstAidPoint_trolley_a01.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/construction_firstAidPoint_trolley_a01",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"construction_firstAidPoint_trolley_a01\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (40 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 40,
+    "mass_source": "first-aid point trolley with kit; estimate"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_construction_fireSafetyPoint_trolley_a01",
+   "name": "construction fireSafetyPoint trolley a01",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/construction_fireSafetyPoint_trolley_a01.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/construction_fireSafetyPoint_trolley_a01.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/construction_fireSafetyPoint_trolley_a01.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/construction_fireSafetyPoint_trolley_a01",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"construction_fireSafetyPoint_trolley_a01\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (55 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 55,
+    "mass_source": "fire point trolley with 2 extinguishers; estimate"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_pallet_a01",
+   "name": "pallet a01",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/pallet_a01.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/pallet_a01.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/pallet_a01.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/pallet_a01",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"pallet_a01\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (25 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 25,
+    "mass_source": "1200 x 800 EUR pallet; EPAL 25 kg"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_pallet_block_a01",
+   "name": "pallet block a01",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/pallet_block_a01.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/pallet_block_a01.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/pallet_block_a01.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/pallet_block_a01",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"pallet_block_a01\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (27 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 27,
+    "mass_source": "1200 x 1000 block pallet; catalogue 25-30 kg"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_drum_steel_a01",
+   "name": "drum steel a01",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/drum_steel_a01.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/drum_steel_a01.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/drum_steel_a01.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/drum_steel_a01",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"drum_steel_a01\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (20 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 20,
+    "mass_source": "empty 200 L steel drum; catalogue 17-23 kg"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_crate_plywood_b01",
+   "name": "crate plywood b01",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/crate_plywood_b01.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/crate_plywood_b01.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/crate_plywood_b01.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/crate_plywood_b01",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"crate_plywood_b01\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (40 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 40,
+    "mass_source": "1 m plywood crate, empty; estimate. USD density says steel (8000 kg/m3)"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_structure_beam_a01",
+   "name": "structure beam a01",
+   "category": "materials",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/structure_beam_a01.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/structure_beam_a01.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/structure_beam_a01.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/structure_beam_a01",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"structure_beam_a01\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); original USD mass kept; colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": null,
+    "mass_source": "explicit USD mass kept (865 kg)"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_pipe_plastic_gray_b08",
+   "name": "pipe plastic gray b08",
+   "category": "materials",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/pipe_plastic_gray_b08.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/pipe_plastic_gray_b08.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/pipe_plastic_gray_b08.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/pipe_plastic_gray_b08",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"pipe_plastic_gray_b08\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (380 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 380,
+    "mass_source": "7 m, ~630 mm HDPE pipe; ~55 kg/m"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_ppe_helmet_hardHat_a01",
+   "name": "ppe helmet hardHat a01",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/ppe_helmet_hardHat_a01.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/ppe_helmet_hardHat_a01.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/ppe_helmet_hardHat_a01.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/ppe_helmet_hardHat_a01",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"ppe_helmet_hardHat_a01\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (0.35 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 0.35,
+    "mass_source": "hard hat; catalogue 0.3-0.4 kg"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_vehicle_forklift_orange_a01",
+   "name": "vehicle forklift orange a01",
+   "category": "machinery",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/vehicle_forklift_orange_a01.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/vehicle_forklift_orange_a01.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/vehicle_forklift_orange_a01.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/vehicle_forklift_orange_a01",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"vehicle_forklift_orange_a01\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (700 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 700,
+    "mass_source": "walk-behind electric pallet stacker; catalogue 600-900 kg"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_hopper_dumpling_steel_red_a07",
+   "name": "hopper dumpling steel red a07",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/hopper_dumpling_steel_red_a07.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/hopper_dumpling_steel_red_a07.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/hopper_dumpling_steel_red_a07.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/hopper_dumpling_steel_red_a07",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"hopper_dumpling_steel_red_a07\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (250 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 250,
+    "mass_source": "self-dumping steel hopper, ~1.5 m3; estimate"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_tiltTruck_red_a04",
+   "name": "tiltTruck red a04",
+   "category": "site",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/tiltTruck_red_a04.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/tiltTruck_red_a04.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/tiltTruck_red_a04.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/tiltTruck_red_a04",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"tiltTruck_red_a04\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); mass set to catalogue value (60 kg); colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": 60,
+    "mass_source": "poly tilt truck on steel base; estimate"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_handTool_hammer_sledge_a01",
+   "name": "handTool hammer sledge a01",
+   "category": "tools",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/handTool_hammer_sledge_a01.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/handTool_hammer_sledge_a01.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/handTool_hammer_sledge_a01.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/handTool_hammer_sledge_a01",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"handTool_hammer_sledge_a01\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); original USD mass kept; colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": null,
+    "mass_source": "explicit USD mass kept (1.21 kg)"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_bucket_utility_red_a01",
+   "name": "bucket utility red a01",
+   "category": "tools",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/bucket_utility_red_a01.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/bucket_utility_red_a01.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/bucket_utility_red_a01.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/bucket_utility_red_a01",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"bucket_utility_red_a01\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); original USD mass kept; colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": null,
+    "mass_source": "USD mass kept (~1.5 kg)"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "simready_vehicleSupport_scissor_lift_c01",
+   "name": "vehicleSupport scissor lift c01",
+   "category": "machinery",
+   "status": "fetched",
+   "files": [
+    "phase1/glb/vehicleSupport_scissor_lift_c01.glb"
+   ],
+   "downloads": [
+    {
+     "path": "phase1/glb/vehicleSupport_scissor_lift_c01.glb",
+     "url": "https://huggingface.co/datasets/codepawl/simready-glb/resolve/main/glb/vehicleSupport_scissor_lift_c01.glb"
+    }
+   ],
+   "source_url": "https://huggingface.co/datasets/nvidia/simready-assets/tree/main/vehicleSupport_scissor_lift_c01",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "NVIDIA (SimReady); GLB conversion by codepawl",
+   "attribution": "\"vehicleSupport_scissor_lift_c01\" by NVIDIA (SimReady assets), GLB conversion by codepawl, licensed under CC BY 4.0",
+   "modifications": "Converted to GLB by codepawl (meshopt, WebP); original USD mass kept; colliders re-derived for some parts (web/hulls)",
+   "realism": "high",
+   "articulated": null,
+   "real_world": {
+    "reference": null
+   },
+   "physics": {
+    "mass_kg": null,
+    "mass_source": "explicit USD mass kept (~3 t). Vehicle lift: the platform is not jointed in the asset, only the 4 ramps hinge"
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "opera_zx200",
+   "name": "Hitachi ZX200 hydraulic excavator (20 t class)",
+   "category": "machinery/excavator",
+   "status": "in-repo",
+   "files": [
+    "assets/machinery/opera_zx200.glb",
+    "assets/licenses/Apache-2.0_pwri-opera_zx200_ros2.txt"
+   ],
+   "source_url": "https://github.com/pwri-opera/zx200_ros2",
+   "download_url": "https://github.com/pwri-opera/zx200_ros2/archive/refs/heads/main.zip",
+   "license": "Apache-2.0",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "share_alike": false,
+   "author": "Public Works Research Institute, Japan (PWRI), OPERA project",
+   "attribution": "\"Hitachi ZX200 hydraulic excavator (20 t class)\" description package by the Public Works Research Institute, Japan (PWRI), OPERA project, licensed under Apache-2.0",
+   "modifications": "Collada meshes combined into one glTF with a node per URDF link at its joint origin; Z-up converted to Y-up; textures limited to 2048 px; joints written to node extras (assets/build_machines.py)",
+   "realism": "high",
+   "articulated": true,
+   "real_world": {
+    "reference": "Hitachi ZX200 (ZAXIS 200)",
+    "operating_mass_kg": 20000,
+    "note": "verify dimensions against the spec sheet; model crawler width 3.58 m incl. outer features"
+   },
+   "physics": {
+    "mass_kg": null,
+    "mass_source": "not in source package (URDF masses are placeholders); use spec-sheet operating mass",
+    "joints": [
+     "swing_joint (continuous, vertical)",
+     "boom_joint (-65..57 deg)",
+     "arm_joint (34..154 deg)",
+     "bucket_joint (-36..136 deg)"
+    ]
+   },
+   "notes": "Hydraulic cylinder and bucket-linkage meshes exist in the package but have no joints in the URDF, so they are not in this GLB yet. Depicts a trademarked product: the license covers copyright, not trademarks or endorsement.",
+   "added": "2026-11-03"
+  },
+  {
+   "id": "opera_ic120",
+   "name": "Hitachi IC120 crawler dump carrier",
+   "category": "machinery/dump_carrier",
+   "status": "in-repo",
+   "files": [
+    "assets/machinery/opera_ic120.glb",
+    "assets/licenses/Apache-2.0_pwri-opera_ic120_ros2.txt"
+   ],
+   "source_url": "https://github.com/pwri-opera/ic120_ros2",
+   "download_url": "https://github.com/pwri-opera/ic120_ros2/archive/refs/heads/main.zip",
+   "license": "Apache-2.0",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "share_alike": false,
+   "author": "Public Works Research Institute, Japan (PWRI), OPERA project",
+   "attribution": "\"Hitachi IC120 crawler dump carrier\" description package by the Public Works Research Institute, Japan (PWRI), OPERA project, licensed under Apache-2.0",
+   "modifications": "Collada meshes combined into one glTF with a node per URDF link at its joint origin; Z-up converted to Y-up; textures limited to 2048 px; joints written to node extras (assets/build_machines.py)",
+   "realism": "high",
+   "articulated": true,
+   "real_world": {
+    "reference": "Hitachi IC120 crawler carrier"
+   },
+   "physics": {
+    "mass_kg": null,
+    "mass_source": "not in source package (URDF masses are placeholders); use spec-sheet operating mass",
+    "joints": [
+     "vessel_pin_joint (dump body tip)",
+     "cylinder head/rod",
+     "sprockets and track wheels"
+    ]
+   },
+   "notes": " Depicts a trademarked product: the license covers copyright, not trademarks or endorsement.",
+   "added": "2026-11-03"
+  },
+  {
+   "id": "opera_d37pxi",
+   "name": "Komatsu D37PXi-24 bulldozer",
+   "category": "machinery/bulldozer",
+   "status": "in-repo",
+   "files": [
+    "assets/machinery/opera_d37pxi.glb",
+    "assets/licenses/Apache-2.0_pwri-opera_d37pxi_ros2.txt"
+   ],
+   "source_url": "https://github.com/pwri-opera/d37pxi_ros2",
+   "download_url": "https://github.com/pwri-opera/d37pxi_ros2/archive/refs/heads/main.zip",
+   "license": "Apache-2.0",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "share_alike": false,
+   "author": "Public Works Research Institute, Japan (PWRI), OPERA project",
+   "attribution": "\"Komatsu D37PXi-24 bulldozer\" description package by the Public Works Research Institute, Japan (PWRI), OPERA project, licensed under Apache-2.0",
+   "modifications": "Collada meshes combined into one glTF with a node per URDF link at its joint origin; Z-up converted to Y-up; textures limited to 2048 px; joints written to node extras (assets/build_machines.py)",
+   "realism": "high",
+   "articulated": true,
+   "real_world": {
+    "reference": "Komatsu D37PXi-24"
+   },
+   "physics": {
+    "mass_kg": null,
+    "mass_source": "not in source package (URDF masses are placeholders); use spec-sheet operating mass",
+    "joints": [
+     "blade_arm_joint (lift)",
+     "blade_angle_joint",
+     "blade_tilt_joint",
+     "lift and angle cylinders (prismatic)"
+    ]
+   },
+   "notes": " Depicts a trademarked product: the license covers copyright, not trademarks or endorsement.",
+   "added": "2026-11-03"
+  },
+  {
+   "id": "gazebo_tower_crane",
+   "name": "Tower crane",
+   "category": "machinery/tower_crane",
+   "status": "in-repo",
+   "files": [
+    "assets/site/gazebo_tower_crane.glb"
+   ],
+   "source_url": "https://fuel.gazebosim.org/1.0/OpenRobotics/models/Tower%20crane",
+   "download_url": "https://fuel.gazebosim.org/1.0/OpenRobotics/models/Tower%20crane.zip",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "share_alike": false,
+   "author": "Nate Koenig / Open Robotics (Gazebo Fuel)",
+   "attribution": "\"Tower crane\" by Nate Koenig / Open Robotics, Gazebo Fuel, CC0",
+   "modifications": "Collada to glTF; inch units and SDF scale applied; Z-up to Y-up; placed on the ground (assets/build_static.py)",
+   "realism": "medium",
+   "articulated": false,
+   "real_world": {
+    "size_m": [
+     6.55,
+     35.03,
+     39.08
+    ]
+   },
+   "physics": {
+    "mass_kg": null,
+    "mass_source": ""
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "gazebo_construction_cone",
+   "name": "Construction Cone",
+   "category": "site/traffic",
+   "status": "in-repo",
+   "files": [
+    "assets/site/gazebo_construction_cone.glb"
+   ],
+   "source_url": "https://fuel.gazebosim.org/1.0/OpenRobotics/models/Construction%20Cone",
+   "download_url": "https://fuel.gazebosim.org/1.0/OpenRobotics/models/Construction%20Cone.zip",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "share_alike": false,
+   "author": "Cole Biesemeyer / Open Robotics (Gazebo Fuel)",
+   "attribution": "\"Construction Cone\" by Cole Biesemeyer / Open Robotics, Gazebo Fuel, CC0",
+   "modifications": "Collada to glTF; inch units and SDF scale applied; Z-up to Y-up; placed on the ground (assets/build_static.py)",
+   "realism": "medium",
+   "articulated": false,
+   "real_world": {
+    "size_m": [
+     0.5,
+     1.09,
+     0.5
+    ]
+   },
+   "physics": {
+    "mass_kg": null,
+    "mass_source": ""
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "gazebo_construction_barrel",
+   "name": "Construction Barrel",
+   "category": "site/traffic",
+   "status": "in-repo",
+   "files": [
+    "assets/site/gazebo_construction_barrel.glb"
+   ],
+   "source_url": "https://fuel.gazebosim.org/1.0/OpenRobotics/models/Construction%20Barrel",
+   "download_url": "https://fuel.gazebosim.org/1.0/OpenRobotics/models/Construction%20Barrel.zip",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "share_alike": false,
+   "author": "Cole Biesemeyer / Open Robotics (Gazebo Fuel)",
+   "attribution": "\"Construction Barrel\" by Cole Biesemeyer / Open Robotics, Gazebo Fuel, CC0",
+   "modifications": "Collada to glTF; inch units and SDF scale applied; Z-up to Y-up; placed on the ground (assets/build_static.py)",
+   "realism": "medium",
+   "articulated": false,
+   "real_world": {
+    "size_m": [
+     1.02,
+     1.55,
+     1.02
+    ]
+   },
+   "physics": {
+    "mass_kg": null,
+    "mass_source": ""
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "gazebo_jersey_barrier",
+   "name": "Jersey Barrier",
+   "category": "site/barrier",
+   "status": "in-repo",
+   "files": [
+    "assets/site/gazebo_jersey_barrier.glb"
+   ],
+   "source_url": "https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey%20Barrier",
+   "download_url": "https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey%20Barrier.zip",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "share_alike": false,
+   "author": "Cole Biesemeyer / Open Robotics (Gazebo Fuel)",
+   "attribution": "\"Jersey Barrier\" by Cole Biesemeyer / Open Robotics, Gazebo Fuel, CC0",
+   "modifications": "Collada to glTF; inch units and SDF scale applied; Z-up to Y-up; placed on the ground (assets/build_static.py)",
+   "realism": "medium",
+   "articulated": false,
+   "real_world": {
+    "size_m": [
+     4.07,
+     1.14,
+     0.81
+    ]
+   },
+   "physics": {
+    "mass_kg": null,
+    "mass_source": ""
+   },
+   "added": "2026-11-03"
+  },
+  {
+   "id": "cand_rocketbox_construction_workers",
+   "name": "Microsoft Rocketbox construction worker avatars (9, rigged, PPE)",
+   "category": "people/worker",
+   "status": "candidate",
+   "files": [],
+   "source_url": "https://github.com/microsoft/Microsoft-Rocketbox/tree/master/Assets/Avatars/Professions",
+   "license": "MIT",
+   "license_url": "https://opensource.org/licenses/MIT",
+   "share_alike": false,
+   "author": "Microsoft Rocketbox",
+   "attribution": "\"Microsoft Rocketbox construction worker avatars (9, rigged, PPE)\" by Microsoft Rocketbox, licensed under MIT",
+   "realism": "high",
+   "notes": "FBX; needs FBX-to-glTF conversion (Blender or FBX2glTF) before use. Construction_Male_01..08, Construction_Female_01.",
+   "added": "2026-11-03"
+  },
+  {
+   "id": "cand_mathscavator9000",
+   "name": "MathWorks MathScavator 9000 excavator (CAD, URDF)",
+   "category": "machinery/excavator",
+   "status": "candidate",
+   "files": [],
+   "source_url": "https://github.com/mathworks-robotics/autonomous-excavator",
+   "license": "BSD-3-Clause",
+   "license_url": "https://opensource.org/licenses/BSD-3-Clause",
+   "share_alike": false,
+   "author": "The MathWorks, Inc.",
+   "attribution": "\"MathWorks MathScavator 9000 excavator (CAD, URDF)\" by The MathWorks, Inc., licensed under BSD-3-Clause",
+   "realism": "medium",
+   "notes": "Untextured CAD STL split into parts with a URDF incl. cylinders; generic (unbranded) design.",
+   "added": "2026-11-03"
+  },
+  {
+   "id": "cand_chrono_bulldozer",
+   "name": "Project Chrono bulldozer",
+   "category": "machinery/bulldozer",
+   "status": "candidate",
+   "files": [],
+   "source_url": "https://github.com/projectchrono/chrono/tree/main/data/models/bulldozer",
+   "license": "BSD-3-Clause",
+   "license_url": "https://opensource.org/licenses/BSD-3-Clause",
+   "share_alike": false,
+   "author": "Project Chrono developers",
+   "attribution": "\"Project Chrono bulldozer\" by Project Chrono developers, licensed under BSD-3-Clause",
+   "realism": "medium",
+   "notes": "OBJ, single body + track shoe/wheel.",
+   "added": "2026-11-03"
+  },
+  {
+   "id": "cand_sketchfab_hl975a_wheel_loader",
+   "name": "Hyundai HL975A wheel loader (scan)",
+   "category": "machinery/wheel_loader",
+   "status": "candidate",
+   "files": [],
+   "source_url": "https://sketchfab.com/3d-models/3ae998672f994c6f9ce2f336c88c8cac",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "Lassi Kaukonen",
+   "attribution": "\"Hyundai HL975A wheel loader (scan)\" by Lassi Kaukonen, licensed under CC-BY-4.0",
+   "realism": "high",
+   "notes": "Sketchfab download needs a logged-in account; static scan; remove logos.",
+   "added": "2026-11-03"
+  },
+  {
+   "id": "cand_sketchfab_adt_pete",
+   "name": "Pete - articulated dump truck",
+   "category": "machinery/dump_truck",
+   "status": "candidate",
+   "files": [],
+   "source_url": "https://sketchfab.com/3d-models/79edce3312424b5995d6a674f9bbd7b6",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "TG13730",
+   "attribution": "\"Pete - articulated dump truck\" by TG13730, licensed under CC-BY-4.0",
+   "realism": "high",
+   "notes": "Sketchfab download needs a logged-in account.",
+   "added": "2026-11-03"
+  },
+  {
+   "id": "cand_sketchfab_mobile_crane",
+   "name": "Mobile crane",
+   "category": "machinery/mobile_crane",
+   "status": "candidate",
+   "files": [],
+   "source_url": "https://sketchfab.com/3d-models/fb62f04101694627803d5a829b8893f0",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "l.ft",
+   "attribution": "\"Mobile crane\" by l.ft, licensed under CC-BY-4.0",
+   "realism": "high",
+   "notes": "Sketchfab download needs a logged-in account.",
+   "added": "2026-11-03"
+  },
+  {
+   "id": "cand_sketchfab_concrete_mixer",
+   "name": "Concrete Mixer Truck",
+   "category": "machinery/mixer_truck",
+   "status": "candidate",
+   "files": [],
+   "source_url": "https://sketchfab.com/3d-models/8d1d88a5955f4e7da13562bb7bec146f",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "doty_aecom",
+   "attribution": "\"Concrete Mixer Truck\" by doty_aecom, licensed under CC-BY-4.0",
+   "realism": "medium",
+   "notes": "Sketchfab download needs a logged-in account.",
+   "added": "2026-11-03"
+  },
+  {
+   "id": "cand_sketchfab_concrete_pump",
+   "name": "Concrete Pump Truck (Boom Pump)",
+   "category": "machinery/concrete_pump",
+   "status": "candidate",
+   "files": [],
+   "source_url": "https://sketchfab.com/3d-models/4328809da1c94ffb95a8eeb60bb6ce9b",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "doty_aecom",
+   "attribution": "\"Concrete Pump Truck (Boom Pump)\" by doty_aecom, licensed under CC-BY-4.0",
+   "realism": "medium",
+   "notes": "Sketchfab download needs a logged-in account.",
+   "added": "2026-11-03"
+  },
+  {
+   "id": "cand_sketchfab_skid_steer_sk820",
+   "name": "Komatsu SK820 skid steer loader",
+   "category": "machinery/skid_steer",
+   "status": "candidate",
+   "files": [],
+   "source_url": "https://sketchfab.com/3d-models/9d16f3d8b3b0456e86db243376b2a390",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "orphanrtg",
+   "attribution": "\"Komatsu SK820 skid steer loader\" by orphanrtg, licensed under CC-BY-4.0",
+   "realism": "high",
+   "notes": "Sketchfab download needs a logged-in account; remove logos.",
+   "added": "2026-11-03"
+  },
+  {
+   "id": "cand_sketchfab_telehandler_merlo",
+   "name": "Telehandler Merlo P.40",
+   "category": "machinery/telehandler",
+   "status": "candidate",
+   "files": [],
+   "source_url": "https://sketchfab.com/3d-models/a482d286e1f443fe915c03a6c6dfe21d",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "author": "Max (Max-7215)",
+   "attribution": "\"Telehandler Merlo P.40\" by Max (Max-7215), licensed under CC-BY-4.0",
+   "realism": "high",
+   "notes": "Sketchfab download needs a logged-in account; remove logos.",
+   "added": "2026-11-03"
+  }
+ ]
+}

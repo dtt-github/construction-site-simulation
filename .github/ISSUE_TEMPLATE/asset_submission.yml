@@ -1,0 +1,35 @@
+name: Asset submission
+description: Offer a 3D model of a machine or site item (or point us to an openly licensed one)
+labels: ["assets"]
+body:
+  - type: markdown
+    attributes:
+      value: "Please read the [asset policy](../blob/main/assets/README.md) first. We can only accept models whose license allows redistribution, modification and commercial use (CC0, CC-BY, CC-BY-SA, MIT, BSD, Apache-2.0)."
+  - type: input
+    id: what
+    attributes: {label: What is it?, placeholder: "e.g. 20 t hydraulic excavator, articulated dump truck"}
+    validations: {required: true}
+  - type: input
+    id: source
+    attributes: {label: Source URL, description: Page where the model is published}
+    validations: {required: true}
+  - type: dropdown
+    id: license
+    attributes:
+      label: License
+      options: [CC0, CC-BY-4.0, CC-BY-3.0, CC-BY-SA-4.0, MIT, BSD, Apache-2.0, "My own work, I release it under CC-BY-4.0", Other / not sure]
+    validations: {required: true}
+  - type: input
+    id: author
+    attributes: {label: Author / attribution}
+  - type: input
+    id: reference
+    attributes: {label: Real machine it represents, placeholder: "make, model, dimensions, operating mass"}
+  - type: checkboxes
+    id: parts
+    attributes:
+      label: Model details
+      options:
+        - label: Moving parts are separate (boom, stick, bucket, wheels, ...)
+        - label: Real-world scale verified
+        - label: I have the right to share this model under the license above

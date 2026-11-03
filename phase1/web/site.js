@@ -193,6 +193,7 @@ function bodyShape(body, obj) {
 const live = []; // { obj, id, mass, debug }
 const constraints = [];
 let soil = null; // Phase 2 soil stream (soil.js)
+let showcase = null; // open-licensed real machines (showcase.js)
 const instances = []; // { asset, joints: { name: { c, type, motor } }, ids }
 const pickable = new Map(); // mesh uuid -> live entry
 let showHulls = false;
@@ -456,6 +457,12 @@ async function build() {
   }
   setupControls();
   try {
+    const { addShowcase } = await import("./showcase.js");
+    showcase = await addShowcase({ THREE, scene, loader, addStatic, terrainHeight, site, panel: document.getElementById("panel") });
+  } catch (err) {
+    console.error("showcase failed", err);
+  }
+  try {
     const { startSoil } = await import(`./soil.js?v=${Date.now()}`);
     soil = startSoil({
       THREE,
@@ -644,6 +651,7 @@ function tick() {
     }
   }
   soil?.update();
+  showcase?.update(dt);
   controls.update();
   renderer.render(scene, camera);
   frames++;

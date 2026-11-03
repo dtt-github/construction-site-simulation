@@ -23,3 +23,6 @@ phase1/glb/
 # Server runtime logs
 phase2/logs/*.log
 phase2/logs/*.txt
+
+# raw third-party downloads (rebuilt by assets/build_machines.py)
+assets/_downloads/

@@ -1,0 +1,17 @@
+name: Validation data
+description: Measured data we can compare the simulation against (forces, pressures, cycle logs, soil tests)
+labels: ["validation"]
+body:
+  - type: textarea
+    id: what
+    attributes: {label: What was measured?, placeholder: "e.g. bucket tip force and boom/stick pressures during digging in dry sand, 20 t excavator"}
+    validations: {required: true}
+  - type: textarea
+    id: conditions
+    attributes: {label: Conditions, description: "Machine, tool geometry, soil type and properties (density, friction angle, cohesion, moisture), speeds"}
+  - type: input
+    id: link
+    attributes: {label: Data / paper link}
+  - type: input
+    id: license
+    attributes: {label: Data license, placeholder: "CC-BY-4.0, CC0, or 'can share privately with the maintainers'"}
