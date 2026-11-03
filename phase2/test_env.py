@@ -6,12 +6,15 @@
 2. each lever moves its joint the documented way (boom + raises, stick + out, bucket + dumps, swing + left)
 3. reset restores the machine, the pit and the truck
 4. the built-in operator, as autopilot, earns the load-truck reward and reports the levers it used
+5. sensors: env_checker with lidar, depth camera and IMU; a ray straight down meets the soil surface; the
+   lidar and the camera see ground, soil, machine and truck; the IMU reads the swing rate
 """
 
 import numpy as np
 from gymnasium.utils.env_checker import check_env
 
 import excavator_server as ex
+import sensors
 from excavator_env import ExcavatorEnv
 
 
@@ -62,6 +65,21 @@ def main():
     levers = np.array(levers)
     assert total > 0.5 and np.abs(levers).max() > 0.5, (total, np.abs(levers).max())
     print(f"4. autopilot: {total:.2f} t to the truck in 25 s; lever ranges {np.round(levers.min(0), 2)} .. {np.round(levers.max(0), 2)}")
+
+    env = ExcavatorEnv(episode_s=2.0, terrain=False, sensors=("lidar", "camera", "imu"), autopilot=True)
+    check_env(env, skip_render_check=True)
+    obs, _ = env.reset()
+    d, lab = env.rig._cast(np.array([2.0, 2.0, 6.0]), np.array([[0.0, 0.0, -1.0]]), 30.0)
+    assert lab[0] == sensors.SOIL and abs(6.0 - d[0] - ex.BED_TOP) < 0.05, (d, lab)
+    seen = set()
+    for _ in range(80):  # 8 s: dig and swing toward the truck
+        obs, *_ = env.step(None)
+        seen |= set(np.unique(obs["lidar_label"]).tolist()) | set(np.unique(obs["depth_label"]).tolist())
+    assert {sensors.GROUND, sensors.SOIL, sensors.MACHINE, sensors.TRUCK} <= seen, seen
+    swing_rate = float(env.sim.qd[0])
+    assert abs(obs["imu"][2] - swing_rate) < 1e-3 and abs(obs["imu"][5] - ex.G) < 0.5, (obs["imu"], swing_rate)
+    print(f"5. sensors: env_checker ok; down ray meets the soil at {6.0 - d[0]:.3f} m (bed top {ex.BED_TOP}); labels seen "
+          f"{sorted(sensors.LABELS[k] for k in seen)}; IMU yaw rate {obs['imu'][2]:+.3f} rad/s = swing {swing_rate:+.3f}")
 
 
 if __name__ == "__main__":

@@ -24,6 +24,14 @@ Observation (dict of float32 arrays, SI units, zone frame: x across the pit, z u
     truck_load (1)         soil in the truck bed (kg)
     terrain (86, 96)       surface height of the pit (m) on a 0.1 m grid, rows along y, from x, y = -3, -2.5
                            (only with terrain=True)
+  with sensors=("lidar", "camera", "imu") or any of them (sensors.py: mounts, frames, what the rays see):
+    lidar_range (32, 1024) spinning lidar on the cab, 32 channels from -45 to +45 deg, 1024 columns per turn
+                           starting forward and turning left; range (m), 0 = no return within 40 m
+    lidar_label (32, 1024) semantic label of each return (uint8; sensors.LABELS: none, ground, soil, machine, truck)
+    depth (240, 320)       depth camera on the cab front, 90 deg wide, pitched 25 deg down: depth along the
+                           optical axis (m), 0 = nothing within 30 m
+    depth_label (240, 320) semantic label of each pixel (uint8)
+    imu (6)                angular velocity (rad/s) and specific force (m/s2) in the house frame
 
 Tasks (reward per control step; pass reward_fn to define your own):
     "load-truck"   tonnes of soil added to the truck
@@ -44,6 +52,7 @@ from gymnasium import spaces
 
 import excavator_server as ex
 import hydraulics as hyd
+import sensors as sensor_rig
 import soils
 
 TASKS = ("load-truck", "fill-bucket")
@@ -53,13 +62,17 @@ class ExcavatorEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, soil=soils.DEFAULT_SOIL, task="load-truck", control_hz=10.0, episode_s=60.0,
-                 autopilot=False, terrain=True, reward_fn=None, sim_kwargs=None):
+                 autopilot=False, terrain=True, sensors=(), reward_fn=None, sim_kwargs=None):
         if task not in TASKS and reward_fn is None:
             raise ValueError(f"task must be one of {TASKS}, or pass reward_fn")
         self.task, self.reward_fn = task, reward_fn
         self.episode_s, self.autopilot, self.with_terrain = episode_s, autopilot, terrain
         self.sim_kwargs = dict(sim_kwargs or {})
         self.sim = ex.ExcavatorSim(soil=soil, **self.sim_kwargs)
+        self.sensors = tuple(sensors)
+        if not set(self.sensors) <= {"lidar", "camera", "imu"}:
+            raise ValueError(f"unknown sensors {self.sensors}: choose from lidar, camera, imu")
+        self.rig = sensor_rig.SensorRig(self.sim) if self.sensors else None
         self.frame_skip = max(1, round(1.0 / (control_hz * self.sim.frame_dt)))
         self.control_dt = self.frame_skip * self.sim.frame_dt
 
@@ -77,6 +90,17 @@ class ExcavatorEnv(gym.Env):
         }
         if terrain:
             obs["terrain"] = spaces.Box(-np.inf, np.inf, shape=(ex.HM_NY, ex.HM_NX), dtype=np.float32)
+        n_labels = len(sensor_rig.LABELS)
+        if "lidar" in self.sensors:
+            shape = self.rig.lidar_shape
+            obs["lidar_range"] = spaces.Box(0.0, self.rig.lidar_range, shape=shape, dtype=np.float32)
+            obs["lidar_label"] = spaces.Box(0, n_labels - 1, shape=shape, dtype=np.uint8)
+        if "camera" in self.sensors:
+            shape = self.rig.camera_shape
+            obs["depth"] = spaces.Box(0.0, np.inf, shape=shape, dtype=np.float32)
+            obs["depth_label"] = spaces.Box(0, n_labels - 1, shape=shape, dtype=np.uint8)
+        if "imu" in self.sensors:
+            obs["imu"] = spaces.Box(-np.inf, np.inf, shape=(6,), dtype=np.float32)
         self.observation_space = spaces.Dict(obs)
         self._obs = None
 
@@ -87,8 +111,11 @@ class ExcavatorEnv(gym.Env):
         soil = options.get("soil", self.sim.soil)
         if soil != self.sim.soil:
             self.sim = ex.ExcavatorSim(soil=soil, **self.sim_kwargs)
+            self.rig = sensor_rig.SensorRig(self.sim) if self.sensors else None
         else:
             self.sim.reset()
+        if self.rig is not None:
+            self.rig.imu_prev = None
         self.sim.auto = self.autopilot
         self.sim.measure()
         self._obs = self._observe()
@@ -138,6 +165,15 @@ class ExcavatorEnv(gym.Env):
         }
         if self.with_terrain:
             obs["terrain"] = sim.hm_np.reshape(ex.HM_NY, ex.HM_NX).astype(np.float32)
+        if "lidar" in self.sensors:
+            scan = self.rig.lidar()
+            obs["lidar_range"], obs["lidar_label"] = scan["ranges"], scan["labels"]
+        if "camera" in self.sensors:
+            image = self.rig.depth_camera()
+            obs["depth"], obs["depth_label"] = image["depth"], image["labels"]
+        if "imu" in self.sensors:
+            imu = self.rig.imu(self.control_dt)
+            obs["imu"] = np.concatenate([imu["angular_velocity"], imu["linear_acceleration"]]).astype(np.float32)
         return obs
 
     def _info(self, action):

@@ -67,8 +67,12 @@ obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
 - **Tasks:** `load-truck` rewards tonnes added to the truck; `fill-bucket` rewards tonnes added to the bucket. You can also pass your own reward function.
 - **Soil:** dry sand, moist sand, loam or clay (`soil=…`, or `reset(options={"soil": …})`).
 - **Demonstrations:** with `autopilot=True`, the built-in operator model drives and `info["action"]` returns the levers it used. `record_demos.py` saves such episodes as `.npz` files for imitation learning.
-- **Speed:** about 1.1–1.2× real time per environment on a GB10, about 11 control steps per second.
-- **Determinism:** identical runs give identical results; Gymnasium's `env_checker` passes (`test_env.py`).
+- **Sensors** ([phase2/sensors.py](phase2/sensors.py)), `sensors=("lidar", "camera", "imu")`. Rays are cast on the GPU against the soil (resting columns and moving particles), the ground, the machine and the truck. Every return carries a semantic label (ground, soil, machine, truck) for training perception. Ranges are exact; add noise in your own pipeline if you need it.
+  - **Lidar:** a spinning lidar on a mast at the cab, 32 channels from −45° to +45°, 1024 columns, 40 m range.
+  - **Depth camera:** 320 × 240, 90° wide, on the cab front, looking down at the dig area.
+  - **IMU:** angular velocity and specific force in the upper structure.
+- **Speed:** about 1.1× real time per environment on a GB10, about 11 control steps per second; with all three sensors about 1.0× (10 steps per second).
+- **Determinism:** within one process, identical runs give identical results; Gymnasium's `env_checker` passes (`test_env.py`). Between processes, results differ slightly (GPU atomics), for example 1.13 against 1.17 t loaded in 25 s.
 - **Units:** SI throughout. The coordinate frame is documented in the module.
 
 ## Join
@@ -94,7 +98,7 @@ Only licenses that allow redistribution, modification and commercial use are acc
 
 - Operator models beyond the scripted cycle (learned or recorded operator inputs), and checking heaped bucket loads against field data
 - Converged soil solves: loads still depend on the MPM iteration count
-- Research APIs: the Gymnasium environment is done. Next: a ROS 2 bridge, and simulated sensors (depth camera or lidar, IMU)
+- Research APIs: the Gymnasium environment with lidar, depth camera and IMU is done. Next: a ROS 2 bridge
 - Measured ZX200 masses, swing torque and pressure logs for validation
 - Measured pressure logs, port relief and house inertia to validate the hydraulics
 - Soil–steel adhesion, bulking of dug clods, and soil presets calibrated to measured sites and bucket loads
