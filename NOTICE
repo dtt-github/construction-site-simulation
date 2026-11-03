@@ -1,8 +1,11 @@
 Construction Site Simulation
-Copyright 2026 the Construction Site Simulation contributors
+Copyright 2026 DigitalTwin Technology GmbH and the Construction Site Simulation contributors
 
-This product includes software developed by the Construction Site Simulation contributors,
-licensed under the Apache License, Version 2.0 (see LICENSE).
+This project was initiated by DigitalTwin Technology GmbH (https://www.digitaltwin.technology),
+its main contributor, as part of its work on ConstructionWare (https://www.constructionware.app).
+
+This product includes software developed by DigitalTwin Technology GmbH and the Construction Site
+Simulation contributors, licensed under the Apache License, Version 2.0 (see LICENSE).
 
 3D assets and data are NOT covered by the Apache License. Each keeps its own license, recorded
 per asset in assets/registry.json and listed below. Most are downloaded by assets/fetch_assets.py

@@ -1,6 +1,6 @@
 # Contributing
 
-This project aims to be an open, physically realistic construction-site simulator that universities and companies build together. Contributions of every kind help: code, 3D assets, measured data, validation studies, and bug reports.
+This project aims to be an open, physically realistic construction-site simulator that universities and companies build together. It was initiated by [DigitalTwin Technology GmbH](https://www.digitaltwin.technology), which maintains it and is its main contributor, as part of its work on [ConstructionWare](https://www.constructionware.app). Contributions of every kind help: code, 3D assets, measured data, validation studies, and bug reports.
 
 By contributing you agree that your contribution is licensed under the same terms as the part of the project it goes into (see [Licensing](#licensing)), and you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 

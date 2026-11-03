@@ -2,6 +2,8 @@
 
 An open-source, physically realistic construction-site simulator, built in the open by universities and industry.
 
+Initiated and maintained by **[DigitalTwin Technology GmbH](https://www.digitaltwin.technology)**, the project's main contributor, as part of its work on **[ConstructionWare](https://www.constructionware.app)**.
+
 ![Open-licensed machines in the site: Komatsu D37PXi dozer, Hitachi IC120 carrier, Hitachi ZX200 excavator](assets/screenshots/showcase_machines.png)
 
 **Goal:** a site you can trust numerically. Soil that digs like soil, machines whose hydraulics stall like real ones, and every model checked against measured data. Rigid-body site physics runs in the browser (three.js + Jolt). Soil and machine dynamics run on a GPU server (NVIDIA Newton: MPM sand, MuJoCo articulations) and stream into the same page.
@@ -74,5 +76,7 @@ Only licenses that allow redistribution, modification and commercial use are acc
 - Multi-user sessions and operator training scenarios
 
 ## License
+
+Copyright 2026 DigitalTwin Technology GmbH and the Construction Site Simulation contributors.
 
 Code: [Apache License 2.0](LICENSE). Assets and data: their own licenses, listed in [NOTICE](NOTICE) and [`assets/registry.json`](assets/registry.json). Physics libraries used: NVIDIA Newton and Warp (Apache-2.0), Jolt Physics (MIT), three.js (MIT), Project Chrono (BSD-3), CoACD (MIT).
