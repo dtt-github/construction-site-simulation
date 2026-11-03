@@ -1,17 +1,80 @@
 name: Validation data
 description: Measured data we can compare the simulation against (forces, pressures, cycle logs, soil tests)
+title: "[Validation data] "
 labels: ["validation"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for offering data. The simulator currently models a Hitachi ZX200 (20 t class) with its real cylinders and MPM sand; see [phase2/RESULTS.md](../blob/main/phase2/RESULTS.md) for what is modelled and measured so far. Partial data is welcome: a single pressure log or a set of soil tests already helps. If you can't share the data publicly, say so under *Licence* and we'll arrange a private exchange.
+  - type: input
+    id: machine
+    attributes:
+      label: Machine
+      description: Make, model and serial range or production year. Note relevant options (boom/arm length, bucket size, power boost).
+      placeholder: "e.g. Hitachi ZX200-5G, 2.91 m arm, 0.8 m³ bucket, serial 500001–"
+    validations: {required: true}
+  - type: checkboxes
+    id: data_type
+    attributes:
+      label: Data type
+      description: Tick all that apply.
+      options:
+        - label: Bucket or blade forces
+        - label: Cylinder pressure logs
+        - label: Joint angles / cylinder strokes
+        - label: Swing torque or swing pressure
+        - label: Cycle times
+        - label: Soil tests
+        - label: Machine parameters (masses, centres of gravity, relief settings)
   - type: textarea
     id: what
-    attributes: {label: What was measured?, placeholder: "e.g. bucket tip force and boom/stick pressures during digging in dry sand, 20 t excavator"}
+    attributes:
+      label: What was measured?
+      description: Describe the data and the task (e.g. digging, trenching, loading a truck).
+      placeholder: "e.g. boom/arm/bucket head- and rod-side pressures during 20 dig cycles in dry sand, with joint angles"
     validations: {required: true}
   - type: textarea
-    id: conditions
-    attributes: {label: Conditions, description: "Machine, tool geometry, soil type and properties (density, friction angle, cohesion, moisture), speeds"}
+    id: soil
+    attributes:
+      label: Soil properties
+      description: Type and grading, bulk density, moisture content, friction angle, cohesion, and the test method for each (e.g. direct shear, triaxial, cone penetrometer, nuclear density gauge).
+      placeholder: |
+        Type: poorly graded sand (SP)
+        Density: 1.6 t/m³ (sand cone)
+        Moisture: 4 %
+        Friction angle: 34° (direct shear)
+        Cohesion: 2 kPa (direct shear)
+  - type: textarea
+    id: setup
+    attributes:
+      label: Measurement setup and sensors
+      description: Sensor types, models and positions, calibration, and how the signals were synchronised.
+      placeholder: "e.g. pressure transducers on both sides of each cylinder (0–400 bar, ±0.25 %), IMUs on boom/arm/bucket, logged via CAN"
   - type: input
-    id: link
-    attributes: {label: Data / paper link}
-  - type: input
+    id: sample_rate
+    attributes:
+      label: Sample rate
+      placeholder: "e.g. 100 Hz pressures, 50 Hz joint angles"
+  - type: dropdown
     id: license
-    attributes: {label: Data license, placeholder: "CC-BY-4.0, CC0, or 'can share privately with the maintainers'"}
+    attributes:
+      label: Licence the data can be shared under
+      description: CC-BY-4.0 or CC0 let us publish the data with the benchmarks. Other terms are fine to discuss.
+      options:
+        - CC-BY-4.0 (preferred)
+        - CC0 (preferred)
+        - Other open licence (state it below)
+        - Can share privately with the maintainers only
+        - Not sure yet
+    validations: {required: true}
+  - type: textarea
+    id: link
+    attributes:
+      label: Data link or attachment
+      description: A URL (repository, Zenodo, paper) or drag files here. Note anything we must cite.
+  - type: input
+    id: contact
+    attributes:
+      label: Contact
+      description: How to reach you if it isn't your GitHub account (name, organisation, email).

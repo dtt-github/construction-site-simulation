@@ -26,3 +26,6 @@ phase2/logs/*.txt
 
 # raw third-party downloads (rebuilt by assets/build_machines.py)
 assets/_downloads/
+
+# Validation outreach drafts (kept local)
+outreach/
