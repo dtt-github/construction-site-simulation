@@ -12,14 +12,18 @@ between that force and the machine, as on the real D37PXi:
                     the travel speed falls with load as the drawbar power allows, and above the
                     tracks' traction the dozer makes no headway (the tracks slip) until the blade lifts
 
-Spreading (zone frame, the spoil area east of the carrier's dump point): the dozer pushes in lanes toward
-+x from just east of the dump point, blade at the design surface, a lift LIFT above the ground; soil above
-grade is carried ahead and dropped where the surface is low, so each load becomes a layer. It works the
-lane holding the most soil above grade, backs up with the blade raised, and repeats until no lane holds
-more than DONE_M3; then it parks north of the dump point. When the spread area is mostly at grade, the
-design surface rises by one lift. The carrier must not dump while the dozer works there: the server holds
-the carrier at its turn point until the dozer has parked, and recalls the dozer when the carrier leaves the
-loading spot.
+Spreading (zone frame, the spoil area east of the carrier's dump point), as end-dumped fill is spread: the
+carrier always dumps at the same place, so the lanes fan out from there. Every push starts at the dump
+heap and heads for a different part of the far edge of the spread area, blade at the design surface, a
+lift LIFT above the ground; soil above grade is carried ahead and dropped where the surface is low, so each
+load becomes a layer. Each lane is scored by min(soil above grade near the heap, room below grade along
+the lane), and the dozer works the best one, backs up with the blade raised, and repeats until no lane's
+heap part holds more than DONE_M3; then it parks north of the dump point. A pass that leaves its lane's
+soil as it was blocks that lane until the next load arrives (the soil it scores is out of the blade's
+reach). When the area holds more soil above grade than room below it, the layer is full and the design
+surface rises by one lift (up to MAX_FILL). The carrier
+must not dump while the dozer works there: the server holds the carrier at its turn point until the dozer
+has parked, and recalls the dozer when the carrier leaves the loading spot.
 
 Geometry from the model (d37pxi_ros2, urdf/d37pxi24.xacro and the meshes): lift arm pivot 0.586 m ahead of
 base_link and 0.386 m above it, lift range -0.41..0.19 rad (positive lowers the blade); blade frame 1.588 m
@@ -59,8 +63,11 @@ FORCE_TAU = 0.15  # s: the blade force is low-passed (one MPM step's impulses ar
 EMPTY_N, EMPTY_S = 3000.0, 0.7  # a push ends when the blade carries less than EMPTY_N for EMPTY_S
 LIFT = 0.3  # m per layer
 TOL = 0.08  # m above grade still counted as spread
-DONE_M3 = 0.35  # a lane with less soil than this above grade + TOL is done
-FULL_FRACTION = 0.8  # the design surface rises once this fraction of the spread area is at grade
+DONE_M3 = 0.35  # a lane whose heap part holds less soil than this above grade + TOL is done
+HEAP_PART = 0.6  # the first part of each lane, from the dump heap: the soil there is what is left to spread
+MAX_FILL = 1.5  # m: the design surface rises by layers up to this above the ground
+FUTILE_M3 = 0.15  # a pass that moves less than this out of its lane's heap part blocks the lane
+NEW_LOAD_M3 = 1.0  # the area's soil above grade growing by this much means a new load: blocked lanes reopen
 
 
 def rot_z(a):
@@ -112,10 +119,14 @@ STAGES = ["parked", "to lane", "lower", "push", "raise", "back", "to park"]
 
 class Dozer:
     def __init__(self, park, area, ground_z):
-        """park: (x, y, yaw) of base_link where the dozer waits; area: (x_start, x_end, lane ys) of the
-        cutting edge: pushes run from x_start to x_end along each lane y."""
+        """park: (x, y, yaw) of base_link where the dozer waits; area: (x_start, y_start, x_end, end ys) of
+        the cutting edge: every push starts at (x_start, y_start), at the dump heap, and runs to x_end, the
+        lanes fanning out to the end ys."""
         self.park, self.ground_z = park, ground_z
-        self.x_start, self.x_end, self.lanes = area
+        self.x_start, self.y_start, self.x_end, ends = area
+        # lanes: heading and the cutting edge's travel to x_end
+        self.lanes = [(math.atan2(y - self.y_start, self.x_end - self.x_start), math.hypot(y - self.y_start, self.x_end - self.x_start)) for y in ends]
+        self.start = np.array([self.x_start - self._edge_ahead(), self.y_start])  # base_link at the start of every push
         self.reset()
 
     def reset(self):
@@ -126,13 +137,16 @@ class Dozer:
         self.stage, self.stage_time, self.time = "parked", 0.0, 0.0
         self.plan = []  # moves still to make: ("spin", yaw) | ("drive", x, y, dir, speed, stage) | ("lift", "up"/"raise"/"grade") | ("push", x, y)
         self.lane = None
+        self.blocked = set()  # lanes whose last pass moved nothing
+        self.pass_soil = None  # the lane's heap-part soil when its pass began
+        self.area_soil = 0.0  # the area's soil above grade at the last planning
         self.recall = False
         self.force = 0.0  # soil resisting the blade along the heading (N), low-passed
         self.load_lift = False
         self.empty_t = 0.0
         self.prev = None
         self.v, self.w = np.zeros(3), np.zeros(3)
-        self.counters = {"passes": 0, "push_m": 0.0, "work_MJ": 0.0, "load_lifts": 0, "lifts_raised": 0, "parked_s": 0.0, "working_s": 0.0, "peak_kN": 0.0, "slip_s": 0.0}
+        self.counters = {"passes": 0, "push_m": 0.0, "work_MJ": 0.0, "load_lifts": 0, "lifts_raised": 0, "parked_s": 0.0, "working_s": 0.0, "peak_kN": 0.0, "slip_s": 0.0, "futile_passes": 0}
         self.push_force = []  # mean blade force per push (kN)
         self._push_sum = [0.0, 0.0]
 
@@ -183,29 +197,36 @@ class Dozer:
         return self.stage == "parked"
 
     # ------------------------------------------------------------------ planning
-    def _lane_excess(self, surface):
-        """Soil above grade + TOL in each lane (m3), from the surface heights."""
-        xs = np.arange(self.x_start, self.x_end, 0.1) + 0.05
-        out = []
-        for y in self.lanes:
-            ys = np.arange(y - BLADE_W / 2, y + BLADE_W / 2, 0.1) + 0.05
-            X, Y = np.meshgrid(xs, ys)
-            h = surface(np.stack([X.ravel(), Y.ravel()], axis=1))
-            out.append(float(np.clip(h - self.grade - TOL, 0.0, None).sum() * 0.01))
-        return np.array(out)
+    def _swath(self, k, s0=0.0, s1=1.0):
+        """Points (0.1 m apart) of lane k's swath, along the lane from fraction s0 to s1 of its length."""
+        th, L = self.lanes[k]
+        d, n = np.array([math.cos(th), math.sin(th)]), np.array([-math.sin(th), math.cos(th)])
+        S, T = np.meshgrid(np.arange(s0 * L, s1 * L, 0.1) + 0.05, np.arange(-BLADE_W / 2, BLADE_W / 2, 0.1) + 0.05)
+        return np.array([self.x_start, self.y_start]) + S.ravel()[:, None] * d + T.ravel()[:, None] * n
+
+    def _lane_scores(self, surface):
+        """Per lane: soil above grade + TOL in its heap part (m3), and room below grade - TOL along it (m3)."""
+        soil, room = [], []
+        for k in range(len(self.lanes)):
+            soil.append(float(np.clip(surface(self._swath(k, 0.0, HEAP_PART)) - self.grade - TOL, 0.0, None).sum() * 0.01))
+            room.append(float(np.clip(self.grade - TOL - surface(self._swath(k)), 0.0, None).sum() * 0.01))
+        return np.array(soil), np.array(room)
+
+    def _area_points(self):
+        """The spread area: every point of any lane's swath, on a 0.1 m grid."""
+        pts = np.round(np.concatenate([self._swath(k) for k in range(len(self.lanes))]) / 0.1).astype(int)
+        return (np.unique(pts, axis=0) + 0.5) * 0.1
 
     def spread_report(self, surface):
-        """Spread quality over the spread area: soil-covered area, how far the covered surface is from the
-        design surface (RMS), the highest point above it, and the soil not yet spread (m3 above grade + TOL)."""
-        y0, y1 = min(self.lanes) - BLADE_W / 2, max(self.lanes) + BLADE_W / 2
-        xs = np.arange(self.x_start, self.x_end, 0.1) + 0.05
-        ys = np.arange(y0, y1, 0.1) + 0.05
-        X, Y = np.meshgrid(xs, ys)
-        h = surface(np.stack([X.ravel(), Y.ravel()], axis=1))
+        """Spread quality over the spread area (the lanes' swaths): soil-covered area, how far the covered
+        surface is from the design surface (RMS), the highest point above it, the fraction at grade, and the
+        soil not yet spread (m3 above grade + TOL)."""
+        h = surface(self._area_points())
         covered = h > self.ground_z + 0.05
         dev = h[covered] - self.grade
         return {
             "design_z_above_ground": round(self.grade - self.ground_z, 2),
+            "area_m2": round(len(h) * 0.01, 1),
             "covered_m2": round(float(covered.sum()) * 0.01, 1),
             "rms_from_grade_m": round(float(np.sqrt(np.mean(dev**2))), 3) if covered.any() else None,
             "max_above_grade_m": round(float(dev.max()), 2) if covered.any() else None,
@@ -213,10 +234,9 @@ class Dozer:
             "unspread_m3": round(float(np.clip(h - self.grade - TOL, 0.0, None).sum() * 0.01), 2),
         }
 
-    def _to_lane(self, y):
-        """Moves from the park to the start of lane y (blade raised): reverse south, spin to face +x."""
-        bx = self.x_start - self._edge_ahead()
-        return [("lift", "up"), ("spin", math.pi / 2), ("drive", bx, y, -1, SPEED_REVERSE, "to lane"), ("spin", 0.0)]
+    def _to_start(self):
+        """Moves from the park to the start of the pushes (blade raised): reverse south to it."""
+        return [("lift", "up"), ("spin", math.pi / 2), ("drive", *self.start, -1, SPEED_REVERSE, "to lane")]
 
     def _to_park(self):
         px, py, pyaw = self.park
@@ -226,7 +246,9 @@ class Dozer:
         px, py, pyaw = self.park
         return math.hypot(self.x - px, self.y - py) < 0.1 and abs(math.sin(self.yaw - pyaw)) < 0.01 and math.cos(self.yaw - pyaw) > 0
 
-    def _edge_ahead(self):
+    @staticmethod
+    def _edge_ahead():
+        """Cutting edge ahead of base_link with the blade down (m)."""
         return float((ARM_PIVOT + rot_y(LIFT_HI) @ (BLADE_ON_ARM + EDGE))[0])
 
     def _next_job(self, surface, may_work):
@@ -235,25 +257,35 @@ class Dozer:
         if not may_work:
             self.lane = None
             return [] if self._at_park() else self._to_park()
-        excess = self._lane_excess(surface)
-        if excess.max() < DONE_M3:
-            rep = self.spread_report(surface)
-            if rep["at_grade_fraction"] >= FULL_FRACTION:  # this layer is in: the next goes on top
-                self.grade += LIFT
-                self.counters["lifts_raised"] += 1
-                return []
+        soil, room = self._lane_scores(surface)
+        if self.lane is not None and self.pass_soil is not None and self.pass_soil - soil[self.lane] < FUTILE_M3:
+            self.blocked.add(self.lane)  # the last pass moved nothing: the blade does not reach that soil
+            self.counters["futile_passes"] = self.counters.get("futile_passes", 0) + 1
+        self.pass_soil = None
+        h = surface(self._area_points())
+        area_soil = float(np.clip(h - self.grade - TOL, 0.0, None).sum() * 0.01)
+        area_room = float(np.clip(self.grade - TOL - h, 0.0, None).sum() * 0.01)
+        if area_soil > self.area_soil + NEW_LOAD_M3:
+            self.blocked.clear()  # a new load: every lane may have soil to move again
+        self.area_soil = area_soil
+        if area_soil >= 2 * DONE_M3 and area_soil > area_room and self.grade + LIFT <= self.ground_z + MAX_FILL + 1e-6:
+            # more soil above grade than room below it: this layer is full, the next goes on top
+            self.grade += LIFT
+            self.counters["lifts_raised"] += 1
+            self.blocked.clear()
+            self.area_soil = 0.0
+            return []
+        score = np.minimum(soil, room)
+        score[list(self.blocked)] = 0.0
+        if score.max() < DONE_M3:
             self.lane = None
             return [] if self._at_park() else self._to_park()
-        k = int(np.argmax(excess))
-        bx = self.x_start - self._edge_ahead()
-        moves = []
-        if not at_lane:
-            moves += self._to_lane(self.lanes[k])
-        elif abs(self.lanes[k] - self.y) > 0.05:  # side-step to the next lane at the start line
-            moves += [("lift", "up"), ("spin", math.copysign(math.pi / 2, self.lanes[k] - self.y)), ("drive", bx, self.lanes[k], +1, SPEED_TRAVEL, "to lane"), ("spin", 0.0)]
-        ex = self.x_end - self._edge_ahead()
-        moves += [("lift", "grade"), ("push", ex, self.lanes[k]), ("lift", "raise"), ("drive", bx, self.lanes[k], -1, SPEED_REVERSE, "back")]
-        self.lane = k
+        k = int(np.argmax(score))
+        th, L = self.lanes[k]
+        d = np.array([math.cos(th), math.sin(th)])
+        moves = [] if at_lane else self._to_start()
+        moves += [("lift", "up"), ("spin", th), ("lift", "grade"), ("push", *(self.start + d * L)), ("lift", "raise"), ("drive", *self.start, -1, SPEED_REVERSE, "back")]
+        self.lane, self.pass_soil = k, soil[k]
         return moves
 
     # ------------------------------------------------------------------ motion
@@ -312,7 +344,7 @@ class Dozer:
         self.counters["parked_s" if self.parked else "working_s"] += dt
         if not may_work and self.plan and self.stage in ("lower", "push"):
             # the carrier is coming: stop pushing, back out with the blade up, and park
-            self.plan = [("lift", "raise"), ("drive", self.x_start - self._edge_ahead(), self.y, -1, SPEED_REVERSE, "back")]
+            self.plan = [("lift", "raise"), ("drive", *self.start, -1, SPEED_REVERSE, "back")]
             self._end_push()
         if not self.plan:
             self.plan = self._next_job(surface, may_work)

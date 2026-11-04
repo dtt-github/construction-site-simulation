@@ -176,12 +176,14 @@ HAUL_TURN_X, HAUL_DUMP_X = 20.0, 23.0
 CARRIER_STAGES = dumper_mod.STAGES
 # dozer (dozer.py): spreads the dumped loads east of the dump point in lanes along +x (cutting edge from
 # DOZER_X_START to DOZER_X_END), and parks north of the dump point, out of the carrier's way
-DOZER_X_START, DOZER_X_END = 25.2, 33.4
-DOZER_LANES = (2.3, 5.2, 8.1)
+DOZER_X_START, DOZER_X_END = 25.2, 33.4  # cutting edge x where the pushes start (the dump heap) and end
+DOZER_LANE_ENDS = (1.3, 3.9, 6.5, 9.1)  # y where the fanned lanes reach DOZER_X_END (from the dump line, y 5.2)
 DOZER_PARK_Y = 11.4
 DOZER_SEES_SPEED = 1.0  # m/s: the dozer plans on all soil slower than this (dumped clay creeps for minutes)
-SPOIL_REGION = ("spoil", 24.0, -0.5, 125, 140, lambda x, y: np.full(np.shape(x), GROUND_Z))
-SPOIL_HM = (24.0, -0.5, 100, 112)  # display heightmap of the spoil area: x0, y0, nx, ny (0.1 m cells)
+# the spoil area reaches 4.6 m past the dozer's lanes, for the soil carried ahead of the blade at the end,
+# and 2 m beside them, for the soil spilled off the blade's ends (soil outside a soil region never settles)
+SPOIL_REGION = ("spoil", 24.0, -2.5, 175, 190, lambda x, y: np.full(np.shape(x), GROUND_Z))
+SPOIL_HM = (24.0, -2.5, 140, 152)  # display heightmap of the spoil area: x0, y0, nx, ny (0.1 m cells)
 
 
 def box_inertia(m, hx, hy, hz):
@@ -611,7 +613,7 @@ class ExcavatorSim:
         # Pit: 6 x 5 m floor, sides 1V:1.5H up to ground level at |x| = 6.75, |y| = 6.25 (as in the site terrain).
         ground = newton.ModelBuilder.ShapeConfig(mu=0.6)
         b.add_shape_box(-1, xform=wp.transform(wp.vec3(10.0, 1.0, GROUND_Z / 2)), hx=3.25, hy=9.0, hz=GROUND_Z / 2, cfg=ground)  # behind the machine
-        b.add_shape_box(-1, xform=wp.transform(wp.vec3(23.625, 3.0, GROUND_Z / 2)), hx=10.375, hy=11.0, hz=GROUND_Z / 2, cfg=ground)  # haul road and spoil area
+        b.add_shape_box(-1, xform=wp.transform(wp.vec3(25.625, 3.0, GROUND_Z / 2)), hx=12.375, hy=11.0, hz=GROUND_Z / 2, cfg=ground)  # haul road and spoil area
         b.add_shape_box(-1, xform=wp.transform(wp.vec3(0.0, 8.1, GROUND_Z / 2)), hx=6.75, hy=1.85, hz=GROUND_Z / 2, cfg=ground)  # beside the pit, truck side
         slope = newton.ModelBuilder.ShapeConfig(mu=0.6, has_shape_collision=False)  # catches sand only
         tilt = math.atan(1 / 1.5)
@@ -668,8 +670,8 @@ class ExcavatorSim:
             c.body, c.vq, c.vqd = v, int(jq[joint_of[v]]), int(jqd[joint_of[v]])
         # the dozer spreading the loads at the spoil area; its blade's free joint follows the vessel's
         self.use_dozer = haul and dozer
-        edge_ahead = Dozer((0.0, 0.0, 0.0), (0.0, 1.0, [0.0]), 0.0)._edge_ahead()
-        self.dozer = Dozer((DOZER_X_START - edge_ahead, DOZER_PARK_Y, math.pi / 2), (DOZER_X_START, DOZER_X_END, DOZER_LANES), GROUND_Z)
+        edge_ahead = Dozer._edge_ahead()
+        self.dozer = Dozer((DOZER_X_START - edge_ahead, DOZER_PARK_Y, math.pi / 2), (DOZER_X_START, BED_CENTER[1], DOZER_X_END, DOZER_LANE_ENDS), GROUND_Z)
         self.blade_q, self.blade_qd = int(jq[joint_of[self.blade]]), int(jqd[joint_of[self.blade]])
 
         cfg = SolverImplicitMPM.Config()

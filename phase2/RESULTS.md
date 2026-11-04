@@ -1172,6 +1172,7 @@ A second IC120 carrier takes turns with the first at the excavator (`ExcavatorSi
   - The dozer has to push heaps all the way and raise the design surface by layer.
   - The spoil area needs more room, or the soil zone needs a larger pool.
   - Until then, the 600 s runs measure the fleet, and long runs measure the spread area's capacity.
+  - (Fixed in part 4: the spread area now keeps up, and the long-run gain is 19 % while there is soil within the excavator's reach.)
 
 - **What this shows:**
   - **One carrier keeps the excavator 75–85 % busy:** the round trip (about 60 s) is short next to loading (120–190 s).
@@ -1188,4 +1189,49 @@ A second IC120 carrier takes turns with the first at the excavator (`ExcavatorSi
 - **Two carriers at most:** there is one waiting place, so three or more would need a queue of places.
 - **Scripted rules:** the traffic rules are fixed, not planned. For example, a loaded carrier waits for the empty one to reach the waiting place even when it could pass.
 - **Few loads per run:** with two or three loads per run, each interval is one cycle. The 1500 s runs have more cycles, but there the spread area limits the result (above).
+
+## A living site, 4: a dozer that keeps up over a long shift
+
+Part 3's long runs found the dozer falling behind after about 15 minutes. Instrumented 1200 s loam runs (every pass logged, the spoil surface saved every 2 minutes) showed why, and each cause was fixed in turn:
+
+| Loam, 1 carrier, 1200 s | As in part 3 | + spoil area extended | + lanes fanned from the dump heap | + futile lanes blocked, layers raised by volume |
+|---|---|---|---|---|
+| Particle pool short | 3048 | 605 | 491 | 291 |
+| Soil left unspread once the dozer has finished a load | 1–9 m³, growing | 0.1–0.9 m³ | 0.1–0.9 m³ | 0.06–0.7 m³ |
+| Design surface | 0.3 m | 0.3 m | 0.3 m | rose to 0.6 m at about 800 s |
+| Dozer passes | 37 | 18 | 33, many empty | 18 |
+| Real-time factor | 0.70 | 0.97 | 0.93 | 0.89 |
+
+**What was wrong, and the fixes:**
+- **A soil leak at the end of the lanes:**
+  - Every push ended at x = 33.5 m, and the soil carried ahead of the blade went up to 2 m further. That is past the edge of the spoil area and of the simulated ground at x = 34 m.
+  - It fell 2.35 m to the plane below, outside any soil column, so it could never settle. By 18 minutes the whole 150 k particle pool was awake, even with the dozer parked, and digging slowed.
+  - The spoil area and its ground now reach 4.6 m past the lanes' ends and 2 m beside them.
+- **Straight lanes fed only the middle:**
+  - The carrier always dumps at y = 5.2 m. Straight lanes pushed that heap down the middle into a 1–1.5 m berm at the far end, while the outer lanes stayed bare.
+  - The lanes now fan out from the dump heap (−25°, −9°, +9°, +25°). Every push starts at the heap and carries part of it to its own sector, as end-dumped fill is spread.
+  - Each lane is scored by min(soil above grade in the first 60 % of the lane, room below grade along it).
+- **Repeated empty passes:** a lane whose score the blade cannot change (soil just outside its reach) was pushed again and again at 2–8 kN. A pass that moves less than 0.15 m³ now blocks its lane until the next load arrives.
+- **The next layer never started:**
+  - The "80 % of the area at grade" test never passed, because soil spills past the lanes' ends and between them.
+  - The design surface now rises by a lift (up to 1.5 m) when the area holds more soil above grade than room below it, which is a volume balance.
+
+**1500 s, with the new spreading** (logs `logs/haul_bench_spread_long_<soil>_<n>carrier.json`; the three runs shared the GPU, so their real-time factors, 0.35–0.38, are not meaningful):
+
+| Run | Loads | Time between loads leaving | Loaded | Delivered | Excavator waiting | Pool short | Dozer passes (empty) | Layers |
+|---|---|---|---|---|---|---|---|---|
+| Loam, 1 carrier | 7 | 168–218 s, then 300 s | 184 t/h (part 3: 160) | 171 t/h (141) | 384 s | 203 (12,699) | 29 (6) | 0.3 → 0.6 m |
+| Loam, 2 carriers | 7 | 157–184 s, then 358 s | 185 t/h (167) | 167 t/h (143) | 133 s | 477 (12,418) | 31 (3) | 0.3 → 0.6 m |
+| Clay, 1 carrier | 6 | 224–244 s, then 270 s | 157 t/h | 145 t/h | 339 s | 127 | 17 (0) | 0.3 → 0.6 m |
+
+- **The spread area keeps up:**
+  - The pool runs short 25–60 times less often.
+  - Over a long shift, loading and delivered tonnes rise 15–21 % with one carrier, and 11–17 % with two.
+  - The dozer works a third to half the time.
+- **A second carrier loads 19 % faster while there is soil within reach:** the mean time between loads over the first five intervals is 164 s, against 196 s with one carrier, which matches part 3's 600 s runs.
+- **The next limit is the pit:**
+  - In every run the last load took longer: 12 and 17 bucket passes instead of 7 in loam, and 10 instead of 9 in clay.
+  - The excavator digs from one place, and after about 60 t it has dug out the soil within reach of its cycle. The run with two carriers digs faster and reaches that point sooner (at about 950 s).
+  - A real excavator would move along the cut. That is the next step for the operator model.
+- **Loam carry-back:** it shows up more over long runs: 0.3 t per trip typically, up to 1.4 t.
 
