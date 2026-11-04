@@ -143,7 +143,7 @@ ARMATURE = 200.0
 RIGID_SUBSTEPS = 4
 USE_MUJOCO_CPU = False  # GPU MuJoCo, with the rigid substeps recorded as one CUDA graph
 # moving soil zone (soil_zone.py): only soil near the bucket is MPM particles, the rest is dormant columns
-POOL = 150_000  # particle capacity; the 2 m fill is about 1.5 million particles
+POOL = 200_000  # particle capacity (dry sand flowing into a cut wakes about 110 k); the 2 m fill is about 1.5 million particles
 ZONE_EVERY = 4  # frames between wake/sleep updates (15 Hz)
 MPM_EVERY = 2  # frames per MPM step: sand at 30 Hz (the stream rate), the machine at 60 Hz
 MPM_ITERATIONS = {1: 60, 2: 150}  # the longer step needs more solver iterations to hold the same load
@@ -158,18 +158,27 @@ HM_NX, HM_NY = 96, 86  # 0.1 m cells to x = 6.6, y = 6.1: past where the fill me
 DIG_Z = BED_TOP - 0.5  # the dig waypoints below were set for a 0.5 m bed
 
 
+WALL_T = 0.4  # thickness of the walls on the pit's -x and -y sides
+
+
 def ground_height(x, y):
     """Ground under the soil (zone frame): pit floor, 1V:1.5H sides on the machine (+x) and truck (+y)
-    sides, site ground beyond (as the static colliders below)."""
+    sides, site ground beyond, and behind the walls on the -x and -y sides (as the static colliders below)."""
     x, y = np.broadcast_arrays(np.asarray(x, dtype=float), np.asarray(y, dtype=float))
-    side = np.maximum(np.clip((x - ZONE_HALF[0]) / 1.5, 0.0, 2.5), np.clip((y - ZONE_HALF[1]) / 1.5, 0.0, 2.5))
-    return np.where((x > 6.75) | (y > 6.25), GROUND_Z, side)
+    zx, zy = ZONE_HALF
+    side = np.maximum(np.clip((x - zx) / 1.5, 0.0, 2.5), np.clip((y - zy) / 1.5, 0.0, 2.5))
+    h = np.where((x > 6.75) | (y > 6.25), GROUND_Z, side)
+    # under the walls themselves the pit floor (sand against a wall pokes a little into it)
+    behind = ((x < -zx - WALL_T) & (y <= zy + WALL_T)) | ((y < -zy - WALL_T) & (x <= zx))
+    return np.where(behind, GROUND_Z, h)
 
 
 # dormant-soil regions, raised ones first: the truck bed, then the pit with its sides and the ground
 # around it (spill), from the pit's walled -x / -y sides to past the machine and the truck
 TRUCK_REGION = ("truck", float(BED_LO[0]), float(BED_LO[1]), int(BED_L / CELL), int(BED_W / CELL), lambda x, y: np.full(np.shape(x), BED_FLOOR_Z))
-GROUND_REGION = ("ground", -ZONE_HALF[0], -ZONE_HALF[1], 160, 140, ground_height)
+# reaching 2 m past the -x / -y walls and over the loading spot, so that spill there can settle: soil outside
+# every soil region never sleeps (it stays awake, using up the particle pool)
+GROUND_REGION = ("ground", -ZONE_HALF[0] - 2.0, -ZONE_HALF[1] - 2.0, 229, 181, ground_height)
 # haul: the carrier spins round at TURN_X and reverses to DUMP_X (its base), tipping onto a spoil area east
 # of the machine, flat site ground from x = 13 to 34 m
 HAUL_TURN_X, HAUL_DUMP_X = 20.0, 23.0
@@ -180,6 +189,8 @@ DOZER_X_START, DOZER_X_END = 25.2, 33.4  # cutting edge x where the pushes start
 DOZER_LANE_ENDS = (1.3, 3.9, 6.5, 9.1)  # y where the fanned lanes reach DOZER_X_END (from the dump line, y 5.2)
 DOZER_PARK_Y = 11.4
 DOZER_SEES_SPEED = 1.0  # m/s: the dozer plans on all soil slower than this (dumped clay creeps for minutes)
+# the haul road between the loading spot and the spoil area: soil falling off a carrier settles there
+ROAD_REGION = ("road", 13.3, -2.5, 134, 190, lambda x, y: np.full(np.shape(x), GROUND_Z))
 # the spoil area reaches 4.6 m past the dozer's lanes, for the soil carried ahead of the blade at the end,
 # and 2 m beside them, for the soil spilled off the blade's ends (soil outside a soil region never settles)
 SPOIL_REGION = ("spoil", 24.0, -2.5, 175, 190, lambda x, y: np.full(np.shape(x), GROUND_Z))
@@ -615,6 +626,9 @@ class ExcavatorSim:
         b.add_shape_box(-1, xform=wp.transform(wp.vec3(10.0, 1.0, GROUND_Z / 2)), hx=3.25, hy=9.0, hz=GROUND_Z / 2, cfg=ground)  # behind the machine
         b.add_shape_box(-1, xform=wp.transform(wp.vec3(25.625, 3.0, GROUND_Z / 2)), hx=12.375, hy=11.0, hz=GROUND_Z / 2, cfg=ground)  # haul road and spoil area
         b.add_shape_box(-1, xform=wp.transform(wp.vec3(0.0, 8.1, GROUND_Z / 2)), hx=6.75, hy=1.85, hz=GROUND_Z / 2, cfg=ground)  # beside the pit, truck side
+        # behind the walls on the -x and -y sides: site ground, where spill from the bucket lands
+        b.add_shape_box(-1, xform=wp.transform(wp.vec3(-6.2, -3.05, GROUND_Z / 2)), hx=2.8, hy=5.95, hz=GROUND_Z / 2, cfg=ground)
+        b.add_shape_box(-1, xform=wp.transform(wp.vec3(-0.2, -5.95, GROUND_Z / 2)), hx=3.2, hy=3.05, hz=GROUND_Z / 2, cfg=ground)
         slope = newton.ModelBuilder.ShapeConfig(mu=0.6, has_shape_collision=False)  # catches sand only
         tilt = math.atan(1 / 1.5)
         half_len = math.hypot(3.75, 2.5) / 2
@@ -649,7 +663,7 @@ class ExcavatorSim:
         )
         self.sand_model = sb.finalize()
         self.n_particles = self.sand_model.particle_count
-        self.zones = SoilZones([TRUCK_REGION, GROUND_REGION, SPOIL_REGION], self.n_particles, SPACING**3)
+        self.zones = SoilZones([TRUCK_REGION, GROUND_REGION, ROAD_REGION, SPOIL_REGION], self.n_particles, SPACING**3)
         z = self.zones
         # dormant faces lower than a cohesive soil's critical height stand; only higher ones are woken to fail
         z.AVALANCHE_DROP = max(SoilZones.AVALANCHE_DROP, 0.8 * soils.critical_height(soil)[0])
@@ -657,9 +671,9 @@ class ExcavatorSim:
         in_pit = ground & (z.col_x < 6.75) & (z.col_y < 6.25)
         fill = np.floor((BED_TOP - z.col_floor) / LAYER_PER_PARTICLE / 4) * 4
         self.bed_counts = np.where(in_pit & (fill > 0), fill, 0).astype(np.int64)
-        self._pit_cols = in_pit
+        self._pit_cols = in_pit & (z.col_x > -ZONE_HALF[0]) & (z.col_y > -ZONE_HALF[1])  # inside the walls
         in_hm = (z.col_x < HM_X0 + HM_NX * HM_CELL) & (z.col_y < HM_Y0 + HM_NY * HM_CELL)
-        z.set_display(ground & ~in_hm)  # the pit, truck and spoil heightmaps show the rest
+        z.set_display((ground & ~in_hm) | z.region_mask("road"))  # the pit, truck and spoil heightmaps show the rest
         self.truck_floor = z.col_floor[z.region_mask("truck")].copy()
         # the carriers' haul cycle; each vessel and the dozer blade has a free joint (found by its child body)
         self.haul = haul

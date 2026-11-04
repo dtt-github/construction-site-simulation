@@ -44,6 +44,9 @@ DUMP_HOLD = 3.0  # s at full tip, for the soil to leave
 # sticky soil stays in a tipped vessel: the operator shakes it (tip oscillating SHAKE_DEG every SHAKE_PERIOD)
 # until less than CARRY_BACK of the load is left, for up to DUMP_MAX s; what is left rides back
 SHAKE_DEG, SHAKE_PERIOD, CARRY_BACK, DUMP_MAX = 4.0, 0.8, 0.03, 15.0
+# the dumped pile builds up under the tipped vessel's tail and holds the rest of the load in: as drivers do,
+# the carrier creeps forward while soil is still in the vessel, so the load spreads out behind it
+CREEP_SPEED, CREEP_MAX = 0.4, 2.5  # m/s, m
 RETURN_X = 18.5  # base_link x where an empty carrier turns back toward the spot, or leaves the road to wait
 QUEUE = (14.5, 11.0, -math.pi / 2)  # waiting place north of the road: base_link x, y, heading (cab to the road)
 
@@ -101,6 +104,7 @@ class Dumper:
         self.trips = []  # per trip: payload and the time spent in each stage away from the loading spot
         self.trip = None
         self.counts = None  # the carried load (server): particle counts per vessel cell, while away
+        self.creep_from = None  # where the carrier stood when it began to dump
         self.carry_counted = 0
         if self.start == "queue":
             self.base = np.array(QUEUE[:2], dtype=float)
@@ -227,8 +231,17 @@ class Dumper:
                 self.tip_rate = 0.0
                 done = True
         elif kind == "dump":
+            if self.stage != "dump":
+                self.creep_from = self.base.copy()
             self._next("dump")
             finished = self.payload_kg <= 0.0 and self.residual_kg <= CARRY_BACK * self.load_kg
+            crept = float(np.linalg.norm(self.base - self.creep_from))
+            if self.stage_time > DUMP_HOLD and not finished and crept < CREEP_MAX:
+                heading = np.array([math.cos(self.yaw), math.sin(self.yaw)])
+                self.speed = CREEP_SPEED
+                self.base += CREEP_SPEED * heading * dt
+            else:
+                self.speed = 0.0
             if self.stage_time > DUMP_HOLD and self.payload_kg <= 0.0 and (finished or self.stage_time > DUMP_MAX):
                 self.tip, self.tip_rate = TIP_MAX, 0.0
                 done = True

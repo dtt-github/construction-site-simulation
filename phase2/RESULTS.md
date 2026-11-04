@@ -1266,3 +1266,40 @@ Part 4 put the late slowdown down to the pit being dug out. That was wrong: at t
   - Dry sand flows furthest, out of the vessel and over the spoil area. This was not investigated further here.
 - **Carry-back over long runs:** loam and clay carried back 0.3–1.6 t per trip in the later loads.
 
+## A living site, 6: dry sand over a long shift
+
+Part 5 left dry sand slowing at the end of long runs: the particle pool ran short 8000 times, each dump took longer (3 s up to 24 s), and the carrier carried 1.5–2.5 t back per trip. An instrumented 1300 s run, which counted every minute where the awake particles were and how fast they moved, found three causes. Each is fixed.
+
+- **Soil that could never sleep:**
+  - About 90,000 particles, more than half the 150 k pool, lay still in places outside every soil region, where the zone cannot put them back to sleep:
+    - 30,000 behind the pit's −y wall: bucket spill fell over the wall 2.35 m to the base plane, because the physics had no ground there.
+    - Up to 52,000 on the ground at the loading spot, just past the pit region's edge (x = 9.8 m): spill from the heaped vessel.
+    - 13,000 on the haul road: soil falling off the vessel's outside.
+  - The fixes:
+    - Site ground behind the −x and −y walls.
+    - The pit region now reaches 2 m past the walls and over the whole loading spot.
+    - A new region along the haul road.
+- **The pool was too small for dry sand:** dry sand flowing into the cut wakes up to about 110,000 particles while the excavator digs, which is physical. The pool is now 200,000.
+- **The dump blocked itself:**
+  - The pile under the tipped vessel's tail reached 1.4–1.9 m at every dump, with the tail only 0.4 m above the ground, so the last of the load could not get out.
+  - As drivers do, the carrier now creeps forward (0.4 m/s, up to 2.5 m) while soil is still in the vessel after the first 3 s, so the load spreads out behind it.
+- **Grains pushed through the ground:**
+  - Spill flung from the swinging bucket at 3–10 m/s can land inside a ground collider. The soil collider under the parked vessel can also push grains beneath it down.
+  - Such grains ended on the base plane and stayed awake. A grain well below the floor of every soil region above it (0.6 m) is now removed and counted as lost: about 1 t over 25 minutes in dry sand (1612 grains of 0.1 kg).
+
+**1500 s, one carrier, before and after** (logs `logs/haul_bench_{face,sandfix}_long_<soil>_1carrier.json`; the runs shared the GPU):
+
+| Soil | Pool short | Carried back per trip | Dump time | Passes per load | Delivered |
+|---|---|---|---|---|---|
+| Dry sand, before | 8008 | 0.02–2.5 t, growing | 3 → 24 s | 9–10, then 13 | 132 t/h |
+| Dry sand, after | **51** | **0.07–0.29 t** | **3–4 s** | 9–12, level | **149 t/h** |
+| Loam, before | 473 | 0.3–1.6 t | 5–15 s | 6–8 | 172 t/h |
+| Loam, after | **30** | **0.1–0.34 t** | **3.5–6 s** | 5–9 | 158 t/h |
+| Clay, before | 362 | 0.25–1.2 t | 12–15 s | 8–10 | 142 t/h |
+| Clay, after | **13** | **0.2–0.35 t** | **6–8 s** | 9–10 | **170 t/h** |
+
+- **Dry sand no longer slows down:** the pool runs short 150 times less often, the carrier no longer carries soil back, and delivered tonnes rise 13 %.
+- **Clay gains 20 %** from the same fixes.
+- **Loam:** the loading rate is unchanged (mean time between loads 179 s against 187 s). It delivered less in this window because its first two loads took 9 passes instead of 7 (run-to-run variation), so 7 loads fitted instead of 8.
+- **Limit:** spill still collects around the loading spot (about 8 % of a dry-sand load runs over the heaped vessel). It now settles, but nothing clears it.
+

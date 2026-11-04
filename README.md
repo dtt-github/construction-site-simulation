@@ -101,7 +101,7 @@ Only licenses that allow redistribution, modification and commercial use are acc
 
 - Operator models beyond the scripted cycle (learned or recorded operator inputs), and checking heaped bucket loads against field data
 - Converged soil solves: loads still depend on the MPM iteration count
-- A living site: the haul cycle, the D37 dozer spreading the spoil, and two carriers sharing the road are done. The operator now chooses each cut where the soil is, so loading holds steady over a long shift in loam and clay. Next: dry sand over long runs (particle pool and carry-back), longer haul roads and more carriers, track–soil contact for the carriers and the dozer, compaction of the spread layers
+- A living site: the haul cycle, the D37 dozer spreading the spoil, and two carriers sharing the road are done. The operator now chooses each cut where the soil is, so loading holds steady over a long shift in loam and clay. Long shifts hold steady in all three soils. Next: clearing spill at the loading spot, longer haul roads and more carriers, track–soil contact for the carriers and the dozer, compaction of the spread layers
 - Research APIs: the Gymnasium environment, the lidar, depth camera and IMU, and the ROS 2 bridge are done (the carrier and the dozer are in all three). Next: a `ros2_control` hardware interface, sensor noise models, and several environments per GPU
 - Measured ZX200 masses, swing torque and pressure logs for validation
 - Measured pressure logs, port relief and house inertia to validate the hydraulics

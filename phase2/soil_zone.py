@@ -40,6 +40,7 @@ PER_LAYER = 4
 LAYER_PER_PARTICLE = SPACING / PER_LAYER  # column rise per particle (m)
 TOP_LIMIT = 4.0  # m above the floor: particles higher than this never sleep into a column (a dumped cohesive load stands over 2 m)
 BELOW_FLOOR = 0.3  # m: particles this far under their column floor belong to no column
+FELL_THROUGH = 0.6  # m: particles this far under the floor of every region above them fell through the ground
 PARK_SPACING = 0.027  # parked particles: about 26 per 8 cm voxel
 PARK_ORIGIN = (-30.0, -30.0, -30.0)
 
@@ -69,6 +70,22 @@ def column_of(p: wp.vec3, regions: Regions):
             if p[2] > f - BELOW_FLOOR and p[2] < f + TOP_LIMIT:
                 return c
     return -1
+
+
+@wp.func
+def fell_through(p: wp.vec3, regions: Regions):
+    """True if p lies under at least one region and well below the floor of every region it lies under:
+    it was pushed through the ground (under a raised region's collider, as under the truck bed)."""
+    under = int(0)
+    for r in range(regions.nx.shape[0]):
+        lo = regions.lo[r]
+        ix = int(wp.floor((p[0] - lo[0]) / CELL))
+        iy = int(wp.floor((p[1] - lo[1]) / CELL))
+        if ix >= 0 and ix < regions.nx[r] and iy >= 0 and iy < regions.ny[r]:
+            if p[2] > regions.floor[regions.offset[r] + iy * regions.nx[r] + ix] - FELL_THROUGH:
+                return False
+            under = 1
+    return under == 1
 
 
 @wp.kernel
@@ -132,12 +149,13 @@ def absorb_kernel(
     lost: wp.array[int],
 ):
     """Sleep: particles in sleeping columns are added to the column count and parked. Particles that
-    fell through the ground (below min_z) are removed and counted as lost."""
+    fell through the ground (below min_z, or well under every region above them) are removed and counted
+    as lost."""
     i = wp.tid()
     if (flags[i] & ACTIVE) == 0:
         return
     p = q[i]
-    if p[2] < min_z:
+    if p[2] < min_z or fell_through(p, regions):
         wp.atomic_add(lost, 0, 1)
         deactivate(i, flags, mpm_flags, mpm_material_flags, mpm_material_volume, q, qd, park, freed, freed_n)
         return
