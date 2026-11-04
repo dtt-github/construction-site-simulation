@@ -23,8 +23,10 @@ Observation (dict of float32 arrays, SI units, zone frame: x across the pit, z u
     bucket_load (1)        soil inside the bucket shell (kg)
     truck_load (1)         soil in the carrier's vessel (kg): at the loading spot, or carried to the spoil
     delivered (1)          soil the carrier has dumped at the spoil area so far (kg)
-    carrier (6)            the crawler carrier (dumper.py): stage (index in CARRIER_STAGES), base x, y (m),
+    carrier (6)            the crawler carrier serving the excavator (dumper.py: the one at the loading spot,
+                           else the next one due there): stage (index in CARRIER_STAGES), base x, y (m),
                            heading (rad), vessel tip (rad), payload (kg)
+    carriers (n, 6)        every carrier, as above (n = carriers, 1 or 2)
     dozer (6)              the dozer spreading the spoil (dozer.py): stage (index in dozer.STAGES), base x, y (m),
                            heading (rad), blade lift angle (rad, + lowers), soil force on the blade along its
                            heading (N)
@@ -42,7 +44,7 @@ Observation (dict of float32 arrays, SI units, zone frame: x across the pit, z u
 Haul cycle: the carrier leaves when its load is near capacity and comes back empty (about a minute away);
 the excavator meanwhile has nothing to load into. With autopilot the operator model decides when to send
 it; otherwise auto_dispatch sends it at 92 % of capacity (or call env.sim.dispatch()). haul=False keeps it
-parked for good.
+parked for good. carriers=2 runs two carriers that take turns at the loading spot (dumper.py).
 
 Tasks (reward per control step; pass reward_fn to define your own):
     "load-truck"   tonnes of soil added to the carrier (loaded into it, whether still in it or dumped)
@@ -72,16 +74,20 @@ CARRIER_STAGES = ex.CARRIER_STAGES
 DOZER_STAGES = dozer_mod.STAGES
 
 
+def carrier_obs(c):
+    return np.array([CARRIER_STAGES.index(c.stage), *c.base, c.yaw, c.tip, c.payload_kg], dtype=np.float32)
+
+
 class ExcavatorEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, soil=soils.DEFAULT_SOIL, task="load-truck", control_hz=10.0, episode_s=60.0,
-                 autopilot=False, terrain=True, sensors=(), reward_fn=None, sim_kwargs=None, haul=True, auto_dispatch=True):
+                 autopilot=False, terrain=True, sensors=(), reward_fn=None, sim_kwargs=None, haul=True, auto_dispatch=True, carriers=1):
         if task not in TASKS and reward_fn is None:
             raise ValueError(f"task must be one of {TASKS}, or pass reward_fn")
         self.task, self.reward_fn = task, reward_fn
         self.episode_s, self.autopilot, self.with_terrain = episode_s, autopilot, terrain
-        self.sim_kwargs = dict(sim_kwargs or {}, haul=haul)
+        self.sim_kwargs = dict(sim_kwargs or {}, haul=haul, carriers=carriers)
         self.auto_dispatch = auto_dispatch
         self.sim = ex.ExcavatorSim(soil=soil, **self.sim_kwargs)
         self.sensors = tuple(sensors)
@@ -104,6 +110,7 @@ class ExcavatorEnv(gym.Env):
             "truck_load": spaces.Box(0.0, np.inf, shape=(1,), dtype=np.float32),
             "delivered": spaces.Box(0.0, np.inf, shape=(1,), dtype=np.float32),
             "carrier": spaces.Box(-np.inf, np.inf, shape=(6,), dtype=np.float32),
+            "carriers": spaces.Box(-np.inf, np.inf, shape=(carriers, 6), dtype=np.float32),
             "dozer": spaces.Box(-np.inf, np.inf, shape=(6,), dtype=np.float32),
         }
         if terrain:
@@ -151,7 +158,7 @@ class ExcavatorEnv(gym.Env):
         else:
             a = np.clip(np.asarray(action, dtype=float), -1.0, 1.0)
             sim.set_levers(*a)
-            if self.auto_dispatch and sim.dumper.parked and sim.truck_kg >= 0.92 * ex.TRUCK_CAPACITY_KG:
+            if self.auto_dispatch and sim.fleet.at_spot is not None and sim.spot_kg >= 0.92 * ex.TRUCK_CAPACITY_KG:
                 sim.dispatch()
             for _ in range(self.frame_skip):
                 sim.step()
@@ -183,8 +190,9 @@ class ExcavatorEnv(gym.Env):
             "bucket_force": sim.force.astype(np.float32),
             "bucket_load": np.array([sim.fill_kg], dtype=np.float32),
             "truck_load": np.array([sim.truck_kg], dtype=np.float32),
-            "delivered": np.array([sim.dumper.delivered_kg], dtype=np.float32),
-            "carrier": np.array([CARRIER_STAGES.index(sim.dumper.stage), *sim.dumper.base, sim.dumper.yaw, sim.dumper.tip, sim.dumper.payload_kg], dtype=np.float32),
+            "delivered": np.array([sim.fleet.delivered_kg], dtype=np.float32),
+            "carrier": carrier_obs(sim.dumper),
+            "carriers": np.stack([carrier_obs(c) for c in sim.fleet]),
             "dozer": np.array([DOZER_STAGES.index(sim.dozer.stage), sim.dozer.x, sim.dozer.y, sim.dozer.yaw, sim.dozer.lift, sim.dozer.force], dtype=np.float32),
         }
         if self.with_terrain:
@@ -210,9 +218,10 @@ class ExcavatorEnv(gym.Env):
             "mckyes_force": sim.fee_ref,
             "passes": sim.passes,
             "carrier_stage": sim.dumper.stage,
+            "carrier_stages": [c.stage for c in sim.fleet],
             "excavator_wait_s": sim.truck_wait,
             "dozer_stage": sim.dozer.stage,
-            "carrier_wait_for_dozer_s": sim.dumper.dozer_wait,
+            "carrier_wait_for_dozer_s": sum(c.dozer_wait for c in sim.fleet),
         }
 
 

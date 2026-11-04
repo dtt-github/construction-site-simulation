@@ -60,7 +60,7 @@ import soils
 import dozer as dozer_mod
 import dumper as dumper_mod
 from dozer import Dozer
-from dumper import Dumper
+from dumper import Fleet
 from soil_zone import CELL, LAYER_PER_PARTICLE, PER_LAYER, SPACING, SoilZones
 
 # ------------------------------------------------------------------ machine (zone frame, Z up)
@@ -173,7 +173,7 @@ GROUND_REGION = ("ground", -ZONE_HALF[0], -ZONE_HALF[1], 160, 140, ground_height
 # haul: the carrier spins round at TURN_X and reverses to DUMP_X (its base), tipping onto a spoil area east
 # of the machine, flat site ground from x = 13 to 34 m
 HAUL_TURN_X, HAUL_DUMP_X = 20.0, 23.0
-CARRIER_STAGES = ("loading", "drive out", "turn to dump", "reverse to dump", "tip", "dump", "lower", "return", "turn to load", "reverse in", "wait at dump")
+CARRIER_STAGES = dumper_mod.STAGES
 # dozer (dozer.py): spreads the dumped loads east of the dump point in lanes along +x (cutting edge from
 # DOZER_X_START to DOZER_X_END), and parks north of the dump point, out of the carrier's way
 DOZER_X_START, DOZER_X_END = 25.2, 33.4
@@ -514,9 +514,9 @@ class ExcavatorSim:
         ("swing back", 0, 6.0, 2.6 + DIG_Z, -95),  # lowers while swinging, once clear of the truck
     ]
 
-    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True):
+    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1):
         wp.init()
-        self.kwargs = {"voxel": voxel, "ppc": ppc, "soil": soil, "iterations": iterations, "fps": fps, "pool": pool, "mpm_every": mpm_every}
+        self.kwargs = {"voxel": voxel, "ppc": ppc, "soil": soil, "iterations": iterations, "fps": fps, "pool": pool, "mpm_every": mpm_every, "carriers": carriers}
         self.soil = soil
         material = soils.SOILS[soil]
         density, friction = material["density"], material["friction"]
@@ -591,10 +591,13 @@ class ExcavatorSim:
             ((-L / 2 - self.TAIL_LEN * math.cos(self.TAIL_ANGLE) / 2, 0.0, self.TAIL_LEN * math.sin(self.TAIL_ANGLE) / 2 - Tb / 2), (self.TAIL_LEN / 2, Wb / 2 + Tb, Tb / 2), self.TAIL_ANGLE),
             ((L / 2 + Tb / 2, 0.0, (Hb + 0.5) / 2), (Tb / 2, Wb / 2, (Hb + 0.5) / 2)),  # headboard, toward the cab
         ]
-        self.vessel = b.add_body(xform=wp.transform(wp.vec3(BED_CENTER[0], BED_CENTER[1], BED_FLOOR_Z), wp.quat_identity()), mass=3000.0,
-                                 com=wp.vec3(0.0), inertia=box_inertia(3000.0, 2.0, 1.3, 0.5), lock_inertia=True, is_kinematic=True, label="vessel")
-        for c, h, *a in self.vessel_boxes:
-            b.add_shape_box(self.vessel, xform=wp.transform(wp.vec3(*c), rot_y(a[0] if a else 0.0)), hx=h[0], hy=h[1], hz=h[2], cfg=truck_cfg)
+        self.vessels = []  # one per carrier; the first starts at the loading spot, the others waiting to load
+        for i in range(carriers):
+            v = b.add_body(xform=wp.transform(wp.vec3(BED_CENTER[0], BED_CENTER[1] + 6.0 * i, BED_FLOOR_Z), wp.quat_identity()), mass=3000.0,
+                           com=wp.vec3(0.0), inertia=box_inertia(3000.0, 2.0, 1.3, 0.5), lock_inertia=True, is_kinematic=True, label=f"vessel{i}")
+            for c, h, *a in self.vessel_boxes:
+                b.add_shape_box(v, xform=wp.transform(wp.vec3(*c), rot_y(a[0] if a else 0.0)), hx=h[0], hy=h[1], hz=h[2], cfg=truck_cfg)
+            self.vessels.append(v)
         # dozer blade: a kinematic body (scripted, dozer.py) that pushes sand (MPM collider); body frame = blade_link
         self.blade_boxes = dozer_mod.blade_plates()
         self.blade = b.add_body(xform=wp.transform(wp.vec3(0.0, 0.0, -20.0), wp.quat_identity()), mass=1200.0, com=wp.vec3(0.0),
@@ -655,17 +658,19 @@ class ExcavatorSim:
         in_hm = (z.col_x < HM_X0 + HM_NX * HM_CELL) & (z.col_y < HM_Y0 + HM_NY * HM_CELL)
         z.set_display(ground & ~in_hm)  # the pit, truck and spoil heightmaps show the rest
         self.truck_floor = z.col_floor[z.region_mask("truck")].copy()
-        # the carrier's haul cycle; its vessel's free joint is the model's last joint
+        # the carriers' haul cycle; each vessel and the dozer blade has a free joint (found by its child body)
         self.haul = haul
-        self.dumper = Dumper(BED_CENTER, GROUND_Z, HAUL_DUMP_X, HAUL_TURN_X, TRUCK_CAPACITY_KG)
-        self.vessel_q = int(self.model.joint_q_start.numpy()[4])
-        self.vessel_qd = int(self.model.joint_qd_start.numpy()[4])
+        self.fleet = Fleet(carriers, BED_CENTER, GROUND_Z, HAUL_DUMP_X, HAUL_TURN_X, TRUCK_CAPACITY_KG)
+        child = self.model.joint_child.numpy()
+        jq, jqd = self.model.joint_q_start.numpy(), self.model.joint_qd_start.numpy()
+        joint_of = {int(bd): j for j, bd in enumerate(child)}
+        for c, v in zip(self.fleet, self.vessels):
+            c.body, c.vq, c.vqd = v, int(jq[joint_of[v]]), int(jqd[joint_of[v]])
         # the dozer spreading the loads at the spoil area; its blade's free joint follows the vessel's
         self.use_dozer = haul and dozer
         edge_ahead = Dozer((0.0, 0.0, 0.0), (0.0, 1.0, [0.0]), 0.0)._edge_ahead()
         self.dozer = Dozer((DOZER_X_START - edge_ahead, DOZER_PARK_Y, math.pi / 2), (DOZER_X_START, DOZER_X_END, DOZER_LANES), GROUND_Z)
-        self.blade_q = int(self.model.joint_q_start.numpy()[5])
-        self.blade_qd = int(self.model.joint_qd_start.numpy()[5])
+        self.blade_q, self.blade_qd = int(jq[joint_of[self.blade]]), int(jqd[joint_of[self.blade]])
 
         cfg = SolverImplicitMPM.Config()
         cfg.voxel_size = voxel
@@ -676,7 +681,7 @@ class ExcavatorSim:
             cfg.warmstart_mode = "particles"  # keeps per-particle stress and plastic volume (Jp) for cracking
         self.mpm = SolverImplicitMPM(self.sand_model, config=cfg)
         # colliders: static shapes, the stick and bucket, and the dormant soil columns
-        collide = [bid for bid in range(self.model.body_count) if bid in (stick, bucket, self.vessel, self.blade)]
+        collide = [bid for bid in range(self.model.body_count) if bid in (stick, bucket, *self.vessels, self.blade)]
         self.mpm.setup_collider(
             model=self.model,
             collider_body_ids=[-1, *collide, None],
@@ -760,15 +765,13 @@ class ExcavatorSim:
         self.q_ref.assign(self.q0.astype(np.float32))
         self.levers = np.zeros(4)
         self.auto = False
-        self.dumper.reset()
+        self.fleet.reset()
         self.dozer.reset()
         self.blade_force = np.zeros(3)
         self.zones.set_region_floor("truck", self.truck_floor)
-        self.payload = None  # the carried load: particle counts per vessel cell (ny, nx), while away
         self.dispatch_pending, self.truck_wait = False, 0.0
         self.pass_kg, self.truck_mark = 0.0, 0.0
         self.was_waiting = False
-        self._carry_counted = 0
         self.auto_stage = 0
         self.auto_s = 0.0
         self.passes = 0
@@ -793,7 +796,7 @@ class ExcavatorSim:
         self.cyl_p = np.zeros(3)
         self.cyl_head = np.ones(3, dtype=bool)
         self.cyl_pts, self.cyl_L, self.cyl_J = self.linkage.state(self.q0)
-        self.truck_kg = 0.0
+        self.truck_kg, self.spot_kg = 0.0, 0.0
         self.truck_hm_np = np.full(TRUCK_NX * TRUCK_NY, BED_FLOOR_Z, dtype=np.float32)
         self.force = np.zeros(3)
         self.fill_kg = 0.0
@@ -1049,7 +1052,7 @@ class ExcavatorSim:
         a, b = (self.curl_out if self.curl_out is not None and w[0] == "curl" else w for w in (a, b))
         a, b = (self._dump_waypoint(w) if w[0] in ("swing to truck", "dump") else w for w in (a, b))
         self.stage_name = b[0]
-        waiting = self.haul and b[0] == "swing to truck" and not self.dumper.parked
+        waiting = self.haul and b[0] == "swing to truck" and self.fleet.at_spot is None
         if waiting:
             # no carrier at the loading spot: swing part way and hold the full bucket up there (the pit's
             # soil goes back to sleep), until one is back
@@ -1233,49 +1236,57 @@ class ExcavatorSim:
             self.solver.step(self.state_0, self.state_1, self.control, self.contacts, self.sim_dt)
             self.state_0, self.state_1 = self.state_1, self.state_0
 
+    @property
+    def dumper(self):
+        """The carrier serving the excavator: the one at the loading spot, else the next one due there."""
+        f = self.fleet
+        return f.at_spot or next((c for c in f if c.stage in ("reverse in", "from queue", "turn to load", "wait to load")), f.carriers[0])
+
     def dispatch(self):
-        """Send the carrier off with its load (once the bucket is clear of it)."""
-        if self.dumper.parked:
+        """Send the carrier at the loading spot off with its load (once the bucket is clear of it)."""
+        if self.fleet.at_spot is not None:
             self.dispatch_pending = True
 
     def _haul(self):
-        """Carrier: move the vessel, and hand the load over to and from the soil zone."""
-        d = self.dumper
-        if self.dispatch_pending and d.parked and (not self.auto or self.stage_name not in ("swing to truck", "dump")) and self.q[0] > math.radians(-70):
+        """Carriers: move the vessels, and hand each load over to and from the soil zone."""
+        f = self.fleet
+        f.gates(self.dozer.parked or not self.use_dozer)
+        spot = f.at_spot
+        if self.dispatch_pending and spot is not None and (not self.auto or self.stage_name not in ("swing to truck", "dump")) and self.q[0] > math.radians(-70):
             self.dispatch_pending = False
-            d.depart_requested = True
-        if d.update(self.frame_dt) == "depart":
-            self._take_load()
-        if d.stage in ("tip", "dump") and self.payload is not None:
-            self._release_load()
-        if d.stage == "dump" and self.zone_frame % 15 == 0:
-            d.residual_kg = self._in_vessel() * self.particle_mass  # what still sticks to the vessel
-        if d.stage == "lower" and self._carry_counted != d.loads:  # once per trip, as the vessel comes down
-            self._carry_counted = d.loads
-            d.residual_kg = self._in_vessel() * self.particle_mass
-            d.delivered_kg -= d.residual_kg  # carried back, not delivered
-            if d.trip is not None:
-                d.trip["carry_back_kg"] = round(d.residual_kg)
-        if d.parked and self.payload is None and self.zones.col_floor[self.zones.region_mask("truck")][0] < 0:
-            self.zones.set_region_floor("truck", self.truck_floor)  # back at the loading spot
-        p, R, v, w = d.vessel_pose()
+            spot.depart_requested = True
         q, qd = self.state_0.joint_q.numpy(), self.state_0.joint_qd.numpy()
-        q[self.vessel_q:self.vessel_q + 7] = [*p, *d.vessel_quat()]
-        qd[self.vessel_qd:self.vessel_qd + 6] = [*v, *w]
+        for d in f:
+            if d.update(self.frame_dt) == "depart":
+                self._take_load(d)
+            if d.stage in ("tip", "dump") and d.counts is not None:
+                self._release_load(d)
+            if d.stage == "dump" and self.zone_frame % 15 == 0:
+                d.residual_kg = self._in_vessel(d) * self.particle_mass  # what still sticks to the vessel
+            if d.stage == "lower" and d.carry_counted != d.loads:  # once per trip, as the vessel comes down
+                d.carry_counted = d.loads
+                d.residual_kg = self._in_vessel(d) * self.particle_mass
+                d.delivered_kg -= d.residual_kg  # carried back, not delivered
+                if d.trip is not None:
+                    d.trip["carry_back_kg"] = round(d.residual_kg)
+            if d.parked and d.counts is None and self.zones.col_floor[self.zones.region_mask("truck")][0] < 0:
+                self.zones.set_region_floor("truck", self.truck_floor)  # a carrier is back at the loading spot
+            p, R, v, w = d.vessel_pose()
+            q[d.vq:d.vq + 7] = [*p, *d.vessel_quat()]
+            qd[d.vqd:d.vqd + 6] = [*v, *w]
         self.state_0.joint_q.assign(q)
         self.state_0.joint_qd.assign(qd)
 
     def _doze(self):
         """Dozer: spread what the carrier dumps; it works only while the carrier is away from the dump point,
         and the carrier waits at its turn point until the dozer has parked."""
-        d, dz = self.dumper, self.dozer
+        dz = self.dozer
         if self.zone_frame % 3 == 0:
             self._spoil_surface(self.doze_hm, DOZER_SEES_SPEED)
             self.doze_hm_np = self.doze_hm.numpy()
-        may_work = d.stage in ("loading", "reverse in") or (d.stage == "drive out" and d.base[0] < HAUL_TURN_X - 6.0)
+        may_work = self.fleet.dump_area_free()
         self.blade_force = self.sand_forces.numpy()[self.blade][:3].astype(float)
         dz.update(self.frame_dt, self._surface, self.blade_force, may_work)
-        d.dump_clear = dz.parked
         p, R = dz.blade_pose()
         q, qd = self.state_0.joint_q.numpy(), self.state_0.joint_qd.numpy()
         q[self.blade_q:self.blade_q + 7] = [*p, *dz.blade_quat()]
@@ -1300,44 +1311,45 @@ class ExcavatorSim:
         h[inside] = np.maximum(self.doze_hm_np[iy[inside] * nx + ix[inside]], GROUND_Z)
         return h
 
-    def _in_vessel(self):
-        """Active particles inside the vessel (count)."""
+    def _in_vessel(self, d):
+        """Active particles inside carrier d's vessel (count)."""
         act = np.flatnonzero(self.zones.active_np)
-        loc = self._vessel_local(self.sand.particle_q.numpy()[act])
+        loc = self._vessel_local(d, self.sand.particle_q.numpy()[act])
         return int(((np.abs(loc[:, 0]) < BED_L / 2 + 0.05) & (np.abs(loc[:, 1]) < BED_W / 2 + 0.05) & (loc[:, 2] > -0.1) & (loc[:, 2] < BED_H + 1.5)).sum())
 
-    def _vessel_local(self, pts):
-        p, R, _, _ = self.dumper.vessel_pose()
+    @staticmethod
+    def _vessel_local(d, pts):
+        p, R, _, _ = d.vessel_pose()
         return (pts - p) @ R
 
-    def _take_load(self):
-        """The carrier leaves: its load (dormant columns at the loading spot and particles in the vessel)
+    def _take_load(self, d):
+        """Carrier d leaves the loading spot: its load (dormant columns at the loading spot and particles in the vessel)
         becomes counts per vessel cell, carried until it is dumped; the loading spot's region is switched
         off (nothing to rest on there now)."""
         z = self.zones
         x0, y0, nx, ny, _ = z.region_grid("truck")
         counts = z.take_region("truck")
         act = np.flatnonzero(z.active_np)
-        loc = self._vessel_local(self.sand.particle_q.numpy()[act])
+        loc = self._vessel_local(d, self.sand.particle_q.numpy()[act])
         inside = (np.abs(loc[:, 0]) < BED_L / 2 + 0.05) & (np.abs(loc[:, 1]) < BED_W / 2 + 0.05) & (loc[:, 2] > -0.1) & (loc[:, 2] < BED_H + 1.5)
         ix = np.clip(((loc[inside, 0] + BED_L / 2) / CELL).astype(int), 0, nx - 1)
         iy = np.clip(((loc[inside, 1] + BED_W / 2) / CELL).astype(int), 0, ny - 1)
         np.add.at(counts, (iy, ix), 1)
         z.remove(act[inside])
         z.set_region_floor("truck", -50.0)
-        self.payload = counts
-        self.dumper.payload_kg = self.dumper.load_kg = float(counts.sum()) * self.particle_mass
-        self.dumper.loads += 1
+        d.counts = counts
+        d.payload_kg = d.load_kg = float(counts.sum()) * self.particle_mass
+        d.loads += 1
 
     TAIL_LEN, TAIL_ANGLE = 0.6, math.radians(25.0)  # the vessel floor's rising rear end
     WAIT_POSE = ("wait for carrier", -50, 5.6, 6.5, -165)  # where the full bucket waits for an empty carrier
     RELEASE_FROM, RELEASE_TO = math.radians(25.0), math.radians(55.0)  # tip over which the load slides out
     RELEASE_PER_FRAME = 6000  # particles at most per frame (the pool and the MPM step stay bounded)
 
-    def _release_load(self):
+    def _release_load(self, d):
         """Tipping: the load leaves as particles, the columns at the rear (tail, -x in the vessel) first,
         moving with the vessel; they then slide out under MPM physics."""
-        d, counts = self.dumper, self.payload
+        counts = d.counts
         frac = np.clip((d.tip - self.RELEASE_FROM) / (self.RELEASE_TO - self.RELEASE_FROM), 0.0, 1.0)
         if frac <= 0.0:
             return
@@ -1377,7 +1389,7 @@ class ExcavatorSim:
         d.delivered_kg += d.payload_kg - remaining
         d.payload_kg = remaining
         if remaining <= 0.0:
-            self.payload = None
+            d.counts = None
 
     def step(self):
         if self.haul:
@@ -1474,9 +1486,12 @@ class ExcavatorSim:
         moving = self.moving.numpy()[:n_moving]
         self.fill_kg = float(self.fill_counter.numpy()[0]) * self.particle_mass
         in_vessel = float(self.truck_counter.numpy()[0] + self.zones.dormant_in("truck")) * self.particle_mass
-        # parked: the soil in the vessel; away: the load it carries
-        self.truck_kg = in_vessel if self.dumper.parked else self.dumper.payload_kg
-        self.truck_hm_np = self.truck_hm.numpy() if self.dumper.parked else self._carried_heightmap()
+        # the soil in the vessel at the loading spot, plus the loads carried by the carriers away from it
+        spot = self.fleet.at_spot
+        self.spot_kg = in_vessel if spot is not None else 0.0
+        self.truck_kg = self.spot_kg + sum(c.payload_kg for c in self.fleet if not c.parked)
+        owner = self._load_owner()
+        self.truck_hm_np = self.truck_hm.numpy() if owner is spot else self._carried_heightmap(owner)
         self._spoil_surface(self.spoil_hm, SURFACE_MAX_SPEED)  # no spoil: below the ground (the browser hides it)
         self.spoil_hm_np = self.spoil_hm.numpy()
         _, _, edge = fk(self.q)
@@ -1536,7 +1551,9 @@ class ExcavatorSim:
                 "hide_nodes": ["cylinder_head_link", "cylinder_rod_link"],  # the tipping cylinder (not posed)
                 "vessel_boxes": [box(np.asarray(c) + dumper_mod.FLOOR_FROM_PIN, h, *a) for c, h, *a in self.vessel_boxes],  # pin frame
                 "body_boxes": [box(c, h) for c, h in [((0.2, s * 1.0, 0.45), (3.1, 0.3, 0.45)) for s in (-1, 1)] + [((-0.3, 0.0, 0.85), (2.9, 1.1, 0.15)), ((2.2, -0.2, 1.9), (1.2, 1.1, 1.0))]],
-                "parked_pin": self._carrier_three()[1],
+                "parked_pin": self._carrier_three(dumper_mod.Dumper(BED_CENTER, GROUND_Z, HAUL_DUMP_X, HAUL_TURN_X, TRUCK_CAPACITY_KG))[1],
+                "count": len(self.fleet),
+                "stages": list(CARRIER_STAGES),
             },
             "truck_capacity_kg": TRUCK_CAPACITY_KG,
         }
@@ -1591,11 +1608,15 @@ class ExcavatorSim:
         parts = self.part_poses()
         body += struct.pack("<I", len(parts)) + b"".join(struct.pack("<3f4f", *self.to_three(p), *self.quat_to_three(qt)) for p, qt in parts)
         body += struct.pack("<3f", *(np.where(self.cyl_head, 1.0, -1.0) * self.cyl_p / 1e5))
-        # trailer: the carrier (base_link and vessel pin poses, tip, payload) and the spoil heightmap
-        base, pin = self._carrier_three()
+        # trailer "CARS": the carriers (base_link and vessel pin poses, tip, payload, delivered, stage), which
+        # of them the truck heightmap belongs to, then the spoil heightmap
         shm = np.clip((self.spoil_hm_np + 1.0) * 1000.0, 0, 65535).astype(np.uint16)
         shm_header = struct.pack("<HHfff", SPOIL_HM[2], SPOIL_HM[3], ox + SPOIL_HM[0] + HM_CELL / 2, oz - SPOIL_HM[1] - HM_CELL / 2, HM_CELL)
-        car = struct.pack("<4s7f7f3fI", b"CAR1", *base, *pin, self.dumper.tip, self.dumper.payload_kg, self.dumper.delivered_kg, CARRIER_STAGES.index(self.dumper.stage))
+        owner = self._load_owner()
+        car = struct.pack("<4sIi", b"CARS", len(self.fleet), -1 if owner is None else owner.index)
+        for d in self.fleet:
+            base, pin = self._carrier_three(d)
+            car += struct.pack("<7f7f3fI", *base, *pin, d.tip, d.payload_kg, d.delivered_kg, CARRIER_STAGES.index(d.stage))
         head = body + hm_header + hm.tobytes() + thm_header + thm.tobytes()
         grains = p_header + qp.tobytes()
         tail = car + shm_header + shm.tobytes()
@@ -1604,28 +1625,35 @@ class ExcavatorSim:
             tail += struct.pack("<4s7fffI", b"DOZ1", *self.to_three(dz.base_pos()), *self.quat_to_three(dz.base_quat()), dz.lift, dz.force / 1000, dozer_mod.STAGES.index(dz.stage))
         return (head, grains, tail) if parts else head + grains + tail
 
-    def _carrier_three(self):
-        """Carrier base_link and vessel pin poses in three.js coordinates ((pos, quat), (pos, quat))."""
-        d = self.dumper
+    def _load_owner(self):
+        """The carrier whose load the truck heightmap shows: the one at the loading spot, else the one
+        carrying a load (the most recent to leave), else None."""
+        if self.fleet.at_spot is not None:
+            return self.fleet.at_spot
+        away = [c for c in self.fleet if c.counts is not None]
+        return max(away, key=lambda c: c.trip["depart_t"] if c.trip else 0.0) if away else None
+
+    def _carrier_three(self, d):
+        """Carrier d's base_link and vessel pin poses in three.js coordinates ((pos, quat), (pos, quat))."""
         base = np.array([d.base[0], d.base[1], GROUND_Z])
         bq = dumper_mod.yaw_quat(d.yaw)
         p, R, _, _ = d.vessel_pose()
         pin = p - R @ dumper_mod.FLOOR_FROM_PIN
         return (list(self.to_three(base)) + list(self.quat_to_three(bq)), list(self.to_three(pin)) + list(self.quat_to_three(d.vessel_quat())))
 
-    def _carried_heightmap(self):
-        """The carried load as the truck heightmap, in the vessel's parked frame (the browser moves it with
+    def _carried_heightmap(self, d):
+        """Carrier d's carried load as the truck heightmap, in the vessel's parked frame (the browser moves it with
         the vessel): heights from the particle counts per vessel cell."""
         z = self.zones
         x0, y0, nx, ny, _ = z.region_grid("truck")
         hm = np.full(TRUCK_NX * TRUCK_NY, BED_FLOOR_Z, dtype=np.float32)
-        if self.payload is None:
+        if d is None or d.counts is None:
             return hm
         gx = BED_LO[0] + (np.arange(TRUCK_NX) + 0.5) * TRUCK_CELL
         gy = BED_LO[1] + (np.arange(TRUCK_NY) + 0.5) * TRUCK_CELL
         ix = np.clip(((gx - x0) / CELL).astype(int), 0, nx - 1)
         iy = np.clip(((gy - y0) / CELL).astype(int), 0, ny - 1)
-        h = BED_FLOOR_Z + self.payload[np.ix_(iy, ix)] * LAYER_PER_PARTICLE
+        h = BED_FLOOR_Z + d.counts[np.ix_(iy, ix)] * LAYER_PER_PARTICLE
         return h.astype(np.float32).ravel()
 
     def stats(self):
@@ -1650,8 +1678,9 @@ class ExcavatorSim:
             "mckyes_kN": round(self.fee_ref / 1000, 1),
             "edge": [round(v, 2) for v in fk(self.q)[2]],
             "truck_kg": round(self.truck_kg),
-            "carrier": {"stage": self.dumper.stage, "payload_kg": round(self.dumper.payload_kg), "delivered_kg": round(self.dumper.delivered_kg),
-                        "loads": self.dumper.loads, "trips": self.dumper.trips[-3:], "excavator_wait_s": round(self.truck_wait, 1)},
+            "carrier": {"stage": self.dumper.stage, "payload_kg": round(self.dumper.payload_kg), "delivered_kg": round(self.fleet.delivered_kg),
+                        "loads": sum(c.loads for c in self.fleet), "trips": self.fleet.trips[-3:], "excavator_wait_s": round(self.truck_wait, 1),
+                        "stages": [c.stage for c in self.fleet]},
             "active": self.zones.n_active,
             "ease_m": round(self.ease, 2),
             "early_curls": self.early_curls,
@@ -1779,8 +1808,9 @@ def main():
     ap.add_argument("--pool", type=int, default=POOL, help="particle capacity of the soil zone")
     ap.add_argument("--mpm-every", type=int, default=MPM_EVERY, help="frames per MPM step (1: sand at 60 Hz)")
     ap.add_argument("--soil", choices=list(soils.SOILS), default=soils.DEFAULT_SOIL, help="soil preset (soils.py)")
+    ap.add_argument("--carriers", type=int, default=1, choices=(1, 2), help="crawler carriers in the haul cycle")
     args = ap.parse_args()
-    sim = ExcavatorSim(voxel=args.voxel, iterations=args.iterations, pool=args.pool, mpm_every=args.mpm_every, soil=args.soil)
+    sim = ExcavatorSim(voxel=args.voxel, iterations=args.iterations, pool=args.pool, mpm_every=args.mpm_every, soil=args.soil, carriers=args.carriers)
     if args.trench:
         sim.set_trench()
     res = None

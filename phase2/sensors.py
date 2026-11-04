@@ -186,7 +186,7 @@ class SensorRig:
         label = []
         for i in boxes:
             c = self.shape_xf[i][:3]
-            if self.shape_body[i] == getattr(sim, "vessel", -2):
+            if self.shape_body[i] in getattr(sim, "vessels", ()):
                 label.append(TRUCK)
             elif self.shape_body[i] >= 0:
                 label.append(MACHINE)
@@ -202,7 +202,8 @@ class SensorRig:
         self.n_fixed_extra = len(extra)
         self.carrier_parts = [((0.2, s * 1.0, 0.45), (3.1, 0.3, 0.45)) for s in (-1, 1)]  # tracks
         self.carrier_parts += [((-0.3, 0.0, 0.85), (2.9, 1.1, 0.15)), ((2.2, -0.2, 1.9), (1.2, 1.1, 1.0))]  # frame, cab and engine
-        extra += [(c, h, TRUCK) for c, h in self.carrier_parts]
+        self.n_carriers = len(getattr(sim, "fleet", [None]))
+        extra += [(c, h, TRUCK) for _ in range(self.n_carriers) for c, h in self.carrier_parts]
         # and the dozer's tracks, frame and cab (its blade is a physics body); base_link frame, moved with it
         self.dozer_parts = [((0.0, s * 0.8, 0.35), (1.3, 0.25, 0.35)) for s in (-1, 1)]
         self.dozer_parts += [((-0.2, 0.0, 1.1), (1.3, 0.8, 0.45)), ((-0.6, 0.0, 2.2), (0.65, 0.7, 0.6))]
@@ -253,21 +254,21 @@ class SensorRig:
             else:
                 p, q = lp, lq
             self.box_xf_np[j] = [*p, *q]
-        d = getattr(sim, "dumper", None)
-        if d is not None:
+        k = len(self.boxes) + self.n_fixed_extra
+        for d in getattr(sim, "fleet", []):
             c, s_ = math.cos(d.yaw), math.sin(d.yaw)
             base = np.array([d.base[0], d.base[1], ex.GROUND_Z])
-            for j, (lc, _) in enumerate(self.carrier_parts):
-                k = len(self.boxes) + self.n_fixed_extra + j
+            for lc, _ in self.carrier_parts:
                 self.box_xf_np[k] = [*(base + np.array([c * lc[0] - s_ * lc[1], s_ * lc[0] + c * lc[1], lc[2]])), 0.0, 0.0, math.sin(d.yaw / 2), math.cos(d.yaw / 2)]
+                k += 1
         dz = getattr(sim, "dozer", None)
         if dz is not None and getattr(sim, "use_dozer", False):
             R, p0, qd = dz.base_rot(), dz.base_pos(), dz.base_quat()
             for j, (lc, _) in enumerate(self.dozer_parts):
-                k = len(self.boxes) + self.n_fixed_extra + len(self.carrier_parts) + j
+                k = len(self.boxes) + self.n_fixed_extra + self.n_carriers * len(self.carrier_parts) + j
                 self.box_xf_np[k] = [*(p0 + R @ np.asarray(lc)), *qd]
         else:  # no dozer: its parts out of sight
-            k0 = len(self.boxes) + self.n_fixed_extra + len(self.carrier_parts)
+            k0 = len(self.boxes) + self.n_fixed_extra + self.n_carriers * len(self.carrier_parts)
             self.box_xf_np[k0:k0 + len(self.dozer_parts)] = [0.0, 0.0, -100.0, 0.0, 0.0, 0.0, 1.0]
         self.box_xf.assign(self.box_xf_np)
         self.surf.fill_(-1.0e30)

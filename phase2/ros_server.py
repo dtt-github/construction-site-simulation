@@ -92,7 +92,7 @@ class Server:
             bp, bR = base_pose(sim)
             hp, hR = rig.house_pose()
             cyl = sim.cyl_p * np.where(sim.cyl_head, 1.0, -1.0)
-            out.append(pack({"type": "state", "t": t, "stage": sim.stage_name, "auto": bool(sim.auto), "carrier_stage": sim.dumper.stage, "dozer_stage": sim.dozer.stage}, [
+            out.append(pack({"type": "state", "t": t, "stage": sim.stage_name, "auto": bool(sim.auto), "carrier_stages": [c.stage for c in sim.fleet], "dozer_stage": sim.dozer.stage}, [
                 ("q", sim.q.astype(np.float64)), ("qd", sim.qd.astype(np.float64)),
                 ("pressure", np.array([sim.tau[0] / hyd.SWING_DISP, *cyl], dtype=np.float64)),
                 ("levers", sim.levers.astype(np.float64)),
@@ -100,8 +100,7 @@ class Server:
                 ("body_p", hp.astype(np.float64)), ("body_q", ex.quat_from_matrix(hR).astype(np.float64)),
                 ("bucket_tip", np.asarray(ex.fk(sim.q)[2], dtype=np.float64)), ("soil_force", sim.force.astype(np.float64)),
                 ("loads", np.array([sim.fill_kg, sim.truck_kg], dtype=np.float64)),
-                ("carrier", np.array([sim.dumper.base[0], sim.dumper.base[1], ex.GROUND_Z, sim.dumper.yaw, sim.dumper.tip,
-                                      sim.dumper.payload_kg, sim.dumper.delivered_kg], dtype=np.float64)),
+                ("carriers", np.array([[c.base[0], c.base[1], ex.GROUND_Z, c.yaw, c.tip, c.payload_kg, c.delivered_kg] for c in sim.fleet], dtype=np.float64)),
                 ("dozer", np.array([*sim.dozer.base_pos(), *sim.dozer.base_quat(), sim.dozer.lift, sim.dozer.force], dtype=np.float64))]))
         if t >= self.next["imu"]:
             self.next["imu"] = t + 1.0 / IMU_HZ
@@ -156,7 +155,7 @@ class Server:
 
 
 async def main_async(args):
-    sim = ex.ExcavatorSim(soil=args.soil)
+    sim = ex.ExcavatorSim(soil=args.soil, carriers=args.carriers)
     sim.auto = args.autopilot
     server = Server(sim, sensors.SensorRig(sim), fast=args.fast)
     srv = await asyncio.start_server(server.handle, args.host, args.port)
@@ -170,6 +169,7 @@ def main():
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=7777)
     ap.add_argument("--soil", default=soils.DEFAULT_SOIL, choices=list(soils.SOILS))
+    ap.add_argument("--carriers", type=int, default=1, choices=(1, 2), help="crawler carriers in the haul cycle")
     ap.add_argument("--autopilot", action="store_true", help="start with the built-in operator driving")
     ap.add_argument("--fast", action="store_true", help="run as fast as possible instead of in real time")
     asyncio.run(main_async(ap.parse_args()))

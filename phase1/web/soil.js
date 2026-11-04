@@ -12,7 +12,8 @@ const HM_HEADER_BYTES = 16;
 const P_HEADER_BYTES = 20;
 const MAGIC_SOIL = 0x4c494f53; // "SOIL"
 const MAGIC_EXC = 0x32435845; // "EXC2"
-const MAGIC_CAR1 = 0x31524143; // "CAR1": crawler carrier trailer
+const MAGIC_CAR1 = 0x31524143; // "CAR1": crawler carrier trailer (one carrier; older recordings)
+const MAGIC_CARS = 0x53524143; // "CARS": crawler carriers trailer
 const MAGIC_DOZ1 = 0x315a4f44; // "DOZ1": dozer trailer
 const MAGIC_EXC3 = 0x33435845; // "EXC3": EXC2 + hydraulic cylinder and linkage poses, cylinder pressures
 
@@ -221,9 +222,12 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   // excavator (excavator_server.py): links built from the hello geometry (boxes), replaced by the real
   // machine's meshes when the server names a glTF model whose link frames match its physics links
   const arm = { links: {}, parts: {}, base: null, truckSurface: null, tracks: null, model: false };
-  // crawler dump carrier (dumper.py): base_link and vessel (pin frame) groups, posed from the frame trailer
-  const carrier = (window.__carrier = { base: null, vessel: null, parkedPin: null, spoil: null, stage: "" });
-  const CARRIER_STAGES = ["loading", "drive out", "turn to dump", "reverse to dump", "tip", "dump", "lower", "return", "turn to load", "reverse in", "wait at dump"];
+  // crawler dump carriers (dumper.py): per carrier, base_link and vessel (pin frame) groups, posed from the
+  // frame trailer; carrier.base / .vessel / .stage are the first one's
+  const carrier = (window.__carrier = { units: [], base: null, vessel: null, parkedPin: null, spoil: null, stage: "", stages: [] });
+  // the server sends the stage names (geometry.carrier.stages); these are for recordings that don't
+  let CARRIER_STAGES = ["loading", "drive out", "turn to dump", "reverse to dump", "tip", "dump", "lower", "return", "turn to load", "reverse in",
+    "wait at dump", "to queue", "wait to load", "from queue"];
   // dozer (dozer.py): base group posed from the "DOZ1" trailer; the blade arm turns about its lift joint
   const dozer = (window.__dozer = { base: null, arm: null, cylinder: null, piston: null, pistonAxis: null, stages: [], stage: "" });
   function buildExcavator(geom) {
@@ -323,12 +327,16 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
 
   function buildCarrier(c) {
     const truckPaint = new THREE.MeshStandardMaterial({ color: "#c98a1e", metalness: 0.3, roughness: 0.6 });
-    carrier.base = new THREE.Group();
-    carrier.vessel = new THREE.Group();
-    c.body_boxes.forEach((b, i) => addBox(carrier.base, b.size, b.center, i < 2 ? dark : truckPaint));
-    c.vessel_boxes.forEach((b) => addBox(carrier.vessel, b.size, b.center, truckPaint));
-    carrier.base.visible = carrier.vessel.visible = false;
-    scene.add(carrier.base, carrier.vessel);
+    if (c.stages) CARRIER_STAGES = c.stages;
+    for (let i = 0; i < (c.count ?? 1); i++) {
+      const u = { base: new THREE.Group(), vessel: new THREE.Group() };
+      c.body_boxes.forEach((b, k) => addBox(u.base, b.size, b.center, k < 2 ? dark : truckPaint));
+      c.vessel_boxes.forEach((b) => addBox(u.vessel, b.size, b.center, truckPaint));
+      u.base.visible = u.vessel.visible = false;
+      scene.add(u.base, u.vessel);
+      carrier.units.push(u);
+    }
+    [carrier.base, carrier.vessel] = [carrier.units[0].base, carrier.units[0].vessel];
     carrier.parkedPin = new THREE.Matrix4().compose(new THREE.Vector3(...c.parked_pin.slice(0, 3)), new THREE.Quaternion(...c.parked_pin.slice(3)), new THREE.Vector3(1, 1, 1));
     if (loader) loadCarrierModel(c);
   }
@@ -352,19 +360,21 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
         });
         return w;
       };
-      const base = gltf.scene.getObjectByName("base_link").clone(true);
-      for (const name of [c.vessel_node, ...c.hide_nodes]) {
-        const n = base.getObjectByName(name);
-        if (n) n.parent.remove(n);
+      for (const u of carrier.units) {
+        const base = gltf.scene.getObjectByName("base_link").clone(true);
+        for (const name of [c.vessel_node, ...c.hide_nodes]) {
+          const n = base.getObjectByName(name);
+          if (n) n.parent.remove(n);
+        }
+        base.position.set(0, 0, 0);
+        base.quaternion.identity();
+        const vessel = new THREE.Group();
+        for (const child of gltf.scene.getObjectByName(c.vessel_node).children) if (!child.name.endsWith("_link")) vessel.add(child.clone(true));
+        u.base.clear();
+        u.base.add(wrap(base));
+        u.vessel.clear();
+        u.vessel.add(wrap(vessel));
       }
-      base.position.set(0, 0, 0);
-      base.quaternion.identity();
-      const vessel = new THREE.Group();
-      for (const child of gltf.scene.getObjectByName(c.vessel_node).children) if (!child.name.endsWith("_link")) vessel.add(child.clone(true));
-      carrier.base.clear();
-      carrier.base.add(wrap(base));
-      carrier.vessel.clear();
-      carrier.vessel.add(wrap(vessel));
     } catch (err) {
       console.warn("carrier: model has unexpected structure, drawing boxes", err);
     }
@@ -520,16 +530,31 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     o += P_HEADER_BYTES;
     f.grains = { count, lo, span, q: new Uint16Array(buf.slice(o, o + count * 6)) };
     o += count * 6;
-    // carrier trailer ("CAR1", excavator_server.py): base_link and vessel pin poses, tip, loads, stage
-    if (o + 4 <= buf.byteLength && dv.getUint32(o, true) === MAGIC_CAR1) {
-      const g = (k) => dv.getFloat32(o + 4 + 4 * k, true);
-      f.carrier = {
-        base: [0, 1, 2, 3, 4, 5, 6].map(g),
-        pin: [7, 8, 9, 10, 11, 12, 13].map(g),
-        tip: g(14), payload: g(15), delivered: g(16),
-        stage: CARRIER_STAGES[dv.getUint32(o + 4 + 4 * 17, true)] ?? "",
-      };
-      o += 4 + 4 * 18;
+    // carriers trailer ("CARS", excavator_server.py): count, the carrier the truck heightmap belongs to,
+    // then per carrier base_link and vessel pin poses, tip, loads, stage ("CAR1": one carrier, no count)
+    const magicCar = o + 4 <= buf.byteLength ? dv.getUint32(o, true) : 0;
+    if (magicCar === MAGIC_CAR1 || magicCar === MAGIC_CARS) {
+      let n = 1;
+      f.loadOwner = 0;
+      o += 4;
+      if (magicCar === MAGIC_CARS) {
+        n = dv.getUint32(o, true);
+        f.loadOwner = dv.getInt32(o + 4, true);
+        o += 8;
+      }
+      f.carriers = [];
+      for (let i = 0; i < n; i++) {
+        const g = (k) => dv.getFloat32(o + 4 * k, true);
+        f.carriers.push({
+          base: [0, 1, 2, 3, 4, 5, 6].map(g),
+          pin: [7, 8, 9, 10, 11, 12, 13].map(g),
+          tip: g(14), payload: g(15), delivered: g(16),
+          stage: CARRIER_STAGES[dv.getUint32(o + 4 * 17, true)] ?? "",
+        });
+        o += 4 * 18;
+      }
+      f.carrier = f.carriers[f.loadOwner] ?? f.carriers[0];
+      f.delivered = f.carriers.reduce((a, c) => a + c.delivered, 0);
       [f.spoilHm, o] = readHeightmap(dv, buf, o);
     }
     // dozer trailer ("DOZ1"): base_link pose, lift angle, blade force (kN), stage
@@ -692,7 +717,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       controlsEl.querySelectorAll("input").forEach((el) => (el.disabled = true));
       const secs = frames[frames.length - 1].t.toFixed(0);
       const what = info.what === "site"
-        ? `a whole haul cycle, ${secs} s played ${info.speed}× faster: the ZX200 loads the IC120 carrier pass by pass, the carrier hauls the load to the spoil area and tips it, and the D37 dozer spreads it, all in Newton MPM soil`
+        ? `a whole haul cycle, ${secs} s played ${info.speed}× faster: the ZX200 loads an IC120 carrier pass by pass${(info.carriers ?? 1) > 1 ? ", which hauls the load to the spoil area while the second carrier takes its place" : " and the carrier hauls the load to the spoil area"}; it tips the load and the D37 dozer spreads it, all in Newton MPM soil`
         : `one auto dig–swing–load pass of the ZX200 with its hydraulic cylinders, in Newton MPM sand (${secs} s)`;
       statusEl.innerHTML = `<strong>Recorded replay</strong> (loops): ${what}, recorded from the GPU server. For live control, run the server (<a href="${QUICK_START}" target="_blank" rel="noopener">quick start</a>).`;
     } catch (err) {
@@ -790,22 +815,30 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       tp.needsUpdate = true;
       arm.truckSurface.geometry.computeVertexNormals();
     }
-    if (f.carrier && carrier.base) {
-      const c = f.carrier;
+    if (f.carriers && carrier.units.length) {
       dispatchBtn.hidden = !!replay;
-      dispatchBtn.disabled = c.stage !== "loading";
-      carrier.base.visible = carrier.vessel.visible = true;
-      carrier.base.position.set(...c.base.slice(0, 3));
-      carrier.base.quaternion.set(...c.base.slice(3));
-      carrier.vessel.position.set(...c.pin.slice(0, 3));
-      carrier.vessel.quaternion.set(...c.pin.slice(3));
-      carrier.stage = c.stage;
-      // the load surface is sent in the vessel's parked frame: move it with the vessel
+      dispatchBtn.disabled = !f.carriers.some((c) => c.stage === "loading");
+      f.carriers.forEach((c, i) => {
+        const u = carrier.units[i];
+        if (!u) return;
+        u.base.visible = u.vessel.visible = true;
+        u.base.position.set(...c.base.slice(0, 3));
+        u.base.quaternion.set(...c.base.slice(3));
+        u.vessel.position.set(...c.pin.slice(0, 3));
+        u.vessel.quaternion.set(...c.pin.slice(3));
+      });
+      carrier.stage = f.carriers[0].stage;
+      carrier.stages = f.carriers.map((c) => c.stage);
+      // the load surface is sent in the parked frame of the vessel holding it: move it with that vessel
+      const owner = carrier.units[f.loadOwner];
       if (arm.truckSurface) {
-        const now = new THREE.Matrix4().compose(carrier.vessel.position, carrier.vessel.quaternion, new THREE.Vector3(1, 1, 1));
-        arm.truckSurface.matrixAutoUpdate = false;
-        arm.truckSurface.matrix.multiplyMatrices(now, carrier.parkedPin.clone().invert());
-        arm.truckSurface.matrixWorldNeedsUpdate = true;
+        arm.truckSurface.visible = !!owner;
+        if (owner) {
+          const now = new THREE.Matrix4().compose(owner.vessel.position, owner.vessel.quaternion, new THREE.Vector3(1, 1, 1));
+          arm.truckSurface.matrixAutoUpdate = false;
+          arm.truckSurface.matrix.multiplyMatrices(now, carrier.parkedPin.clone().invert());
+          arm.truckSurface.matrixWorldNeedsUpdate = true;
+        }
       }
     }
     if (f.dozer && dozer.base) {
@@ -897,7 +930,13 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     rows.push(["McKyes reference", f.cut > 0.01 ? `${kN(f.fee)} at ${(f.cut * 100).toFixed(0)} cm cut` : "–"]);
     rows.push(["Bucket load", `${f.fill.toFixed(0)} kg`]);
     if (f.kind === "excavator") rows.push(["Truck load", `${(f.truck / 1000).toFixed(2)} t of ${(f.capacity / 1000).toFixed(0)} t (${Math.round((100 * f.truck) / f.capacity)}%)`]);
-    if (f.carrier) rows.push(["Carrier", `${f.carrier.stage} · ${(f.carrier.delivered / 1000).toFixed(1)} t dumped`]);
+    if (f.carriers) {
+      if (f.carriers.length === 1) rows.push(["Carrier", `${f.carriers[0].stage} · ${(f.delivered / 1000).toFixed(1)} t dumped`]);
+      else {
+        f.carriers.forEach((c, i) => rows.push([`Carrier ${i + 1}`, c.stage]));
+        rows.push(["Dumped", `${(f.delivered / 1000).toFixed(1)} t`]);
+      }
+    }
     if (f.dozer) rows.push(["Dozer", `${dozer.stage}${f.dozer.force > 0.5 ? ` · blade ${f.dozer.force.toFixed(0)} kN` : ""}`]);
     statsEl.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     window.__soil = { lastFrame: f, stats: { ...stats }, stalled, model: arm.model };

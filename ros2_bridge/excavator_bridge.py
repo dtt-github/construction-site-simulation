@@ -28,6 +28,7 @@ Published (stamps in simulation time; run your nodes with use_sim_time:=true):
     /carrier/joint_states               sensor_msgs/JointState  vessel_pin_joint (rad, negative = tipped, as the URDF)
     /carrier/stage                      std_msgs/String   haul stage (loading, drive out, ..., reverse in)
     /carrier/payload, /carrier/delivered  std_msgs/Float64  load carried, total dumped (kg)
+                                        (with two carriers the second is carrier2: carrier2/base_link, /carrier2/...)
     /tf                                 world -> dozer/base_link (the Komatsu D37PXi-24 dozer, PWRI OPERA d37pxi_ros2)
     /dozer/joint_states                 sensor_msgs/JointState  lift_joint (rad, + lowers the blade, as the URDF)
     /dozer/stage                        std_msgs/String   parked, to lane, lower, push, raise, back, to park
@@ -96,10 +97,6 @@ class Bridge(Node):
             "bucket": self.create_publisher(Float64, "/excavator/bucket_load", 10),
             "truck": self.create_publisher(Float64, "/excavator/truck_load", 10),
             "stage": self.create_publisher(String, "/excavator/stage", 10),
-            "carrier_joints": self.create_publisher(JointState, "/carrier/joint_states", 10),
-            "carrier_stage": self.create_publisher(String, "/carrier/stage", 10),
-            "carrier_payload": self.create_publisher(Float64, "/carrier/payload", 10),
-            "carrier_delivered": self.create_publisher(Float64, "/carrier/delivered", 10),
             "dozer_joints": self.create_publisher(JointState, "/dozer/joint_states", 10),
             "dozer_stage": self.create_publisher(String, "/dozer/stage", 10),
             "dozer_force": self.create_publisher(Float64, "/dozer/blade_force", 10),
@@ -108,6 +105,7 @@ class Bridge(Node):
         self.create_subscription(Bool, "/excavator/autopilot", lambda m: self.send({"type": "autopilot", "on": bool(m.data)}), 10)
         self.create_subscription(Empty, "/excavator/reset", lambda m: self.send({"type": "reset"}), 10)
         self.create_subscription(Empty, "/carrier/dispatch", lambda m: self.send({"type": "dispatch"}), 10)
+        self.carriers = {}  # per carrier: its publishers, made when it first appears
         self.sock, self.lock, self.hello = None, threading.Lock(), None
         threading.Thread(target=self.receive_loop, daemon=True).start()
 
@@ -169,6 +167,16 @@ class Bridge(Node):
         self.pub["tf_static"].publish(TFMessage(transforms=static))
         self.get_logger().info(f"simulator: soil {h['soil']}, rates {h['rates']}")
 
+    def carrier_pubs(self, name):
+        if name not in self.carriers:
+            self.carriers[name] = {
+                "joints": self.create_publisher(JointState, f"/{name}/joint_states", 10),
+                "stage": self.create_publisher(String, f"/{name}/stage", 10),
+                "payload": self.create_publisher(Float64, f"/{name}/payload", 10),
+                "delivered": self.create_publisher(Float64, f"/{name}/delivered", 10),
+            }
+        return self.carriers[name]
+
     def on_state(self, h, a):
         t = h["t"]
         self.pub["clock"].publish(Clock(clock=stamp(t)))
@@ -178,16 +186,19 @@ class Bridge(Node):
         js.position, js.velocity, js.effort = a["q"].tolist(), a["qd"].tolist(), a["pressure"].tolist()
         self.pub["joints"].publish(js)
         tfs = [transform("world", "base_link", t, a["base_p"], a["base_q"]), transform("world", "body_link", t, a["body_p"], a["body_q"])]
-        if "carrier" in a:
-            x, y, z, yaw, tip, payload, delivered = (float(v) for v in a["carrier"])
-            tfs.append(transform("world", "carrier/base_link", t, (x, y, z), (0.0, 0.0, np.sin(yaw / 2), np.cos(yaw / 2))))
+        stages = h.get("carrier_stages", [])
+        for i, row in enumerate(a.get("carriers", np.zeros((0, 7))).reshape(-1, 7)):
+            x, y, z, yaw, tip, payload, delivered = (float(v) for v in row)
+            name = "carrier" if i == 0 else f"carrier{i + 1}"  # carrier, carrier2, ...
+            pub = self.carrier_pubs(name)
+            tfs.append(transform("world", f"{name}/base_link", t, (x, y, z), (0.0, 0.0, np.sin(yaw / 2), np.cos(yaw / 2))))
             cj = JointState()
             cj.header.stamp = stamp(t)
             cj.name, cj.position = ["vessel_pin_joint"], [-tip]
-            self.pub["carrier_joints"].publish(cj)
-            self.pub["carrier_stage"].publish(String(data=h.get("carrier_stage", "")))
-            self.pub["carrier_payload"].publish(Float64(data=payload))
-            self.pub["carrier_delivered"].publish(Float64(data=delivered))
+            pub["joints"].publish(cj)
+            pub["stage"].publish(String(data=stages[i] if i < len(stages) else ""))
+            pub["payload"].publish(Float64(data=payload))
+            pub["delivered"].publish(Float64(data=delivered))
         if "dozer" in a:
             d = [float(v) for v in a["dozer"]]
             tfs.append(transform("world", "dozer/base_link", t, d[0:3], d[3:7]))

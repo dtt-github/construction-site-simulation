@@ -1131,3 +1131,61 @@ The carrier's loads no longer pile up where they are dumped. A dozer, the Komats
 - **Momentary forces:** the kinematic blade can still meet more resistance than its tracks could pull, until load control lifts it. The particle pool sometimes runs short (79–434 times per run); a column that cannot be woken then stays rigid in front of the blade.
 - **No compaction:** the spread layers are loose. Compaction by the tracks and by rolling is not modelled.
 
+## A living site, 3: two carriers sharing one road
+
+A second IC120 carrier takes turns with the first at the excavator (`ExcavatorSim(carriers=2)`, `--carriers 2`). The question it answers is the one a site engineer asks first: how many trucks per excavator?
+
+**Traffic** (`dumper.py`: each carrier follows a list of moves; `Fleet` sets the gates between them):
+- **One lane:** the haul road between the loading spot and the dump point is one lane, as on a small site.
+- **Waiting place:** an empty carrier that finds the spot busy leaves the road at the return point (x = 18.5 m). It drives diagonally to a waiting place north of the road, at (14.5, 11) m, and waits there facing the road.
+- **Three gates:**
+  - A loaded carrier leaves the spot only while the other carrier is at the waiting place, so two carriers never meet head-on on the lane. With two carriers this costs nothing, because the empty one is always back first; it would matter with a longer road.
+  - The waiting carrier comes down to the spot once it is empty and the loaded one has turned and is backing into the dump point.
+  - A carrier backs into the dump point only while no other carrier, and not the dozer, is there.
+- **Clearances:** every place and move was checked against each spin turn's swept circle (4.15 m about `base_link`), against the parked carrier, the dozer's lanes and park, and the excavator.
+- **Same route for one carrier:** an empty carrier now turns back at x = 18.5 m instead of 20 m, which shortens its reverse into the spot by 1.5 m.
+
+**Benchmark** (`CARRIERS=1|2 bench_haul.py 600`, logs `logs/haul_bench_{1carrier,2carriers}_<soil>.json`). Delivered tonnes come in whole loads (two or three per 600 s), so the time between loads leaving the spot measures the gain better:
+
+| Soil | Carriers | Time between loads leaving | Loading rate (load / interval) | Excavator waiting | Spot empty | Carriers waiting to load |
+|---|---|---|---|---|---|---|
+| Dry sand | 1 | 255 s | 145 t/h | 93 s | 114 s | 0 |
+| | 2 | 228 s | 163 t/h (+12 %) | 39 s | 60 s | 519 s |
+| Loam | 1 | 170, 195 s | 202 t/h | 163 s | 197 s | 0 |
+| | 2 | 154, 141 s | 256 t/h (+27 %) | 63 s | 98 s | 460 s |
+| Clay | 1 | 214 s | 179 t/h | 113 s | 137 s | 0 |
+| | 2 | 178, 197 s | 204 t/h (+14 %) | 55 s | 91 s | 460 s |
+
+**Longer runs show a limit** (loam, 1500 s, logs `logs/haul_bench_long_loam_{1,2}carrier.json`):
+
+| Carriers | Loads | Time between loads leaving | Loaded | Excavator waiting | Carriers waiting to load / to leave | Particle pool short |
+|---|---|---|---|---|---|---|
+| 1 | 6 | 167–196 s, then 318 s | 160 t/h | 430 s | 0 / 0 s | 12,699 times |
+| 2 | 7 | 142–208 s (mean 156 s) | 167 t/h (+5 %) | 156 s | 1116 / 61 s | 12,418 times |
+
+- **The dozer falls behind after about 15 minutes:**
+  - Dumped loam builds up into heaps 2–3 m above the design surface that it does not push far enough. Only half the spread area reaches grade, so the next lift never starts, and 5–8 m³ is left unspread.
+  - Those heaps keep particles awake. The particle pool runs short more than 12,000 times per run, against 130 in 600 s, and digging slows in both runs (the one-carrier run's last load took 318 s).
+- **A second carrier gains less over a long shift:** 5 % more loaded against 27 % over 600 s. The excavator still waits a third as long.
+- **The one-lane rule costs something:** the loaded carrier waited 61 s in total before leaving, until the empty one had reached the waiting place.
+- **The spread area needs work first:**
+  - The dozer has to push heaps all the way and raise the design surface by layer.
+  - The spoil area needs more room, or the soil zone needs a larger pool.
+  - Until then, the 600 s runs measure the fleet, and long runs measure the spread area's capacity.
+
+- **What this shows:**
+  - **One carrier keeps the excavator 75–85 % busy:** the round trip (about 60 s) is short next to loading (120–190 s).
+    - A second carrier removes most of the remaining wait. What is left is the swap: about 30 s with no carrier at the spot while one leaves and the other backs in.
+    - In return, each carrier now waits 3.5–4.5 minutes per 10 minutes at the waiting place.
+  - **The textbook match factor agrees:** carriers × loading time / carrier cycle time.
+    - One carrier: 0.67–0.75, so the excavator waits.
+    - Two carriers: 1.3–1.5, so the carriers wait.
+    - The best fleet for this short haul is between one and two carriers. A second carrier pays off most in loam, which loads fastest (+27 %), and least in dry sand (+12 %), which loads slowest. These are 600 s figures; over 1500 s the gain shrinks (below).
+  - **Longer hauls:** a second carrier would pay off more as the haul gets longer. The road here is 13 m from the spot to the dump point.
+- **The dozer** worked between dumps as before. The carriers never waited for it at the dump point.
+
+**Limits:**
+- **Two carriers at most:** there is one waiting place, so three or more would need a queue of places.
+- **Scripted rules:** the traffic rules are fixed, not planned. For example, a loaded carrier waits for the empty one to reach the waiting place even when it could pass.
+- **Few loads per run:** with two or three loads per run, each interval is one cycle. The 1500 s runs have more cycles, but there the spread area limits the result (above).
+

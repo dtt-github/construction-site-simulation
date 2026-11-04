@@ -7,9 +7,9 @@ is connected, `speed` times faster than recorded.
 
 Two recordings:
     cycle   one dig-swing-load pass (the original demo)
-    site    a whole haul cycle: the carrier is loaded pass by pass, hauls the load to the spoil area and
-            dumps it, and the dozer spreads it, until the dozer parks again (about 5 minutes, played
-            as a time-lapse)
+    site    a whole haul cycle with two carriers: the first is loaded pass by pass and hauls the load to
+            the spoil area while the second takes its place at the excavator; the first dumps, the dozer
+            spreads the load, until the dozer parks again (about 5 minutes, played as a time-lapse)
 
 File, version 2: "RPLY", u32 version, u32 hello length, hello JSON (with "replay": {"speed", "what"}),
 u32 frame count, then per frame u32 head, grains and tail lengths and the three pieces of the frame as the
@@ -50,6 +50,7 @@ def main():
     ap.add_argument("--grains", type=int, default=None, help="grains kept per frame (cycle 3000, site 700)")
     ap.add_argument("--max-s", type=float, default=None)
     ap.add_argument("--soil", default=ex.soils.DEFAULT_SOIL)
+    ap.add_argument("--carriers", type=int, default=None, help="site: carriers (default 2)")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     site = args.what == "site"
@@ -58,7 +59,7 @@ def main():
     n_grains = args.grains or (700 if site else 3000)
     max_s = args.max_s or (420.0 if site else 90.0)
 
-    sim = ex.ExcavatorSim(soil=args.soil, dozer=site, haul=site)
+    sim = ex.ExcavatorSim(soil=args.soil, dozer=site, haul=site, carriers=(args.carriers or 2) if site else 1)
     sim.auto = True
     every = max(1, round(1 / (fps * sim.frame_dt)))
     frames, n, spread = [], 0, False
@@ -81,7 +82,7 @@ def main():
         frames.append(struct.pack("<III", len(head), len(grains), len(tail)) + xor(head, prev[0]) + grains + xor(tail, prev[1]))
         prev = (head, tail)
     hello = sim.hello()
-    hello["replay"] = {"speed": speed, "what": args.what, "soil": args.soil}
+    hello["replay"] = {"speed": speed, "what": args.what, "soil": args.soil, "carriers": len(sim.fleet)}
     hello = json.dumps(hello).encode()
     blob = b"RPLY" + struct.pack("<II", 2, len(hello)) + hello + struct.pack("<I", len(frames)) + b"".join(frames)
     out = pathlib.Path(args.out or OUT[args.what])
@@ -89,7 +90,7 @@ def main():
     out.write_bytes(gzip.compress(blob, compresslevel=9))
     print(json.dumps({
         "file": str(out), "sim_s": round(sim.sim_time, 1), "frames": len(frames), "fps": round(1 / (every * sim.frame_dt), 1), "speed": speed,
-        "raw_mb": round(len(blob) / 1e6, 2), "gz_mb": round(out.stat().st_size / 1e6, 2), "delivered_kg": round(sim.dumper.delivered_kg),
+        "raw_mb": round(len(blob) / 1e6, 2), "gz_mb": round(out.stat().st_size / 1e6, 2), "delivered_kg": round(sim.fleet.delivered_kg),
     }))
 
 

@@ -60,6 +60,7 @@ Stamps are in simulation time, so run your nodes with `use_sim_time:=true`.
 | `/carrier/joint_states` | sensor_msgs/JointState | 30 Hz | `vessel_pin_joint` (rad, negative = tipped, as in PWRI OPERA's `ic120_ros2`) |
 | `/carrier/stage` | std_msgs/String | 30 Hz | haul stage: `loading`, `drive out`, `turn to dump`, `reverse to dump`, `tip`, `dump`, `lower`, `return`, `turn to load`, `reverse in`, `wait at dump` (held while the dozer works there) |
 | `/carrier/payload`, `/carrier/delivered` | std_msgs/Float64 | 30 Hz | load carried, total dumped (kg) |
+| `carrier2/...` | | 30 Hz | with `ros_server.py --carriers 2`, the second carrier: `world → carrier2/base_link` and the same four topics under `/carrier2/`; stages add `to queue`, `wait to load`, `from queue` |
 | `/tf` (dozer) | tf2_msgs/TFMessage | 30 Hz | `world → dozer/base_link`: the Komatsu D37PXi-24 dozer, tilting with the ground under its tracks |
 | `/dozer/joint_states` | sensor_msgs/JointState | 30 Hz | `lift_joint` (rad, positive lowers the blade, as in PWRI OPERA's `d37pxi_ros2`) |
 | `/dozer/stage` | std_msgs/String | 30 Hz | `parked`, `to lane`, `lower`, `push`, `raise`, `back`, `to park` |
