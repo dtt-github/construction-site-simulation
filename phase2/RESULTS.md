@@ -1303,3 +1303,26 @@ Part 5 left dry sand slowing at the end of long runs: the particle pool ran shor
 - **Loam:** the loading rate is unchanged (mean time between loads 179 s against 187 s). It delivered less in this window because its first two loads took 9 passes instead of 7 (run-to-run variation), so 7 loads fitted instead of 8.
 - **Limit:** spill still collects around the loading spot (about 8 % of a dry-sand load runs over the heaped vessel). It now settles, but nothing clears it.
 
+## Validation 3: site productivity against handbooks and time studies
+
+The site's productivity figures were compared with published references. The sources are the Caterpillar Performance Handbook Ed. 29, the Komatsu Specifications & Application Handbook Ed. 27, Nunnally's tables, the German BML guideline, time studies and the Baidu autonomous-excavator study. The full report, with sources and every calculation flagged, is [reports/Earthmoving productivity reference figures.md](../reports/Earthmoving%20productivity%20reference%20figures.md).
+
+| Simulator | Reference | Verdict |
+|---|---|---|
+| Excavator cycle 16.6 s (15.2–18.0), loam, 103° swing, 2 m pit | Komatsu PC200 16–19 s at 90–180° × 0.9–1.1 = 14.4–20.9 s; Cat 320B 13.8 s at 60–90° + 1 s per 10° = 16.6 s; BML 17.5–19.7 s; field 20.8–23.6 s | **Within** the handbooks; faster than field operators |
+| Phase split: dig 8.3, swing loaded 3.3, dump 2.3, swing back 2.8 s | Cat 320B: 5.4 / 3.6 / 1.8 / 3.0 s; field (30 t): 7.4 / 5.0 / 4.2 / 4.3 s | Dig **long** (it includes the approach, which Cat counts in swing empty), swings and dump **short** |
+| Payload per pass, loam, 1.55 t | 0.8 m³ × fill 1.00–1.10 × loose 1250–1600 kg/m³ = 1.0–1.4 t | **Heavy** by 15–45 %: no bulking, and 1850 kg/m³ in the bucket |
+| Passes per 11 t load: loam 6–9, clay 9–10, dry sand 9–12 | 8–9 (calculated); clay ≈ 10; sand 7–10 | Within; loam low and sand high (sand fill ≈ 0.75–0.9) |
+| Excavator waiting 19–20 % (1 carrier), 10 % (2) | Field 20–44 %; 0.7 min exchange ≈ 22 % | **Within** |
+| Two-carrier swap ≈ 15–30 s | Cat ideal: at most one excavator cycle (18–24 s) | Within |
+| Carrier travel 7.9 / 10 km/h, 60° tip | IC120 8.0 / 10.9 km/h, 65°; CD110R 10.0 / 8.4 km/h, 60° | Within; no published dump or cycle times exist for crawler carriers |
+| Dozer speeds 3.6 / 5.8 km/h, mean blade force 5–28 kN | Komatsu 3–5 / 5–7 km/h; power limit ≈ 63 kN (calculated) | **Within** |
+| Dozer force peaks 90–175 kN | 56 kN modelled traction; D3K stall 122 kN | **Above** |
+
+**What follows:**
+- **The cycle and the waiting are credible.** The excavator's total cycle and the site's waiting fractions sit inside the references.
+- **Two misleading figures are bookkeeping, not dynamics:**
+  - Dug soil does not bulk. A bucket carries in-situ density, so the tonnes per pass are high, the loose volumes low, and a 0.3 m spread lift is effectively compacted.
+  - The phase boundaries differ from the handbooks', so per-phase times do not compare directly. Whether the swings are genuinely too fast needs Cat's four segments and a swing sweep (45–180°).
+- **What the open literature cannot validate:** crawler-carrier cycles, ZX200 estimating tables, 9–10 t dozer production curves and blade forces. A video time study of a real ZX200 and IC120, about 50 cycles per soil, would close that gap.
+
