@@ -186,18 +186,23 @@ class SensorRig:
         label = []
         for i in boxes:
             c = self.shape_xf[i][:3]
-            if self.shape_body[i] >= 0:
+            if self.shape_body[i] == getattr(sim, "vessel", -2):
+                label.append(TRUCK)
+            elif self.shape_body[i] >= 0:
                 label.append(MACHINE)
             elif ex.BED_LO[0] - 0.3 < c[0] < ex.BED_HI[0] + 0.3 and ex.BED_LO[1] - 0.3 < c[1] < ex.BED_HI[1] + 0.3 and c[2] > ex.BED_FLOOR_Z - 0.3:
                 label.append(TRUCK)
             else:
                 label.append(GROUND)
-        # parts that the browser draws but the physics does not have: crawler tracks, truck chassis, cab, wheels
-        g, (cx, cy) = ex.GROUND_Z, ex.BED_CENTER
+        # parts that the browser draws but the physics does not have: the excavator's crawler tracks (fixed),
+        # and the carrier's tracks, frame and cab (in its base_link frame, moved with it)
+        g = ex.GROUND_Z
         extra = [((ex.SWING_POS[0] + s * 1.2, 0.0, g + 0.45), (0.35, 2.3, 0.45), MACHINE) for s in (-1, 1)]
         extra += [((ex.SWING_POS[0], 0.0, g + 0.75), (0.9, 1.4, 0.25), MACHINE)]
-        extra += [((cx + 0.9, cy, 3.6), (3.4, 0.5, 0.3), TRUCK), ((cx + ex.BED_L / 2 + 1.15, cy, g + 1.7), (0.95, 1.2, 1.1), TRUCK)]
-        extra += [((cx + ax, cy + s * (ex.BED_W / 2 - 0.25), g + 0.55), (0.55, 0.225, 0.55), TRUCK) for ax in (-1.3, 0.0, ex.BED_L / 2 + 1.1) for s in (-1, 1)]
+        self.n_fixed_extra = len(extra)
+        self.carrier_parts = [((0.2, s * 1.0, 0.45), (3.1, 0.3, 0.45)) for s in (-1, 1)]  # tracks
+        self.carrier_parts += [((-0.3, 0.0, 0.85), (2.9, 1.1, 0.15)), ((2.2, -0.2, 1.9), (1.2, 1.1, 1.0))]  # frame, cab and engine
+        extra += [(c, h, TRUCK) for c, h in self.carrier_parts]
         self.extra = extra
         self.box_label = wp.array(label + [e[2] for e in extra], dtype=int)
         self.box_half = wp.array(np.concatenate([self.shape_half[boxes], np.array([e[1] for e in extra])]).astype(np.float32), dtype=wp.vec3)
@@ -244,6 +249,13 @@ class SensorRig:
             else:
                 p, q = lp, lq
             self.box_xf_np[j] = [*p, *q]
+        d = getattr(sim, "dumper", None)
+        if d is not None:
+            c, s_ = math.cos(d.yaw), math.sin(d.yaw)
+            base = np.array([d.base[0], d.base[1], ex.GROUND_Z])
+            for j, (lc, _) in enumerate(self.carrier_parts):
+                k = len(self.boxes) + self.n_fixed_extra + j
+                self.box_xf_np[k] = [*(base + np.array([c * lc[0] - s_ * lc[1], s_ * lc[0] + c * lc[1], lc[2]])), 0.0, 0.0, math.sin(d.yaw / 2), math.cos(d.yaw / 2)]
         self.box_xf.assign(self.box_xf_np)
         self.surf.fill_(-1.0e30)
         sim.zones.merge_heightmap(self.surf, self.sx0, self.sy0, CELL, self.snx, self.sny)

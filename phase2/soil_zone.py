@@ -149,6 +149,30 @@ def absorb_kernel(
 
 
 @wp.kernel
+def remove_kernel(
+    slots: wp.array[int],
+    flags: wp.array[wp.int32],
+    mpm_flags: wp.array[wp.int32],
+    mpm_material_flags: wp.array[wp.int32],
+    mpm_material_volume: wp.array[float],
+    q: wp.array[wp.vec3],
+    qd: wp.array[wp.vec3],
+    park: wp.array[wp.vec3],
+    freed: wp.array[int],
+    freed_n: wp.array[int],
+):
+    """Take the given active particles out of the simulation (they are parked)."""
+    i = slots[wp.tid()]
+    deactivate(i, flags, mpm_flags, mpm_material_flags, mpm_material_volume, q, qd, park, freed, freed_n)
+
+
+@wp.kernel
+def set_velocity_kernel(slots: wp.array[int], vel: wp.array[wp.vec3], qd: wp.array[wp.vec3]):
+    k = wp.tid()
+    qd[slots[k]] = vel[k]
+
+
+@wp.kernel
 def spawn_kernel(
     slots: wp.array[int],
     pos: wp.array[wp.vec3],
@@ -393,6 +417,62 @@ class SoilZones:
 
     def dormant_in(self, name):
         return int(self.count_np[self.region_mask(name)].sum())
+
+    # ------------------------------------------------------------------ moving soil between regions and
+    # things the zone does not know about (a vehicle carrying a load)
+    def region_grid(self, name):
+        """(x0, y0, nx, ny, column offset) of a region."""
+        i = self.names.index(name)
+        return self.spec[i]
+
+    def set_region_floor(self, name, floor):
+        """Move a region's floor (array per column, or one height). A region far below the ground is
+        switched off: no particle maps to its columns and its collider surface is out of the way."""
+        m = self.region_mask(name)
+        self.col_floor[m] = floor
+        self.floor_z.assign(self.col_floor.astype(np.float32))
+        self._refit()
+
+    def take_region(self, name):
+        """Remove a region's dormant soil; returns its particle counts as a (ny, nx) grid."""
+        x0, y0, nx, ny, off = self.region_grid(name)
+        counts = self.count_np[off : off + nx * ny].reshape(ny, nx).copy()
+        self.count_np[off : off + nx * ny] = 0
+        self.count.assign(self.count_np.astype(np.int32))
+        self._refit()
+        return counts
+
+    def remove(self, slots):
+        """Take active particles (pool slots) out of the simulation."""
+        slots = np.asarray(slots, dtype=np.int32)
+        if not len(slots):
+            return
+        st, mm = self.state, self.mpm._mpm_model
+        self.freed_n.zero_()
+        wp.launch(remove_kernel, dim=len(slots), inputs=[wp.array(slots, dtype=int), self.model.particle_flags, mm.particle_flags, mm.material_particle_flags, mm.material_particle_volume, st.particle_q, st.particle_qd, self.park, self.freed, self.freed_n])
+        self.active_np[slots] = False
+
+    def inject(self, pos, vel):
+        """Add fresh, unstressed particles at pos with velocities vel (as many as the pool has room for);
+        returns how many were added."""
+        free = np.flatnonzero(~self.active_np)
+        n = min(len(free), len(pos))
+        if n < len(pos):
+            self.counters["pool_short"] += 1
+        if n == 0:
+            return 0
+        st, mm, ext = self.state, self.mpm._mpm_model, self.state.mpm
+        slots = free[:n]
+        self.active_np[slots] = True
+        slots_wp = wp.array(slots.astype(np.int32), dtype=int)
+        wp.launch(
+            spawn_kernel, dim=n,
+            inputs=[slots_wp, wp.array(np.asarray(pos[:n], dtype=np.float32), dtype=wp.vec3), self.particle_volume, self.model.particle_flags, mm.particle_flags, mm.material_particle_flags, mm.material_particle_volume, st.particle_q, st.particle_qd, ext.particle_qd_grad, ext.particle_elastic_strain, ext.particle_Jp, ext.particle_stress, ext.particle_transform],
+        )
+        wp.launch(set_velocity_kernel, dim=n, inputs=[slots_wp, wp.array(np.asarray(vel[:n], dtype=np.float32), dtype=wp.vec3), st.particle_qd])
+        if self.on_spawn is not None:
+            self.on_spawn(slots_wp)
+        return n
 
     def _refit(self):
         wp.launch(column_top_kernel, dim=self.n_cols, inputs=[self.count, self.floor_z, self.mesh_points])
