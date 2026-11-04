@@ -38,7 +38,7 @@ SPACING = 0.04  # particle lattice (m): 2 x 2 columns per 8 cm cell
 CELL = 2 * SPACING
 PER_LAYER = 4
 LAYER_PER_PARTICLE = SPACING / PER_LAYER  # column rise per particle (m)
-TOP_LIMIT = 2.0  # m above the floor: particles higher than this never sleep into a column
+TOP_LIMIT = 4.0  # m above the floor: particles higher than this never sleep into a column (a dumped cohesive load stands over 2 m)
 BELOW_FLOOR = 0.3  # m: particles this far under their column floor belong to no column
 PARK_SPACING = 0.027  # parked particles: about 26 per 8 cm voxel
 PARK_ORIGIN = (-30.0, -30.0, -30.0)
@@ -454,13 +454,13 @@ class SoilZones:
 
     def inject(self, pos, vel):
         """Add fresh, unstressed particles at pos with velocities vel (as many as the pool has room for);
-        returns how many were added."""
+        returns how many were added and their pool slots."""
         free = np.flatnonzero(~self.active_np)
         n = min(len(free), len(pos))
         if n < len(pos):
             self.counters["pool_short"] += 1
         if n == 0:
-            return 0
+            return 0, None
         st, mm, ext = self.state, self.mpm._mpm_model, self.state.mpm
         slots = free[:n]
         self.active_np[slots] = True
@@ -472,7 +472,7 @@ class SoilZones:
         wp.launch(set_velocity_kernel, dim=n, inputs=[slots_wp, wp.array(np.asarray(vel[:n], dtype=np.float32), dtype=wp.vec3), st.particle_qd])
         if self.on_spawn is not None:
             self.on_spawn(slots_wp)
-        return n
+        return n, slots_wp
 
     def _refit(self):
         wp.launch(column_top_kernel, dim=self.n_cols, inputs=[self.count, self.floor_z, self.mesh_points])

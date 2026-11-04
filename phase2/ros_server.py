@@ -11,6 +11,7 @@ bytes of the arrays the header lists ({"name", "dtype", "shape"} in order).
                       imu (IMU_HZ), lidar (LIDAR_HZ: points in the lidar frame and labels), camera
                       (CAMERA_HZ: depth and label images)
     client -> server  {"type": "levers", "levers": [swing, boom, stick, bucket]}   each in [-1, 1]
+                      {"type": "dispatch"}   send the carrier off with its load
                       {"type": "autopilot", "on": true | false}
                       {"type": "reset"}
 Levers return to neutral when no lever message arrives for COMMAND_TIMEOUT s (a dead-man switch).
@@ -75,6 +76,8 @@ class Server:
             self.last_cmd = time.monotonic()
         elif msg.get("type") == "autopilot":
             sim.auto = bool(msg.get("on"))
+        elif msg.get("type") == "dispatch":
+            sim.dispatch()
         elif msg.get("type") == "reset":
             sim.reset()
             self.rig.imu_prev = None
@@ -89,14 +92,16 @@ class Server:
             bp, bR = base_pose(sim)
             hp, hR = rig.house_pose()
             cyl = sim.cyl_p * np.where(sim.cyl_head, 1.0, -1.0)
-            out.append(pack({"type": "state", "t": t, "stage": sim.stage_name, "auto": bool(sim.auto)}, [
+            out.append(pack({"type": "state", "t": t, "stage": sim.stage_name, "auto": bool(sim.auto), "carrier_stage": sim.dumper.stage}, [
                 ("q", sim.q.astype(np.float64)), ("qd", sim.qd.astype(np.float64)),
                 ("pressure", np.array([sim.tau[0] / hyd.SWING_DISP, *cyl], dtype=np.float64)),
                 ("levers", sim.levers.astype(np.float64)),
                 ("base_p", bp.astype(np.float64)), ("base_q", ex.quat_from_matrix(bR).astype(np.float64)),
                 ("body_p", hp.astype(np.float64)), ("body_q", ex.quat_from_matrix(hR).astype(np.float64)),
                 ("bucket_tip", np.asarray(ex.fk(sim.q)[2], dtype=np.float64)), ("soil_force", sim.force.astype(np.float64)),
-                ("loads", np.array([sim.fill_kg, sim.truck_kg], dtype=np.float64))]))
+                ("loads", np.array([sim.fill_kg, sim.truck_kg], dtype=np.float64)),
+                ("carrier", np.array([sim.dumper.base[0], sim.dumper.base[1], ex.GROUND_Z, sim.dumper.yaw, sim.dumper.tip,
+                                      sim.dumper.payload_kg, sim.dumper.delivered_kg], dtype=np.float64))]))
         if t >= self.next["imu"]:
             self.next["imu"] = t + 1.0 / IMU_HZ
             imu = rig.imu()

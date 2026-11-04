@@ -21,7 +21,10 @@ Observation (dict of float32 arrays, SI units, zone frame: x across the pit, z u
     bucket_tip (3)         cutting edge position (m)
     bucket_force (3)       soil force on the bucket (N)
     bucket_load (1)        soil inside the bucket shell (kg)
-    truck_load (1)         soil in the truck bed (kg)
+    truck_load (1)         soil in the carrier's vessel (kg): at the loading spot, or carried to the spoil
+    delivered (1)          soil the carrier has dumped at the spoil area so far (kg)
+    carrier (6)            the crawler carrier (dumper.py): stage (index in CARRIER_STAGES), base x, y (m),
+                           heading (rad), vessel tip (rad), payload (kg)
     terrain (86, 96)       surface height of the pit (m) on a 0.1 m grid, rows along y, from x, y = -3, -2.5
                            (only with terrain=True)
   with sensors=("lidar", "camera", "imu") or any of them (sensors.py: mounts, frames, what the rays see):
@@ -33,8 +36,13 @@ Observation (dict of float32 arrays, SI units, zone frame: x across the pit, z u
     depth_label (240, 320) semantic label of each pixel (uint8)
     imu (6)                angular velocity (rad/s) and specific force (m/s2) in the house frame
 
+Haul cycle: the carrier leaves when its load is near capacity and comes back empty (about a minute away);
+the excavator meanwhile has nothing to load into. With autopilot the operator model decides when to send
+it; otherwise auto_dispatch sends it at 92 % of capacity (or call env.sim.dispatch()). haul=False keeps it
+parked for good.
+
 Tasks (reward per control step; pass reward_fn to define your own):
-    "load-truck"   tonnes of soil added to the truck
+    "load-truck"   tonnes of soil added to the carrier (loaded into it, whether still in it or dumped)
     "fill-bucket"  tonnes of soil added to the bucket (negative when it spills)
 
 autopilot=True lets the built-in operator model (the browser's "auto" cycle) drive and ignores the actions;
@@ -56,18 +64,20 @@ import sensors as sensor_rig
 import soils
 
 TASKS = ("load-truck", "fill-bucket")
+CARRIER_STAGES = ("loading", "drive out", "turn to dump", "reverse to dump", "tip", "dump", "lower", "return", "turn to load", "reverse in")
 
 
 class ExcavatorEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, soil=soils.DEFAULT_SOIL, task="load-truck", control_hz=10.0, episode_s=60.0,
-                 autopilot=False, terrain=True, sensors=(), reward_fn=None, sim_kwargs=None):
+                 autopilot=False, terrain=True, sensors=(), reward_fn=None, sim_kwargs=None, haul=True, auto_dispatch=True):
         if task not in TASKS and reward_fn is None:
             raise ValueError(f"task must be one of {TASKS}, or pass reward_fn")
         self.task, self.reward_fn = task, reward_fn
         self.episode_s, self.autopilot, self.with_terrain = episode_s, autopilot, terrain
-        self.sim_kwargs = dict(sim_kwargs or {})
+        self.sim_kwargs = dict(sim_kwargs or {}, haul=haul)
+        self.auto_dispatch = auto_dispatch
         self.sim = ex.ExcavatorSim(soil=soil, **self.sim_kwargs)
         self.sensors = tuple(sensors)
         if not set(self.sensors) <= {"lidar", "camera", "imu"}:
@@ -87,6 +97,8 @@ class ExcavatorEnv(gym.Env):
             "bucket_force": spaces.Box(-np.inf, np.inf, shape=(3,), dtype=np.float32),
             "bucket_load": spaces.Box(0.0, np.inf, shape=(1,), dtype=np.float32),
             "truck_load": spaces.Box(0.0, np.inf, shape=(1,), dtype=np.float32),
+            "delivered": spaces.Box(0.0, np.inf, shape=(1,), dtype=np.float32),
+            "carrier": spaces.Box(-np.inf, np.inf, shape=(6,), dtype=np.float32),
         }
         if terrain:
             obs["terrain"] = spaces.Box(-np.inf, np.inf, shape=(ex.HM_NY, ex.HM_NX), dtype=np.float32)
@@ -133,6 +145,8 @@ class ExcavatorEnv(gym.Env):
         else:
             a = np.clip(np.asarray(action, dtype=float), -1.0, 1.0)
             sim.set_levers(*a)
+            if self.auto_dispatch and sim.dumper.parked and sim.truck_kg >= 0.92 * ex.TRUCK_CAPACITY_KG:
+                sim.dispatch()
             for _ in range(self.frame_skip):
                 sim.step()
             used = a
@@ -143,7 +157,8 @@ class ExcavatorEnv(gym.Env):
         if self.reward_fn is not None:
             reward = float(self.reward_fn(prev, obs, info))
         elif self.task == "load-truck":
-            reward = float(obs["truck_load"][0] - prev["truck_load"][0]) / 1000.0
+            loaded = lambda o: o["truck_load"][0] + o["delivered"][0]  # noqa: E731
+            reward = float(loaded(obs) - loaded(prev)) / 1000.0
         else:
             reward = float(obs["bucket_load"][0] - prev["bucket_load"][0]) / 1000.0
         truncated = sim.sim_time >= self.episode_s - 1e-6
@@ -162,6 +177,8 @@ class ExcavatorEnv(gym.Env):
             "bucket_force": sim.force.astype(np.float32),
             "bucket_load": np.array([sim.fill_kg], dtype=np.float32),
             "truck_load": np.array([sim.truck_kg], dtype=np.float32),
+            "delivered": np.array([sim.dumper.delivered_kg], dtype=np.float32),
+            "carrier": np.array([CARRIER_STAGES.index(sim.dumper.stage), *sim.dumper.base, sim.dumper.yaw, sim.dumper.tip, sim.dumper.payload_kg], dtype=np.float32),
         }
         if self.with_terrain:
             obs["terrain"] = sim.hm_np.reshape(ex.HM_NY, ex.HM_NX).astype(np.float32)
@@ -185,6 +202,8 @@ class ExcavatorEnv(gym.Env):
             "cut_depth": sim.cut_depth,
             "mckyes_force": sim.fee_ref,
             "passes": sim.passes,
+            "carrier_stage": sim.dumper.stage,
+            "excavator_wait_s": sim.truck_wait,
         }
 
 

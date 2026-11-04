@@ -364,8 +364,9 @@ const smooth = (e0, e1, x) => {
   return t * t * (3 - 2 * t);
 };
 function terrainHeight(x, z) {
-  // outside the pad (|x| < 30, |z| < 22) the ground rises into low rolling hills
-  const dx = Math.max(Math.abs(x) - 30, 0);
+  // outside the pad (-30 < x < 62, |z| < 22) the ground rises into low rolling hills; the pad runs east to
+  // the site's edge for the carrier's haul road and spoil area (excavator_server.py)
+  const dx = Math.max(-x - 30, x - 62, 0);
   const dz = Math.max(Math.abs(z) - 22, 0);
   const out = Math.hypot(dx, dz);
   const hills = 0.9 * Math.sin(x * 0.11) * Math.cos(z * 0.13) + 0.6 * Math.sin(x * 0.27 + z * 0.19) + 0.35 * Math.cos(x * 0.53 - z * 0.41);

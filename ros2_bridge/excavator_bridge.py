@@ -24,11 +24,16 @@ Published (stamps in simulation time; run your nodes with use_sim_time:=true):
     /excavator/bucket_load              std_msgs/Float64  soil in the bucket (kg)
     /excavator/truck_load               std_msgs/Float64  soil in the truck (kg)
     /excavator/stage                    std_msgs/String   operator stage ("manual" or the autopilot's stage)
+    /tf                                 world -> carrier/base_link (the IC120 crawler carrier, PWRI OPERA ic120_ros2)
+    /carrier/joint_states               sensor_msgs/JointState  vessel_pin_joint (rad, negative = tipped, as the URDF)
+    /carrier/stage                      std_msgs/String   haul stage (loading, drive out, ..., reverse in)
+    /carrier/payload, /carrier/delivered  std_msgs/Float64  load carried, total dumped (kg)
 Subscribed:
     /excavator/levers     std_msgs/Float64MultiArray  [swing (+ left), boom (+ raise), stick (+ out), bucket (+ dump)],
                           each in [-1, 1]; publish at 10 Hz or more: levers return to neutral 0.5 s after the last
     /excavator/autopilot  std_msgs/Bool   the built-in operator drives (any lever message takes over again)
     /excavator/reset      std_msgs/Empty  restore the machine, the pit and the truck
+    /carrier/dispatch     std_msgs/Empty  send the carrier off with its load (it leaves once the bucket is clear)
 Labels: 0 none, 1 ground, 2 soil, 3 machine, 4 truck.
 
     python3 excavator_bridge.py --ros-args -p host:=127.0.0.1 -p port:=7777
@@ -87,10 +92,15 @@ class Bridge(Node):
             "bucket": self.create_publisher(Float64, "/excavator/bucket_load", 10),
             "truck": self.create_publisher(Float64, "/excavator/truck_load", 10),
             "stage": self.create_publisher(String, "/excavator/stage", 10),
+            "carrier_joints": self.create_publisher(JointState, "/carrier/joint_states", 10),
+            "carrier_stage": self.create_publisher(String, "/carrier/stage", 10),
+            "carrier_payload": self.create_publisher(Float64, "/carrier/payload", 10),
+            "carrier_delivered": self.create_publisher(Float64, "/carrier/delivered", 10),
         }
         self.create_subscription(Float64MultiArray, "/excavator/levers", lambda m: self.send({"type": "levers", "levers": list(m.data)[:4]}), 10)
         self.create_subscription(Bool, "/excavator/autopilot", lambda m: self.send({"type": "autopilot", "on": bool(m.data)}), 10)
         self.create_subscription(Empty, "/excavator/reset", lambda m: self.send({"type": "reset"}), 10)
+        self.create_subscription(Empty, "/carrier/dispatch", lambda m: self.send({"type": "dispatch"}), 10)
         self.sock, self.lock, self.hello = None, threading.Lock(), None
         threading.Thread(target=self.receive_loop, daemon=True).start()
 
@@ -160,8 +170,18 @@ class Bridge(Node):
         js.name = list(self.hello["joints"]) if self.hello else ["swing_joint", "boom_joint", "arm_joint", "bucket_joint"]
         js.position, js.velocity, js.effort = a["q"].tolist(), a["qd"].tolist(), a["pressure"].tolist()
         self.pub["joints"].publish(js)
-        self.pub["tf"].publish(TFMessage(transforms=[transform("world", "base_link", t, a["base_p"], a["base_q"]),
-                                                     transform("world", "body_link", t, a["body_p"], a["body_q"])]))
+        tfs = [transform("world", "base_link", t, a["base_p"], a["base_q"]), transform("world", "body_link", t, a["body_p"], a["body_q"])]
+        if "carrier" in a:
+            x, y, z, yaw, tip, payload, delivered = (float(v) for v in a["carrier"])
+            tfs.append(transform("world", "carrier/base_link", t, (x, y, z), (0.0, 0.0, np.sin(yaw / 2), np.cos(yaw / 2))))
+            cj = JointState()
+            cj.header.stamp = stamp(t)
+            cj.name, cj.position = ["vessel_pin_joint"], [-tip]
+            self.pub["carrier_joints"].publish(cj)
+            self.pub["carrier_stage"].publish(String(data=h.get("carrier_stage", "")))
+            self.pub["carrier_payload"].publish(Float64(data=payload))
+            self.pub["carrier_delivered"].publish(Float64(data=delivered))
+        self.pub["tf"].publish(TFMessage(transforms=tfs))
         self.pub["levers"].publish(Float64MultiArray(data=a["levers"].tolist()))
         tip = PointStamped()
         tip.header.stamp, tip.header.frame_id = stamp(t), "world"

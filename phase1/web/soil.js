@@ -12,6 +12,7 @@ const HM_HEADER_BYTES = 16;
 const P_HEADER_BYTES = 20;
 const MAGIC_SOIL = 0x4c494f53; // "SOIL"
 const MAGIC_EXC = 0x32435845; // "EXC2"
+const MAGIC_CAR1 = 0x31524143; // "CAR1": crawler carrier trailer
 const MAGIC_EXC3 = 0x33435845; // "EXC3": EXC2 + hydraulic cylinder and linkage poses, cylinder pressures
 
 export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, layerStatic, panel, view }) {
@@ -35,6 +36,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     <dl class="stats" id="soil-stats"></dl>
     <div class="buttons" id="soil-buttons" hidden>
       <button id="soil-auto">Auto dig cycle</button>
+      <button id="soil-dispatch" class="secondary" hidden>Send carrier</button>
       <button id="soil-reset" class="secondary">Reset soil</button>
       <button id="soil-view" class="secondary">View pit</button>
     </div>
@@ -62,6 +64,8 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     if (notify) send({ type: "auto", on: auto });
   };
   autoBtn.addEventListener("click", () => setAuto(!auto));
+  const dispatchBtn = box.querySelector("#soil-dispatch");
+  dispatchBtn.addEventListener("click", () => send({ type: "dispatch" }));
   box.querySelector("#soil-reset").addEventListener("click", () => send({ type: "reset" }));
   box.querySelector("#soil-view").addEventListener("click", () =>
     kind === "excavator" ? view(17.5, 10, 18.5, 27.5, -0.5, 9.5) : view(29.5, 3.5, 17.5, 24, -2.2, 12)
@@ -215,6 +219,9 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   // excavator (excavator_server.py): links built from the hello geometry (boxes), replaced by the real
   // machine's meshes when the server names a glTF model whose link frames match its physics links
   const arm = { links: {}, parts: {}, base: null, truckSurface: null, tracks: null, model: false };
+  // crawler dump carrier (dumper.py): base_link and vessel (pin frame) groups, posed from the frame trailer
+  const carrier = (window.__carrier = { base: null, vessel: null, parkedPin: null, spoil: null, stage: "" });
+  const CARRIER_STAGES = ["loading", "drive out", "turn to dump", "reverse to dump", "tip", "dump", "lower", "return", "turn to load", "reverse in"];
   function buildExcavator(geom) {
     for (const name of ["house", "boom", "stick", "bucket"]) {
       const g = new THREE.Group();
@@ -244,6 +251,56 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     scene.add(base);
     arm.base = base;
     arm.capacity = geom.truck_capacity_kg;
+    if (geom.carrier) buildCarrier(geom.carrier);
+  }
+
+  function buildCarrier(c) {
+    const truckPaint = new THREE.MeshStandardMaterial({ color: "#c98a1e", metalness: 0.3, roughness: 0.6 });
+    carrier.base = new THREE.Group();
+    carrier.vessel = new THREE.Group();
+    c.body_boxes.forEach((b, i) => addBox(carrier.base, b.size, b.center, i < 2 ? dark : truckPaint));
+    c.vessel_boxes.forEach((b) => addBox(carrier.vessel, b.size, b.center, truckPaint));
+    carrier.base.visible = carrier.vessel.visible = false;
+    scene.add(carrier.base, carrier.vessel);
+    carrier.parkedPin = new THREE.Matrix4().compose(new THREE.Vector3(...c.parked_pin.slice(0, 3)), new THREE.Quaternion(...c.parked_pin.slice(3)), new THREE.Vector3(1, 1, 1));
+    if (loader) loadCarrierModel(c);
+  }
+
+  async function loadCarrierModel(c) {
+    let gltf;
+    try {
+      gltf = await loader.loadAsync(`../${c.file}`);
+    } catch (err) {
+      console.warn(`carrier: could not load ${c.file}, drawing boxes`, err);
+      return;
+    }
+    try {
+      // URDF frames are Z up: wrap each part in a -90 deg turn about x, as for the excavator
+      const wrap = (obj) => {
+        const w = new THREE.Group();
+        w.rotation.x = -Math.PI / 2;
+        w.add(obj);
+        w.traverse((o) => {
+          if (o.isMesh) o.castShadow = o.receiveShadow = true;
+        });
+        return w;
+      };
+      const base = gltf.scene.getObjectByName("base_link").clone(true);
+      for (const name of [c.vessel_node, ...c.hide_nodes]) {
+        const n = base.getObjectByName(name);
+        if (n) n.parent.remove(n);
+      }
+      base.position.set(0, 0, 0);
+      base.quaternion.identity();
+      const vessel = new THREE.Group();
+      for (const child of gltf.scene.getObjectByName(c.vessel_node).children) if (!child.name.endsWith("_link")) vessel.add(child.clone(true));
+      carrier.base.clear();
+      carrier.base.add(wrap(base));
+      carrier.vessel.clear();
+      carrier.vessel.add(wrap(vessel));
+    } catch (err) {
+      console.warn("carrier: model has unexpected structure, drawing boxes", err);
+    }
   }
 
   async function loadMachineModel(model) {
@@ -395,6 +452,19 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     const span = dv.getFloat32(o + 16, true);
     o += P_HEADER_BYTES;
     f.grains = { count, lo, span, q: new Uint16Array(buf.slice(o, o + count * 6)) };
+    o += count * 6;
+    // carrier trailer ("CAR1", excavator_server.py): base_link and vessel pin poses, tip, loads, stage
+    if (o + 4 <= buf.byteLength && dv.getUint32(o, true) === MAGIC_CAR1) {
+      const g = (k) => dv.getFloat32(o + 4 + 4 * k, true);
+      f.carrier = {
+        base: [0, 1, 2, 3, 4, 5, 6].map(g),
+        pin: [7, 8, 9, 10, 11, 12, 13].map(g),
+        tip: g(14), payload: g(15), delivered: g(16),
+        stage: CARRIER_STAGES[dv.getUint32(o + 4 + 4 * 17, true)] ?? "",
+      };
+      o += 4 + 4 * 18;
+      [f.spoilHm, o] = readHeightmap(dv, buf, o);
+    }
   }
 
   function handleFrame(buf) {
@@ -616,6 +686,33 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       tp.needsUpdate = true;
       arm.truckSurface.geometry.computeVertexNormals();
     }
+    if (f.carrier && carrier.base) {
+      const c = f.carrier;
+      dispatchBtn.hidden = !!replay;
+      dispatchBtn.disabled = c.stage !== "loading";
+      carrier.base.visible = carrier.vessel.visible = true;
+      carrier.base.position.set(...c.base.slice(0, 3));
+      carrier.base.quaternion.set(...c.base.slice(3));
+      carrier.vessel.position.set(...c.pin.slice(0, 3));
+      carrier.vessel.quaternion.set(...c.pin.slice(3));
+      carrier.stage = c.stage;
+      // the load surface is sent in the vessel's parked frame: move it with the vessel
+      if (arm.truckSurface) {
+        const now = new THREE.Matrix4().compose(carrier.vessel.position, carrier.vessel.quaternion, new THREE.Vector3(1, 1, 1));
+        arm.truckSurface.matrixAutoUpdate = false;
+        arm.truckSurface.matrix.multiplyMatrices(now, carrier.parkedPin.clone().invert());
+        arm.truckSurface.matrixWorldNeedsUpdate = true;
+      }
+    }
+    if (f.spoilHm) {
+      const t = f.spoilHm;
+      if (!carrier.spoil) carrier.spoil = makeSurface(t.nx, t.ny, t.x0, t.z0, t.cell);
+      const sp = carrier.spoil.geometry.attributes.position;
+      // cells without spoil sit just under the ground, out of sight
+      for (let k = 0; k < t.heights.length; k++) sp.array[k * 3 + 1] = t.heights[k] > -3.4 ? t.heights[k] : -0.4;
+      sp.needsUpdate = true;
+      carrier.spoil.geometry.computeVertexNormals();
+    }
     if (f.kind === "bucket") {
       bucket.visible = true;
       bucket.position.set(...f.pos);
@@ -683,6 +780,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     rows.push(["McKyes reference", f.cut > 0.01 ? `${kN(f.fee)} at ${(f.cut * 100).toFixed(0)} cm cut` : "–"]);
     rows.push(["Bucket load", `${f.fill.toFixed(0)} kg`]);
     if (f.kind === "excavator") rows.push(["Truck load", `${(f.truck / 1000).toFixed(2)} t of ${(f.capacity / 1000).toFixed(0)} t (${Math.round((100 * f.truck) / f.capacity)}%)`]);
+    if (f.carrier) rows.push(["Carrier", `${f.carrier.stage} · ${(f.carrier.delivered / 1000).toFixed(1)} t dumped`]);
     statsEl.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     window.__soil = { lastFrame: f, stats: { ...stats }, stalled, model: arm.model };
   }

@@ -59,7 +59,7 @@ MACHINES = {
         "repo": "pwri-opera/ic120_ros2",
         "urdf": "ic120_description/urdf/ic120_gazebo.urdf",
         "package": "ic120_description",
-        "name": "Hitachi IC120 crawler dump carrier",
+        "name": "IHI (Kato) IC120 crawler dump carrier",
     },
     "d37pxi": {
         "repo": "pwri-opera/d37pxi_ros2",

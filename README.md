@@ -7,7 +7,7 @@ An open-source, physically realistic construction-site simulator, built in the o
 
 Initiated and maintained by **[DigitalTwin Technology GmbH](https://www.digitaltwin.technology)**, the project's main contributor, as part of its work on **[ConstructionWare](https://www.constructionware.app)**.
 
-![Open-licensed machines in the site: Komatsu D37PXi dozer, Hitachi IC120 carrier, Hitachi ZX200 excavator](assets/screenshots/showcase_machines.png)
+![Open-licensed machines in the site: Komatsu D37PXi dozer, IHI IC120 carrier, Hitachi ZX200 excavator](assets/screenshots/showcase_machines.png)
 
 **[Try the site in your browser](https://dtt-github.github.io/construction-site-simulation/)**, no GPU needed: the terrain, the SimReady props and the open machines run client-side (three.js + Jolt). The excavator and soil need the GPU server, so the demo plays a recorded dig–swing–load pass from it (ZX200 hydraulics, MPM sand, cylinder pressures; `phase2/record_replay.py`). Click *View pit* to watch it. For live control, see [Quick start](#quick-start).
 
@@ -18,10 +18,11 @@ Initiated and maintained by **[DigitalTwin Technology GmbH](https://www.digitalt
 | Area | Status |
 |---|---|
 | Site | 128 m terrain with pad, haul road, stockpile and a 2.5 m excavation pit; 40+ physics props from NVIDIA SimReady (CC BY 4.0) with checked masses and colliders |
-| Real machines (open-licensed) | Hitachi ZX200 excavator, Hitachi IC120 crawler carrier, Komatsu D37PXi dozer (articulated, from the PWRI OPERA project, Apache-2.0); 35 m tower crane, cones, barrels and jersey barriers (Gazebo, CC0) |
+| Real machines (open-licensed) | Hitachi ZX200 excavator, IHI (Kato) IC120 crawler carrier, Komatsu D37PXi dozer (articulated, from the PWRI OPERA project, Apache-2.0); 35 m tower crane, cones, barrels and jersey barriers (Gazebo, CC0) |
 | Soil | The pit filled with 2 m of MPM soil (Newton implicit MPM) on the GPU, two-way coupled to the machine, in four presets switchable live: dry sand, moist sand, loam and clay. Cohesion is checked against vertical-cut stability and McKyes cutting forces, and dug clods break up to their remoulded strength; only soil near the bucket is particles, resting soil elsewhere is a heightfield, and cut faces slump to the angle of repose. The sand steps at 30 Hz and the machine at 60 Hz; the dig cycle runs at 1.3× real time, and a trench dug in one lane (1.2×) reaches 1.7 m with 43–45° sides |
 | Excavator | The real Hitachi ZX200 (OPERA URDF geometry and joint limits, curved bucket with teeth) driven by its real hydraulic cylinders (Hitachi bores, 34.3 MPa main relief and port reliefs, pump flow shared between functions, bucket four-bar linkage) and swing motor (13.3 min⁻¹, 68.9 kN·m, braking on its cross-over reliefs), so force and speed vary with pose and the machine slows and stalls under load. Digging force at the teeth 149 kN against 151–158 kN published. Full dig–swing–load cycle into a dump truck, lifting while swinging like an operator: 15–18 s and about 1 t per pass |
-| Browser client | Levers and keyboard control, cylinder pressure gauges, stall warnings, live truck load; 60 fps |
+| Haul cycle | An IHI IC120 crawler carrier (PWRI OPERA model) is loaded by the excavator, drives the load to a spoil area, tips it out as MPM soil and comes back. The operator model sends it off when full, waits while it is away, and spreads passes along the vessel; sticky loads are shaken out. One excavator and one carrier deliver 119–179 t/h depending on soil, with the excavator waiting 15–27 % of the time ([phase2/RESULTS.md](phase2/RESULTS.md)) |
+| Browser client | Levers and keyboard control, cylinder pressure gauges, stall warnings, live truck load, the carrier and its spoil heap, a "Send carrier" button; 60 fps |
 | Validation | Bucket forces compared with the McKyes/Reece earthmoving equation; field data wanted (see below) |
 
 | Folder | What's in it |
@@ -99,7 +100,8 @@ Only licenses that allow redistribution, modification and commercial use are acc
 
 - Operator models beyond the scripted cycle (learned or recorded operator inputs), and checking heaped bucket loads against field data
 - Converged soil solves: loads still depend on the MPM iteration count
-- Research APIs: the Gymnasium environment, the lidar, depth camera and IMU, and the ROS 2 bridge are done. Next: a `ros2_control` hardware interface, sensor noise models, and several environments per GPU
+- A living site: the carrier's haul cycle is done. Next: the D37 dozer spreading the spoil, several carriers queueing, carrier track–soil contact
+- Research APIs: the Gymnasium environment, the lidar, depth camera and IMU, and the ROS 2 bridge are done (the carrier is in all three). Next: a `ros2_control` hardware interface, sensor noise models, and several environments per GPU
 - Measured ZX200 masses, swing torque and pressure logs for validation
 - Measured pressure logs, port relief and house inertia to validate the hydraulics
 - Soil–steel adhesion, bulking of dug clods, and soil presets calibrated to measured sites and bucket loads

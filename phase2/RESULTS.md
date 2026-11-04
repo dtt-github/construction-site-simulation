@@ -1011,3 +1011,60 @@ The blade test at 1/30 s, against the 2000-iteration force (dry sand 23.2 kN, lo
 | 1/240 s | 150 | 12.6 kN |
 
 The small-step runs end up 10 % above the 2000-iteration value, so a little genuine time-step dependence remains once the solve converges. An issue for Newton's implicit MPM is drafted, with this reproducer, the option table and the yield-cone mapping. It asks about a multigrid or preconditioned rheology solve and a public convergence indicator.
+
+## A living site, 1: the haul cycle
+
+The static truck is now a crawler dump carrier, the IHI (Kato) IC120 of PWRI's OPERA project (open model, Apache-2.0). The autopilot loads it; when it is full, it drives the load to a spoil area, tips it out, and comes back. The site now has a load–haul–dump loop, and its cycle time, fleet matching and tonnes per hour come out of the simulation.
+
+**The carrier** (`dumper.py`): scripted kinematics.
+- **Vessel:** taken from the OPERA model. The pin sits 3.0 m behind `base_link` and 0.95 m up. Inside, the vessel is 3.8 × 2.35 m, with 0.8 m sides (0.73–0.84 m on the mesh) and a floor 1.3 m above the ground. The rear is open, and its floor rises at 25° over the last 0.6 m. It tips to 60°.
+- **Performance:**
+  - Driving: 2.2 m/s loaded, 2.8 m/s empty, 1.2 m/s in reverse (the spec sheet gives 10.9 km/h top speed).
+  - Spin turns: 25°/s.
+  - Vessel: up in about 8 s, down in about 5 s.
+- **Route:**
+  - Out: drive forward to x = 20 m, spin round, reverse to the dump point.
+  - At the spoil area: tip, dump, lower.
+  - Back: drive forward, spin round, reverse into the loading spot.
+  - Spin turns are made away from the excavator.
+- **Loading spot:** east of the pit edge, on flat ground beside the machine (vessel centre 8.6, 5.2 m: a 103° swing, as with a real carrier parked beside the excavator).
+- **Not modelled:** the carrier does not feel the ground or the load.
+
+**The soil is MPM throughout loading and dumping.**
+- **The vessel:** a kinematic body, so it holds the soil (MPM collider) and the bucket can hit it (rigid contact).
+- **Departure:** the load is handed over. The loading spot's dormant columns and the particles in the vessel become counts per vessel cell (`SoilZones.take_region`, `remove`), carried until the dump. The loading spot's soil region is switched off by moving its floor away, so nothing rests on an empty spot.
+- **Dumping:** tipping past 25° releases the load as particles (`SoilZones.inject`), tail first, moving with the vessel, at their remoulded strength (dug soil is broken up). They slide out under MPM physics and settle into a spoil region (10 × 11 m).
+- **Shaking:** if more than 3 % of the load sticks, the carrier shakes the vessel (±4° every 0.8 s) for up to 15 s. Whatever is still stuck rides back and is not counted as delivered.
+
+**The operator model:**
+- **Dispatch:** it sends the carrier off when the next pass would not fit. That check runs after a normal dump and after shaking sticky soil out of the bucket.
+- **Waiting:** while the carrier is away, it waits with the full bucket raised part way round (−50°, 6.5 m), so the pit's soil goes back to sleep.
+- **Spreading the load:** it puts successive passes front, rear, then middle of the vessel, 0.9 m apart, as operators do.
+
+**Haul-cycle benchmark** (`bench_haul.py 600`, 600 simulated seconds per soil, logs `logs/haul_bench_<soil>.json`):
+
+| Soil | Delivered | Loads | Load (passes) | Loading | Carrier away | Excavator waiting | Carry-back per trip | Real-time factor |
+|---|---|---|---|---|---|---|---|---|
+| Dry sand | 19.8 t, **119 t/h** | 2 | 10.2–10.3 t (10–11) | 186–198 s | 57–69 s | 105 s | 0.03, 0.75 t | 1.09 |
+| Loam | 29.9 t, **179 t/h** | 3 | 10.8–11.1 t (7–8) | 125–148 s | 59–69 s | 161 s | 0.3, 0.3, 2.4 t | 1.07 |
+| Clay | 21.1 t, **126 t/h** | 3 | 9.4–10.7 t (7–9) | 139–173 s | 57 s | 94 s | 0, 0 | 0.73 |
+
+- **The trip:** 57 s, made up of drive out 8 s, spin 7 s, reverse 4 s, tip 8 s, hold 3 s, lower 5 s, back 4 s, spin 7 s, reverse in 10 s. It takes up to 69 s when the vessel is shaken.
+- **What this shows:**
+  - **The carrier is the bottleneck:** with one carrier, the excavator waits 15–27 % of the time.
+  - **Time per load:** a 10–11 t load costs 2–3 minutes of loading plus a minute of hauling, which is the arithmetic a site engineer uses to match a fleet.
+- **The first runs got these wrong, and the fixes:**
+  - **Swing-back deadlock:** clearance over the vessel now includes its sides, so the bucket can no longer be lowered into the vessel and trapped there.
+  - **Pool exhausted while waiting:** the excavator waited in the pit, which kept about 125 k particles awake. It now waits raised.
+  - **Carrier never left in loam:** the dispatch check was skipped when sticky soil was shaken out of the bucket.
+  - **Carry-back:**
+    - The vessel had a full-height tail plate instead of an open rear.
+    - The released load was spawned at intact strength. A 10 t loam block wedged between the sides, and up to 3.9 t rode back.
+  - **Clay rolled off the vessel:** every pass landed in the middle, so clay lumps rolled off the heap. Passes are now spread along the vessel.
+  - **Dumped clay stayed awake:** it stands taller than 2 m, and the zone did not let particles over 2 m above a column's floor sleep; the limit is now 4 m.
+
+**Limits:**
+- **Driving:** the carrier is scripted; there is no track–soil contact, slip or tilt, and its route is fixed.
+- **Clay is slow:** it runs below real time (0.73×) because the dumped clay settles slowly; at the end of the run 11 of 21 t had settled.
+- **Loam sometimes sticks:** one loam trip in three still carried 2.4 t back after 15 s of shaking.
+- **One carrier:** with one carrier and one excavator, there is no queueing between several carriers yet.

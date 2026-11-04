@@ -56,11 +56,16 @@ Stamps are in simulation time, so run your nodes with `use_sim_time:=true`.
 | `/excavator/soil_force` | geometry_msgs/Vector3Stamped | 30 Hz | soil force on the bucket (N), `world` |
 | `/excavator/bucket_load`, `/excavator/truck_load` | std_msgs/Float64 | 30 Hz | kg |
 | `/excavator/stage` | std_msgs/String | 30 Hz | `manual`, or the autopilot's stage |
+| `/tf` (carrier) | tf2_msgs/TFMessage | 30 Hz | `world → carrier/base_link`: the IC120 crawler carrier |
+| `/carrier/joint_states` | sensor_msgs/JointState | 30 Hz | `vessel_pin_joint` (rad, negative = tipped, as in PWRI OPERA's `ic120_ros2`) |
+| `/carrier/stage` | std_msgs/String | 30 Hz | haul stage: `loading`, `drive out`, `turn to dump`, `reverse to dump`, `tip`, `dump`, `lower`, `return`, `turn to load`, `reverse in` |
+| `/carrier/payload`, `/carrier/delivered` | std_msgs/Float64 | 30 Hz | load carried, total dumped (kg) |
 
 Subscribed:
 - **`/excavator/levers`** (std_msgs/Float64MultiArray): [swing (+ left), boom (+ raise), stick (+ out), bucket (+ dump)], each in [−1, 1]. Publish at 10 Hz or more: the levers return to neutral 0.5 s after the last message (a dead-man switch).
 - **`/excavator/autopilot`** (std_msgs/Bool): the built-in operator drives. Any lever message takes over again.
 - **`/excavator/reset`** (std_msgs/Empty): restores the machine, the pit and the truck.
+- **`/carrier/dispatch`** (std_msgs/Empty): sends the carrier off with its load, once the bucket is clear of it. On autopilot, the operator model sends it itself when the next pass would not fit.
 
 Semantic labels: 0 none, 1 ground, 2 soil, 3 machine, 4 truck.
 

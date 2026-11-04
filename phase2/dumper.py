@@ -31,6 +31,9 @@ ACCEL = 0.6  # m/s2
 SPIN_RATE = math.radians(25.0)  # rad/s, counter-rotating tracks
 TIP_RATE, LOWER_RATE = math.radians(7.5), math.radians(12.0)  # rad/s (about 8 s up to 60 deg, 5 s down)
 DUMP_HOLD = 3.0  # s at full tip, for the soil to leave
+# sticky soil stays in a tipped vessel: the operator shakes it (tip oscillating SHAKE_DEG every SHAKE_PERIOD)
+# until less than CARRY_BACK of the load is left, for up to DUMP_MAX s; what is left rides back
+SHAKE_DEG, SHAKE_PERIOD, CARRY_BACK, DUMP_MAX = 4.0, 0.8, 0.03, 15.0
 
 
 def yaw_quat(yaw):
@@ -67,6 +70,7 @@ class Dumper:
         self.stage, self.stage_time, self.cycle_start = "loading", 0.0, 0.0
         self.depart_requested = False
         self.payload_kg = 0.0
+        self.residual_kg, self.load_kg = 0.0, 0.0  # soil still in the vessel while dumping; the load taken
         self.delivered_kg, self.loads = 0.0, 0
         self.time = 0.0
         self.trips = []  # per trip: payload and the time spent in each stage away from the loading spot
@@ -147,8 +151,15 @@ class Dumper:
                 self.tip_rate = 0.0
                 self._next("dump")
         elif st == "dump":
-            if self.stage_time > DUMP_HOLD and self.payload_kg <= 0.0:
+            done = self.payload_kg <= 0.0 and self.residual_kg <= CARRY_BACK * self.load_kg
+            if self.stage_time > DUMP_HOLD and self.payload_kg <= 0.0 and (done or self.stage_time > DUMP_MAX):
+                self.tip, self.tip_rate = TIP_MAX, 0.0
                 self._next("lower")
+            elif self.stage_time > DUMP_HOLD and self.payload_kg <= 0.0:
+                ph = 2 * math.pi * (self.stage_time - DUMP_HOLD) / SHAKE_PERIOD
+                a = math.radians(SHAKE_DEG) / 2
+                self.tip = TIP_MAX - a * (1 - math.cos(ph))
+                self.tip_rate = -a * math.sin(ph) * 2 * math.pi / SHAKE_PERIOD
         elif st == "lower":
             self.tip_rate = -LOWER_RATE
             self.tip = max(0.0, self.tip - LOWER_RATE * dt)
