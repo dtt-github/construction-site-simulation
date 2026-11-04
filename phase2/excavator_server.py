@@ -123,13 +123,15 @@ SWING_VMAX, SWING_TAU = hyd.SWING_SPEED, hyd.SWING_TORQUE  # 13.3 min^-1, 68.9 k
 KP = {"swing": 2.0e6, "boom": 3.0e7, "stick": 8.0e6, "bucket": 1.5e6}
 KD = {"swing": 8.0e5, "boom": 3.0e6, "stick": 6.0e5, "bucket": 4.0e4}
 
-# dump truck parked on the machine's right (zone +y), bed long axis along x
-BED_CENTER = np.array([7.0, 5.5])
-BED_L, BED_W, BED_H, BED_T = 4.2, 2.3, 1.0, 0.08  # inside length, width, side height, plate thickness
-BED_FLOOR_Z = 4.1
+# crawler dump carrier (IHI/Kato IC120, the PWRI OPERA model) parked beside the machine (zone +y, east of
+# the pit edge on flat ground), vessel long axis along x. Vessel from the model's mesh: 4.3 m long and
+# 2.6 m wide outside, floor about 1.3 m above the ground; 11 t maximum payload (spec sheet)
+BED_CENTER = np.array([8.6, 5.2])
+BED_L, BED_W, BED_H, BED_T = 3.8, 2.35, 0.7, 0.08  # inside length, width, side height, plate thickness
+BED_FLOOR_Z = GROUND_Z + 1.3
 BED_LO = np.array([BED_CENTER[0] - BED_L / 2, BED_CENTER[1] - BED_W / 2, BED_FLOOR_Z])
 BED_HI = np.array([BED_CENTER[0] + BED_L / 2, BED_CENTER[1] + BED_W / 2, BED_FLOOR_Z + BED_H + 1.0])
-TRUCK_CAPACITY_KG = 15000.0
+TRUCK_CAPACITY_KG = 11000.0
 TRUCK_CELL = 0.1
 TRUCK_NX = int(round(BED_L / TRUCK_CELL))
 TRUCK_NY = int(round(BED_W / TRUCK_CELL))
@@ -485,9 +487,9 @@ class ExcavatorSim:
         ("drag", 0, 5.6, 1.1 + DIG_Z, -100),
         ("drag-curl", 0, 4.7, 1.2 + DIG_Z, -145),  # keep dragging while curling: the 1.2 m mouth fills toward the top
         ("curl", 0, 4.6, 1.6 + DIG_Z, -180),
-        ("swing to truck", -90, 5.4, 7.0, -165),  # lifts while swinging, as far as the clearance allows; aimed
+        ("swing to truck", -103, 5.3, 7.0, -165),  # lifts while swinging, as far as the clearance allows; aimed
         # above what clears the truck, so the boom is still rising at full speed as the bucket gets there
-        ("dump", -90, 5.4, 6.4, -40),
+        ("dump", -103, 5.3, 6.2, -40),
         ("swing back", 0, 6.0, 2.6 + DIG_Z, -95),  # lowers while swinging, once clear of the truck
     ]
 
@@ -555,19 +557,22 @@ class ExcavatorSim:
             b.joint_target_mode[k] = int(newton.JointTargetMode.EFFORT)
         self.links = {"house": house, "boom": boom, "stick": stick, "bucket": bucket}
 
-        # dump truck: the bed holds sand (MPM collider) and can be hit by the bucket (rigid contact)
+        # dump carrier vessel: a kinematic body (scripted motion: driving and tipping) that holds sand (MPM
+        # collider) and can be hit by the bucket (rigid contact). Body frame at the middle of the vessel floor.
         truck_cfg = newton.ModelBuilder.ShapeConfig(mu=0.5)
-        cx, cy = BED_CENTER
         L, Wb, Hb, Tb = BED_L, BED_W, BED_H, BED_T
-        self.truck_bed_boxes = [
-            ((cx, cy, BED_FLOOR_Z - Tb / 2), (L / 2 + Tb, Wb / 2 + Tb, Tb / 2)),  # floor
-            ((cx, cy - Wb / 2 - Tb / 2, BED_FLOOR_Z + Hb / 2), (L / 2 + Tb, Tb / 2, Hb / 2)),  # sides
-            ((cx, cy + Wb / 2 + Tb / 2, BED_FLOOR_Z + Hb / 2), (L / 2 + Tb, Tb / 2, Hb / 2)),
-            ((cx - L / 2 - Tb / 2, cy, BED_FLOOR_Z + Hb / 2), (Tb / 2, Wb / 2, Hb / 2)),  # tailgate
-            ((cx + L / 2 + Tb / 2, cy, BED_FLOOR_Z + (Hb + 0.5) / 2), (Tb / 2, Wb / 2, (Hb + 0.5) / 2)),  # headboard
+        self.vessel_boxes = [
+            ((0.0, 0.0, -Tb / 2), (L / 2 + Tb, Wb / 2 + Tb, Tb / 2)),  # floor
+            ((0.0, -Wb / 2 - Tb / 2, Hb / 2), (L / 2 + Tb, Tb / 2, Hb / 2)),  # sides
+            ((0.0, Wb / 2 + Tb / 2, Hb / 2), (L / 2 + Tb, Tb / 2, Hb / 2)),
+            ((-L / 2 - Tb / 2, 0.0, Hb / 2), (Tb / 2, Wb / 2, Hb / 2)),  # tail, open-ended on the real vessel: a low lip
+            ((L / 2 + Tb / 2, 0.0, (Hb + 0.5) / 2), (Tb / 2, Wb / 2, (Hb + 0.5) / 2)),  # headboard, toward the cab
         ]
-        for c, h in self.truck_bed_boxes:
-            b.add_shape_box(-1, xform=wp.transform(wp.vec3(*c)), hx=h[0], hy=h[1], hz=h[2], cfg=truck_cfg)
+        self.vessel = b.add_body(xform=wp.transform(wp.vec3(BED_CENTER[0], BED_CENTER[1], BED_FLOOR_Z), wp.quat_identity()), mass=3000.0, is_kinematic=True, label="vessel")
+        for c, h in self.vessel_boxes:
+            b.add_shape_box(self.vessel, xform=wp.transform(wp.vec3(*c), wp.quat_identity()), hx=h[0], hy=h[1], hz=h[2], cfg=truck_cfg)
+        cx, cy = BED_CENTER
+        self.truck_bed_boxes = [((cx + c[0], cy + c[1], BED_FLOOR_Z + c[2]), h) for c, h in self.vessel_boxes]  # parked, for display
         # site ground and pit slopes where spilled sand can land (the pit floor plane is 2.35 m lower).
         # Pit: 6 x 5 m floor, sides 1V:1.5H up to ground level at |x| = 6.75, |y| = 6.25 (as in the site terrain).
         ground = newton.ModelBuilder.ShapeConfig(mu=0.6)
@@ -627,7 +632,7 @@ class ExcavatorSim:
             cfg.warmstart_mode = "particles"  # keeps per-particle stress and plastic volume (Jp) for cracking
         self.mpm = SolverImplicitMPM(self.sand_model, config=cfg)
         # colliders: static shapes, the stick and bucket, and the dormant soil columns
-        collide = [bid for bid in range(self.model.body_count) if bid in (stick, bucket)]
+        collide = [bid for bid in range(self.model.body_count) if bid in (stick, bucket, self.vessel)]
         self.mpm.setup_collider(
             model=self.model,
             collider_body_ids=[-1, *collide, None],
@@ -869,9 +874,9 @@ class ExcavatorSim:
         m = self.CLEAR_BAND
         x0, y0, x1, y1 = BED_LO[0], BED_LO[1], BED_LO[0] + BED_L, BED_LO[1] + BED_W
         in_bed = (x > x0 - m) & (x < x1 + m) & (y > y0 - m) & (y < y1 + m)
-        inside = (x > x0 + m) & (x < x1 - m) & (y > y0 + m) & (y < y1 - m)
-        load = self._load_top() + self.CLEAR_LOAD
-        truck = np.where(inside, load, max(load, BED_FLOOR_Z + BED_H + self.CLEAR_TRUCK))
+        # over the whole vessel the bucket stays above its sides as well as the load: lowered inside it, the
+        # bucket could not swing out past a side again (the arm only backs up along its own path)
+        truck = max(self._load_top() + self.CLEAR_LOAD, BED_FLOOR_Z + BED_H + self.CLEAR_TRUCK)
         wall = (x < -ZONE_HALF[0] + m) | (y < -ZONE_HALF[1] + m)
         ground = np.where(wall, WALL_HEIGHT, np.maximum(ground_height(x, y), BED_TOP)) + self.CLEAR_GROUND
         return np.where(in_bed, truck, ground)
