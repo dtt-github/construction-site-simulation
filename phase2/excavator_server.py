@@ -657,6 +657,7 @@ class ExcavatorSim:
         in_pit = ground & (z.col_x < 6.75) & (z.col_y < 6.25)
         fill = np.floor((BED_TOP - z.col_floor) / LAYER_PER_PARTICLE / 4) * 4
         self.bed_counts = np.where(in_pit & (fill > 0), fill, 0).astype(np.int64)
+        self._pit_cols = in_pit
         in_hm = (z.col_x < HM_X0 + HM_NX * HM_CELL) & (z.col_y < HM_Y0 + HM_NY * HM_CELL)
         z.set_display(ground & ~in_hm)  # the pit, truck and spoil heightmaps show the rest
         self.truck_floor = z.col_floor[z.region_mask("truck")].copy()
@@ -784,6 +785,8 @@ class ExcavatorSim:
         self.curl_from = None  # load when this pass's early curl began
         self.swing_inertia = self.SWING_INERTIA_GUESS
         self._z_cache = {}
+        self._faces, self.face_log, self.pit_done = {}, [], False
+        self.face_rest, self.pass_fill = {}, 0.0  # strips set aside after a poor pass (until pass n); this pass's best fill
         self.stage_time = 0.0
         self.auto_wait = 0.0
         self.low_prev, self.low_rate, self.swing_held, self.arm_held = None, 0.0, 0.0, 0.0
@@ -858,10 +861,14 @@ class ExcavatorSim:
             i = next(k for k, w in enumerate(self.CYCLE) if w[0] == wp_[0])
             prev = self.CYCLE[i - 1]
             z_prev = self._stage_z(prev)
-            level = self.passes // len(self.LANES)  # deepen only after every lane has been dug
-            deepen = min(self.DEEPEN_PER_PASS * level, self.MAX_DEEPEN)
+            face = self._face(self.passes)
+            if face is not None:  # cut FIRST_CUT below the chosen strip's own surface, clear of its hard floor
+                deepen, lowest = face["deepen"], face["lowest"]
+            else:
+                level = self.passes // len(self.LANES)  # deepen only after every lane has been dug
+                deepen = min(self.DEEPEN_PER_PASS * level, self.MAX_DEEPEN)
+                lowest = max(self.FLOOR_CLEARANCE, BED_TOP - self.FIRST_CUT - deepen)
             z = wp_[3] - deepen
-            lowest = max(self.FLOOR_CLEARANCE, BED_TOP - self.FIRST_CUT - deepen)
             while self._bucket_lowest(prev, z_prev, wp_, z) < lowest:
                 z += 0.01
             self._z_cache[key] = z
@@ -872,8 +879,73 @@ class ExcavatorSim:
     LANES = (0.0, 9.0, -9.0, 17.0, -17.0)
     LANE_STAGES = ("approach", "penetrate", "drag", "drag-curl", "curl")
 
+    # where to dig: before each pass the operator looks at the pit and takes the strip (a swing direction and a
+    # reach) holding the most resting soil above its hard floor, cutting FIRST_CUT below that strip's own
+    # surface; the strip is a bucket width along the dig path (cutting edge EDGE_REACH from the swing axis,
+    # shifted in or out). It works across the face and around into the sloped sides as the middle is dug out.
+    adaptive_face = True
+    FACE_PSI = (20.0, 10.0, 0.0, -10.0, -20.0, -30.0, -40.0)  # swing offsets (deg; negative toward the truck side)
+    # m: reach in or out of the standard dig path. Only the standard one: reaching 1 m further runs the arm into
+    # its limits (stages time out, 0.1-0.3 t per pass) and 1 m closer, onto the slope under the machine, digs little
+    FACE_SHIFTS = (0.0,)
+    EDGE_REACH = (4.4, 7.4)  # m: the cutting edge's distance from the swing axis, end and start of the dig path
+    STRIP_HALF_W = 0.55  # m: half the bucket width
+    PIT_DONE_M3 = 0.3  # no strip's cut holds more than this: the excavation is finished (within reach)
+    POOR_PASS, POOR_REST = 0.3, 12  # a pass bringing back less than this fraction of a full bucket sets its strip aside for this many passes
+
+    def _face(self, p):
+        """The cut for pass p: swing offset, reach shift, deepen and the lowest the bucket may go (None in
+        trench mode). Planned once, when first asked for (as the bucket swings back for that pass)."""
+        if not self.adaptive_face:
+            return None
+        if p not in self._faces:
+            self._faces = {k: v for k, v in self._faces.items() if k >= p - 1}
+            self._faces[p] = self._plan_face(p)
+        return self._faces[p]
+
+    def _plan_face(self, p):
+        z = self.zones
+        has = self._pit_cols & (z.count_np > 0)
+        cx, cy = z.col_x[has], z.col_y[has]
+        top = z.col_floor[has] + z.count_np[has] * LAYER_PER_PARTICLE
+        hard = ground_height(cx, cy)
+        dx, dy = cx - SWING_POS[0], cy - SWING_POS[1]
+        best, best_score = None, -1.0
+        for psi in self.FACE_PSI:
+            # psi = 0 digs toward -x, positive toward -y (swing + left)
+            ux, uy = -math.cos(math.radians(psi)), -math.sin(math.radians(psi))
+            along, across = dx * ux + dy * uy, -dx * uy + dy * ux
+            for shift in self.FACE_SHIFTS:
+                if shift < 0 and abs(psi) > 10.0:
+                    continue  # reaching in is for the slope under the machine, straight ahead
+                band = (along > self.EDGE_REACH[0] + shift) & (along < self.EDGE_REACH[1] + shift) & (np.abs(across) < self.STRIP_HALF_W)
+                if band.sum() < 10 or self.face_rest.get((psi, shift), -1) > p:
+                    continue
+                band_top = float(np.percentile(top[band], 90))
+                # the cut goes FIRST_CUT into the strip, but stays clear of its highest hard floor (a slope)
+                lowest = max(float(hard[band].max()) + self.FLOOR_CLEARANCE, band_top - self.FIRST_CUT)
+                avail = float(np.clip(top[band] - lowest, 0.0, None).sum() * CELL * CELL)  # what this pass can cut
+                score = avail * (1.1 if shift == 0.0 else 1.0)  # the standard path digs best
+                if score > best_score:
+                    best_score, best = score, {"psi": psi, "shift": shift, "avail_m3": round(avail, 2), "deepen": max(0.0, BED_TOP - band_top), "lowest": lowest}
+        if best is None or best["avail_m3"] < self.PIT_DONE_M3:
+            self.pit_done = True
+            return self._faces.get(max(self._faces, default=None), None) if self._faces else {"psi": 0.0, "shift": 0.0, "avail_m3": 0.0, "deepen": 0.0, "lowest": BED_TOP}
+        self.face_log.append({"pass": p, **{k: (round(v, 2) if isinstance(v, float) else v) for k, v in best.items()}})
+        return best
+
+    def _stage_r(self, wp_, start=False):
+        """Waypoint reach (m): dig-side stages shift with the current pass's cut, 'swing back' heads for the
+        next pass's (as _stage_psi)."""
+        if self.adaptive_face and wp_[0] in self.LANE_STAGES:
+            return wp_[2] + self._face(self.passes)["shift"]
+        if self.adaptive_face and wp_[0] == "swing back":
+            return wp_[2] + self._face(self.passes + (0 if start else 1))["shift"]
+        return wp_[2]
+
     def set_trench(self, deepen=0.25):
         """Auto cycle digs a single lane and goes deeper every pass (a trench), down to the floor."""
+        self.adaptive_face = False
         self.LANES = (0.0,)
         self.DEEPEN_PER_PASS = deepen
         self._z_cache = {}
@@ -882,6 +954,10 @@ class ExcavatorSim:
         """Waypoint swing angle (deg): dig-side stages shift to the current pass's lane; the final
         'swing back' stage already heads for the next pass's lane. As the start of the next segment (after
         the pass count went up) 'swing back' is in the current lane."""
+        if self.adaptive_face and wp_[0] in self.LANE_STAGES:
+            return wp_[1] + self._face(self.passes)["psi"]
+        if self.adaptive_face and wp_[0] == "swing back":
+            return wp_[1] + self._face(self.passes + (0 if start else 1))["psi"]
         if wp_[0] in self.LANE_STAGES:
             return wp_[1] + self.LANES[self.passes % len(self.LANES)]
         if wp_[0] == "swing back":
@@ -889,7 +965,7 @@ class ExcavatorSim:
         return wp_[1]
 
     def _waypoint_q(self, wp_, start=False):
-        r, phi = wp_[2], wp_[4]
+        r, phi = self._stage_r(wp_, start), wp_[4]
         return ik(math.radians(self._stage_psi(wp_, start)), r, self._stage_z(wp_), math.radians(phi))
 
     # operator judgement in the auto cycle: ease off a cut that stalls the arm or bucket at relief, and
@@ -1069,6 +1145,7 @@ class ExcavatorSim:
         digging = b[0] in self.DIG_STAGES
         if digging and self.auto_frame % 6 == 0:
             self.auto_fill = self._bucket_fill()
+            self.pass_fill = max(self.pass_fill, self.auto_fill)
             if self.auto_fill >= self.full_kg - self.curl_gain and b[0] != "curl":
                 self.early_curls += 1
                 self._jump_to("curl")
@@ -1086,13 +1163,14 @@ class ExcavatorSim:
         ease_a = self.ease if a[0] in self.DIG_STAGES else 0.0
         ease_b = self.ease if digging else 0.0
         q_end = self._waypoint_q(b)
-        q_end = ik(q_end[0], b[2], self._stage_z(b) + ease_b, math.radians(b[4])) if ease_b else q_end
+        rb = self._stage_r(b)
+        q_end = ik(q_end[0], rb, self._stage_z(b) + ease_b, math.radians(b[4])) if ease_b else q_end
         speed = b[5] if len(b) > 5 else 1.0
         s = self.auto_s
         if self.seg_from is not None:
             pa, ra, za, fa = self.seg_from
         else:
-            pa, ra, za, fa = self._stage_psi(a, start=True), a[2], self._stage_z(a) + ease_a, a[4]
+            pa, ra, za, fa = self._stage_psi(a, start=True), self._stage_r(a, start=True), self._stage_z(a) + ease_a, a[4]
         q_start = ik(math.radians(pa), ra, za, math.radians(fa))
         dq = q_end - q_start
         v_dir = np.where(dq > 0, self.vmax_dir[1], self.vmax_dir[0])
@@ -1106,7 +1184,7 @@ class ExcavatorSim:
         seg_all = max(np.max(np.abs(dq) / (v_dir * speed)), 0.5)  # with the swing, for the stage timeout
 
         def pose(s):
-            return ik(math.radians(pa + s * (pb - pa)), ra + s * (b[2] - ra), za + s * (zb - za), math.radians(fa + s * (b[4] - fa)))
+            return ik(math.radians(pa + s * (pb - pa)), ra + s * (rb - ra), za + s * (zb - za), math.radians(fa + s * (b[4] - fa)))
 
         q_goal = pose(s)  # straight bucket-pin path
         held = False
@@ -1127,7 +1205,7 @@ class ExcavatorSim:
                     s = max(0.0, s - self.frame_dt / seg_time)
                     self.auto_s = s
                     q_goal = pose(s)
-            rise_to_end = float(self._bucket_local(ik(0.0, b[2], zb, math.radians(b[4])))[:, 2].min()) - low
+            rise_to_end = float(self._bucket_local(ik(0.0, rb, zb, math.radians(b[4])))[:, 2].min()) - low
 
             def allow(direction):
                 return self._swing_allowance(local, math.radians(pb), direction, rise_to_end)
@@ -1181,9 +1259,21 @@ class ExcavatorSim:
             self.seg_from = None
             self.low_prev, self.low_rate = None, 0.0
             if self.auto_stage == 0:
+                face = self._faces.get(self.passes) if self.adaptive_face else None
+                if face is not None and self.pass_fill < self.POOR_PASS * self.full_kg:
+                    self.face_rest[(face["psi"], face["shift"])] = self.passes + self.POOR_REST  # little came out of it
+                    for f in self.face_log[-2:]:
+                        if f["pass"] == self.passes:
+                            f["poor_kg"] = round(self.pass_fill)
+                self.pass_fill = 0.0
                 self.passes += 1
                 self.ease = 0.0
                 self.curl_out, self.curl_from = None, None
+                if self.pit_done:  # nothing left within reach: stop, and send the carrier off with what it has
+                    self.auto = False
+                    self.stage_name = "pit dug out"
+                    if self.haul and self.fleet.at_spot is not None:
+                        self.dispatch_pending = True
 
     # -------------------------------------------------------------- hydraulics
     def link_frames(self, q):
@@ -1689,6 +1779,8 @@ class ExcavatorSim:
             "payload_kg": round(self.payload_kg),
             "curl_gain_kg": round(self.curl_gain),
             "zone": dict(self.zones.counters),
+            "face": self.face_log[-1] if self.face_log else None,
+            "pit_done": self.pit_done,
         }
 
 

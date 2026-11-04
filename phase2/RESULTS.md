@@ -1235,3 +1235,34 @@ Part 3's long runs found the dozer falling behind after about 15 minutes. Instru
   - A real excavator would move along the cut. That is the next step for the operator model.
 - **Loam carry-back:** it shows up more over long runs: 0.3 t per trip typically, up to 1.4 t.
 
+## A living site, 5: digging where the soil is
+
+Part 4 put the late slowdown down to the pit being dug out. That was wrong: at the end of those runs about 100 t was still in the pit. The operator model dug five fixed lanes (swing −17° to +17°) 0.15 m deeper each round. After about 60 t those lanes reached the hard floor, and passes came back light, while the truck-side wedge and the strips between lanes were never touched.
+
+**The fix:** before each pass the operator looks at the pit and chooses where to cut (`_plan_face`).
+- **The choice:** seven swing directions (+20° to −40°, negative toward the truck side) along the standard dig path (cutting edge 4.4–7.4 m from the swing axis), each a bucket-width strip.
+- **The score:** the soil the cut can take. The cut goes 0.42 m into the strip but stays 0.08 m above the highest hard floor under it, which matters on the sloped sides.
+- **Learning from poor passes:** a strip whose pass brings back less than 30 % of a full bucket is set aside for 12 passes.
+- **Finishing:** when no strip's cut holds 0.3 m³, the excavation is finished within reach. The operator stops and sends the carrier off.
+
+**What did not work, found with per-pass logs:**
+- **Scoring strips by all the soil above the hard floor:** this kept choosing the −40° strip over the slope, where the cut can only skim the top (0–180 kg per pass).
+- **Reaching 1 m further or closer:** further runs the arm into its limits (stages time out, 0.1–0.3 t per pass); closer, onto the slope under the machine, digs little. Only the standard path is used.
+
+**1500 s, all fixes** (logs `logs/haul_bench_face_long_<soil>_<n>carrier.json`; four runs shared the GPU):
+
+| Run | Loads | Passes per load | Time between loads leaving | Loaded | Delivered | Pit left | Stage timeouts |
+|---|---|---|---|---|---|---|---|
+| Loam, 1 carrier | 8 | 6–8 to the end (part 4: 12 at the end) | 176–194 s | 186 t/h | 172 t/h | 103 t | 0 |
+| Loam, 2 carriers | 8 | 6–9 (part 4: 17 at the end) | 132–220 s (mean 161 s) | 188 t/h | 175 t/h | 100 t | 9 |
+| Clay, 1 carrier | 7 | 8–10 | 200–238 s | 176 t/h (part 4: 157) | 142 t/h | 113 t | 0 |
+| Dry sand, 1 carrier | 6 | 9–10, then 13 | 208–221 s, then 304 s | 152 t/h | 132 t/h | 75 t | 0 |
+
+- **No late slowdown in loam and clay:** passes per load stay level for 25 minutes.
+- **The fleet:** a second carrier shortens the time between loads by 14 % (161 against 186 s over the first six), and the excavator waits 146 s instead of 384 s.
+- **Dry sand still slows at the end:**
+  - The particle pool ran short 8000 times in that run, against 130–590 for the other soils.
+  - Carry-back grew to 1.5–2.5 t per trip.
+  - Dry sand flows furthest, out of the vessel and over the spoil area. This was not investigated further here.
+- **Carry-back over long runs:** loam and clay carried back 0.3–1.6 t per trip in the later loads.
+

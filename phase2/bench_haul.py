@@ -71,6 +71,9 @@ out = {
     "carrier_wait_to_leave_s": round(sum(c.depart_wait for c in fleet), 1),
     "carrier_wait_to_load_s": round(sum(c.queue_wait for c in fleet), 1),
     "spot_empty_s": round(idle_spot, 1),
+    "pit_left_t": round(float((sim.zones.count_np * sim._pit_cols).sum()) * sim.particle_mass / 1000, 1),
+    "pit_done": sim.pit_done,
+    "faces": [(f["psi"], f["shift"]) for f in sim.face_log],
     "dozer": {**{k: round(v, 2) for k, v in sim.dozer.counters.items()}, "mean_push_kN": sim.dozer.push_force},
     "spread": sim.dozer.spread_report(sim._surface),
 }
