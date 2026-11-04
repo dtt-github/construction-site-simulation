@@ -57,7 +57,9 @@ from soil_server import (
 )
 import hydraulics as hyd
 import soils
+import dozer as dozer_mod
 import dumper as dumper_mod
+from dozer import Dozer
 from dumper import Dumper
 from soil_zone import CELL, LAYER_PER_PARTICLE, PER_LAYER, SPACING, SoilZones
 
@@ -171,6 +173,13 @@ GROUND_REGION = ("ground", -ZONE_HALF[0], -ZONE_HALF[1], 160, 140, ground_height
 # haul: the carrier spins round at TURN_X and reverses to DUMP_X (its base), tipping onto a spoil area east
 # of the machine, flat site ground from x = 13 to 34 m
 HAUL_TURN_X, HAUL_DUMP_X = 20.0, 23.0
+CARRIER_STAGES = ("loading", "drive out", "turn to dump", "reverse to dump", "tip", "dump", "lower", "return", "turn to load", "reverse in", "wait at dump")
+# dozer (dozer.py): spreads the dumped loads east of the dump point in lanes along +x (cutting edge from
+# DOZER_X_START to DOZER_X_END), and parks north of the dump point, out of the carrier's way
+DOZER_X_START, DOZER_X_END = 25.2, 33.4
+DOZER_LANES = (2.3, 5.2, 8.1)
+DOZER_PARK_Y = 11.4
+DOZER_SEES_SPEED = 1.0  # m/s: the dozer plans on all soil slower than this (dumped clay creeps for minutes)
 SPOIL_REGION = ("spoil", 24.0, -0.5, 125, 140, lambda x, y: np.full(np.shape(x), GROUND_Z))
 SPOIL_HM = (24.0, -0.5, 100, 112)  # display heightmap of the spoil area: x0, y0, nx, ny (0.1 m cells)
 
@@ -505,7 +514,7 @@ class ExcavatorSim:
         ("swing back", 0, 6.0, 2.6 + DIG_Z, -95),  # lowers while swinging, once clear of the truck
     ]
 
-    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True):
+    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True):
         wp.init()
         self.kwargs = {"voxel": voxel, "ppc": ppc, "soil": soil, "iterations": iterations, "fps": fps, "pool": pool, "mpm_every": mpm_every}
         self.soil = soil
@@ -586,6 +595,13 @@ class ExcavatorSim:
                                  com=wp.vec3(0.0), inertia=box_inertia(3000.0, 2.0, 1.3, 0.5), lock_inertia=True, is_kinematic=True, label="vessel")
         for c, h, *a in self.vessel_boxes:
             b.add_shape_box(self.vessel, xform=wp.transform(wp.vec3(*c), rot_y(a[0] if a else 0.0)), hx=h[0], hy=h[1], hz=h[2], cfg=truck_cfg)
+        # dozer blade: a kinematic body (scripted, dozer.py) that pushes sand (MPM collider); body frame = blade_link
+        self.blade_boxes = dozer_mod.blade_plates()
+        self.blade = b.add_body(xform=wp.transform(wp.vec3(0.0, 0.0, -20.0), wp.quat_identity()), mass=1200.0, com=wp.vec3(0.0),
+                                inertia=box_inertia(1200.0, 0.3, 1.6, 0.6), lock_inertia=True, is_kinematic=True, label="blade")
+        blade_cfg = newton.ModelBuilder.ShapeConfig(mu=0.5, has_shape_collision=False)
+        for c, h, a in self.blade_boxes:
+            b.add_shape_box(self.blade, xform=wp.transform(wp.vec3(*c), rot_y(a)), hx=h[0], hy=h[1], hz=h[2], cfg=blade_cfg)
         cx, cy = BED_CENTER
         self.truck_bed_boxes = [((cx + c[0], cy + c[1], BED_FLOOR_Z + c[2]), h) for c, h, *_ in self.vessel_boxes]  # parked
         # site ground and pit slopes where spilled sand can land (the pit floor plane is 2.35 m lower).
@@ -644,6 +660,12 @@ class ExcavatorSim:
         self.dumper = Dumper(BED_CENTER, GROUND_Z, HAUL_DUMP_X, HAUL_TURN_X, TRUCK_CAPACITY_KG)
         self.vessel_q = int(self.model.joint_q_start.numpy()[4])
         self.vessel_qd = int(self.model.joint_qd_start.numpy()[4])
+        # the dozer spreading the loads at the spoil area; its blade's free joint follows the vessel's
+        self.use_dozer = haul and dozer
+        edge_ahead = Dozer((0.0, 0.0, 0.0), (0.0, 1.0, [0.0]), 0.0)._edge_ahead()
+        self.dozer = Dozer((DOZER_X_START - edge_ahead, DOZER_PARK_Y, math.pi / 2), (DOZER_X_START, DOZER_X_END, DOZER_LANES), GROUND_Z)
+        self.blade_q = int(self.model.joint_q_start.numpy()[5])
+        self.blade_qd = int(self.model.joint_qd_start.numpy()[5])
 
         cfg = SolverImplicitMPM.Config()
         cfg.voxel_size = voxel
@@ -654,12 +676,12 @@ class ExcavatorSim:
             cfg.warmstart_mode = "particles"  # keeps per-particle stress and plastic volume (Jp) for cracking
         self.mpm = SolverImplicitMPM(self.sand_model, config=cfg)
         # colliders: static shapes, the stick and bucket, and the dormant soil columns
-        collide = [bid for bid in range(self.model.body_count) if bid in (stick, bucket, self.vessel)]
+        collide = [bid for bid in range(self.model.body_count) if bid in (stick, bucket, self.vessel, self.blade)]
         self.mpm.setup_collider(
             model=self.model,
             collider_body_ids=[-1, *collide, None],
             collider_meshes=[None] * (1 + len(collide)) + [self.zones.mesh],
-            collider_friction=[None] * (1 + len(collide)) + [friction],
+            collider_friction=[None] * (1 + len(collide)) + [soils.resting_friction(soil)],  # dormant soil
         )
         self.collider_body = self.mpm.collider_body_index
 
@@ -702,6 +724,8 @@ class ExcavatorSim:
         self.truck_hm = wp.zeros(TRUCK_NX * TRUCK_NY, dtype=float)
         self.spoil_hm = wp.zeros(SPOIL_HM[2] * SPOIL_HM[3], dtype=float)
         self.spoil_hm_np = np.zeros(SPOIL_HM[2] * SPOIL_HM[3], dtype=np.float32)
+        self.doze_hm = wp.zeros(SPOIL_HM[2] * SPOIL_HM[3], dtype=float)  # what the dozer sees, creeping soil included
+        self.doze_hm_np = np.full(SPOIL_HM[2] * SPOIL_HM[3], -0.95, dtype=np.float32)
         self.bucket_poly = wp.array(BUCKET_SHELL.astype(np.float32), dtype=wp.vec2)
         self.heap_poly = wp.array(_heaped_profile().astype(np.float32), dtype=wp.vec2)
         self.truck_counter = wp.zeros(1, dtype=int)
@@ -737,6 +761,8 @@ class ExcavatorSim:
         self.levers = np.zeros(4)
         self.auto = False
         self.dumper.reset()
+        self.dozer.reset()
+        self.blade_force = np.zeros(3)
         self.zones.set_region_floor("truck", self.truck_floor)
         self.payload = None  # the carried load: particle counts per vessel cell (ny, nx), while away
         self.dispatch_pending, self.truck_wait = False, 0.0
@@ -1239,6 +1265,41 @@ class ExcavatorSim:
         self.state_0.joint_q.assign(q)
         self.state_0.joint_qd.assign(qd)
 
+    def _doze(self):
+        """Dozer: spread what the carrier dumps; it works only while the carrier is away from the dump point,
+        and the carrier waits at its turn point until the dozer has parked."""
+        d, dz = self.dumper, self.dozer
+        if self.zone_frame % 3 == 0:
+            self._spoil_surface(self.doze_hm, DOZER_SEES_SPEED)
+            self.doze_hm_np = self.doze_hm.numpy()
+        may_work = d.stage in ("loading", "reverse in") or (d.stage == "drive out" and d.base[0] < HAUL_TURN_X - 6.0)
+        self.blade_force = self.sand_forces.numpy()[self.blade][:3].astype(float)
+        dz.update(self.frame_dt, self._surface, self.blade_force, may_work)
+        d.dump_clear = dz.parked
+        p, R = dz.blade_pose()
+        q, qd = self.state_0.joint_q.numpy(), self.state_0.joint_qd.numpy()
+        q[self.blade_q:self.blade_q + 7] = [*p, *dz.blade_quat()]
+        qd[self.blade_qd:self.blade_qd + 6] = [*dz.v, *dz.w]
+        self.state_0.joint_q.assign(q)
+        self.state_0.joint_qd.assign(qd)
+
+    def _spoil_surface(self, hm, max_speed):
+        """Spoil-area heightmap: the dormant columns and the particles slower than max_speed (-0.95 where
+        there is no soil)."""
+        hm.fill_(-0.95)
+        wp.launch(heightmap_kernel, dim=self.n_particles, inputs=[self.sand.particle_q, self.sand.particle_qd, max_speed, self.radius, SPOIL_HM[0], SPOIL_HM[1], HM_CELL, SPOIL_HM[2], SPOIL_HM[3], hm])
+        self.zones.merge_heightmap(hm, SPOIL_HM[0], SPOIL_HM[1], HM_CELL, SPOIL_HM[2], SPOIL_HM[3])
+
+    def _surface(self, xy):
+        """Ground and soil height at points xy (n, 2): the spoil heightmap where it covers them, else the ground."""
+        x0, y0, nx, ny = SPOIL_HM
+        ix = np.floor((xy[:, 0] - x0) / HM_CELL).astype(int)
+        iy = np.floor((xy[:, 1] - y0) / HM_CELL).astype(int)
+        inside = (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny)
+        h = np.full(len(xy), GROUND_Z)
+        h[inside] = np.maximum(self.doze_hm_np[iy[inside] * nx + ix[inside]], GROUND_Z)
+        return h
+
     def _in_vessel(self):
         """Active particles inside the vessel (count)."""
         act = np.flatnonzero(self.zones.active_np)
@@ -1321,6 +1382,8 @@ class ExcavatorSim:
     def step(self):
         if self.haul:
             self._haul()
+        if self.use_dozer:
+            self._doze()
         if self.auto:
             self._auto_control()
         self._hydraulics()
@@ -1337,7 +1400,7 @@ class ExcavatorSim:
             wp.capture_launch(self.rigid_graph)
 
         if self.zone_frame % ZONE_EVERY == 0:
-            self.zones.update(self.bucket_box())
+            self.zones.update([self.bucket_box(), self.dozer.blade_box()] if self.use_dozer else self.bucket_box())
         self.zone_frame += 1
         if self.zone_frame % self.mpm_every == 0:
             # the rigid frames in between reuse the last sand impulses as a constant force
@@ -1414,8 +1477,7 @@ class ExcavatorSim:
         # parked: the soil in the vessel; away: the load it carries
         self.truck_kg = in_vessel if self.dumper.parked else self.dumper.payload_kg
         self.truck_hm_np = self.truck_hm.numpy() if self.dumper.parked else self._carried_heightmap()
-        self.spoil_hm.fill_(-0.95)  # no spoil: below the ground (the browser hides it)
-        self.zones.merge_heightmap(self.spoil_hm, SPOIL_HM[0], SPOIL_HM[1], HM_CELL, SPOIL_HM[2], SPOIL_HM[3])
+        self._spoil_surface(self.spoil_hm, SURFACE_MAX_SPEED)  # no spoil: below the ground (the browser hides it)
         self.spoil_hm_np = self.spoil_hm.numpy()
         _, _, edge = fk(self.q)
         ix = int((edge[0] - HM_X0) / HM_CELL)
@@ -1449,7 +1511,7 @@ class ExcavatorSim:
 
         cx, cy = BED_CENTER
         g = GROUND_Z
-        return {
+        out = {
             "house": [box(*bx) for bx in self.house_boxes],
             "boom": [box(*bx) for bx in self.boom_boxes],
             "stick": [box(*bx) for bx in self.stick_boxes],
@@ -1478,13 +1540,25 @@ class ExcavatorSim:
             },
             "truck_capacity_kg": TRUCK_CAPACITY_KG,
         }
+        if self.use_dozer:  # the dozer moves (frame trailer "DOZ1"): its glTF, or these boxes, in URDF base_link frames
+            out["dozer"] = {
+                "file": "assets/machinery/opera_d37pxi.glb",
+                "arm_node": "blade_arm_link", "cylinder_node": "blade_arm_cylinder_link", "piston_node": "blade_arm_piston_link",
+                "arm_pivot": dozer_mod.ARM_PIVOT.tolist(), "blade_on_arm": dozer_mod.BLADE_ON_ARM.tolist(),
+                "body_boxes": [{"center": c, "size": s} for c, s in [((0.0, s * 0.8, 0.35), (2.6, 0.5, 0.7)) for s in (-1, 1)] + [((-0.2, 0.0, 1.1), (2.6, 1.6, 0.9)), ((-0.6, 0.0, 2.2), (1.3, 1.4, 1.2))]],
+                "blade_box": {"center": [0.2, 0.0, 0.25], "size": [0.2, dozer_mod.BLADE_W, 1.09]},
+                "stages": dozer_mod.STAGES,
+            }
+        return out
 
     def hello(self):
         """First message to a client: machine, limits and scene geometry."""
         return {"type": "hello", "kind": "excavator", "particles": self.n_particles, "zone": True, "voxel": self.voxel, "joints": JOINTS, "limits": LIMITS, "vmax": dict(zip(JOINTS, self.vmax.round(3).tolist())), "relief_mpa": hyd.P_RELIEF / 1e6, "geometry": self.geometry(), "stages": [c[0] for c in self.CYCLE],
                 "soil": {"name": self.soil, **soils.SOILS[self.soil], "options": [{"name": k, "label": v["label"]} for k, v in soils.SOILS.items()]}}
 
-    def frame_bytes(self, frame_no, moving):
+    def frame_bytes(self, frame_no, moving, parts=False):
+        """One stream frame. parts=True returns it in three pieces (fixed-size head, grains, tail) for the
+        replay recorder, which stores the head and tail as differences to the previous frame."""
         bq = self.state_0.body_q.numpy()
         links = b"".join(struct.pack("<3f4f", *self.to_three(bq[i][:3]), *self.quat_to_three(bq[i][3:])) for i in (self.links[name] for name in LINKS))
         f = self.force
@@ -1521,9 +1595,14 @@ class ExcavatorSim:
         base, pin = self._carrier_three()
         shm = np.clip((self.spoil_hm_np + 1.0) * 1000.0, 0, 65535).astype(np.uint16)
         shm_header = struct.pack("<HHfff", SPOIL_HM[2], SPOIL_HM[3], ox + SPOIL_HM[0] + HM_CELL / 2, oz - SPOIL_HM[1] - HM_CELL / 2, HM_CELL)
-        stages = ("loading", "drive out", "turn to dump", "reverse to dump", "tip", "dump", "lower", "return", "turn to load", "reverse in")
-        car = struct.pack("<4s7f7f3fI", b"CAR1", *base, *pin, self.dumper.tip, self.dumper.payload_kg, self.dumper.delivered_kg, stages.index(self.dumper.stage))
-        return body + hm_header + hm.tobytes() + thm_header + thm.tobytes() + p_header + qp.tobytes() + car + shm_header + shm.tobytes()
+        car = struct.pack("<4s7f7f3fI", b"CAR1", *base, *pin, self.dumper.tip, self.dumper.payload_kg, self.dumper.delivered_kg, CARRIER_STAGES.index(self.dumper.stage))
+        head = body + hm_header + hm.tobytes() + thm_header + thm.tobytes()
+        grains = p_header + qp.tobytes()
+        tail = car + shm_header + shm.tobytes()
+        if self.use_dozer:  # trailer "DOZ1": the dozer's base_link pose, lift angle, blade force (kN), stage
+            dz = self.dozer
+            tail += struct.pack("<4s7fffI", b"DOZ1", *self.to_three(dz.base_pos()), *self.quat_to_three(dz.base_quat()), dz.lift, dz.force / 1000, dozer_mod.STAGES.index(dz.stage))
+        return (head, grains, tail) if parts else head + grains + tail
 
     def _carrier_three(self):
         """Carrier base_link and vessel pin poses in three.js coordinates ((pos, quat), (pos, quat))."""

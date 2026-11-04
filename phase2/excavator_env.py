@@ -25,6 +25,9 @@ Observation (dict of float32 arrays, SI units, zone frame: x across the pit, z u
     delivered (1)          soil the carrier has dumped at the spoil area so far (kg)
     carrier (6)            the crawler carrier (dumper.py): stage (index in CARRIER_STAGES), base x, y (m),
                            heading (rad), vessel tip (rad), payload (kg)
+    dozer (6)              the dozer spreading the spoil (dozer.py): stage (index in dozer.STAGES), base x, y (m),
+                           heading (rad), blade lift angle (rad, + lowers), soil force on the blade along its
+                           heading (N)
     terrain (86, 96)       surface height of the pit (m) on a 0.1 m grid, rows along y, from x, y = -3, -2.5
                            (only with terrain=True)
   with sensors=("lidar", "camera", "imu") or any of them (sensors.py: mounts, frames, what the rays see):
@@ -58,13 +61,15 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
+import dozer as dozer_mod
 import excavator_server as ex
 import hydraulics as hyd
 import sensors as sensor_rig
 import soils
 
 TASKS = ("load-truck", "fill-bucket")
-CARRIER_STAGES = ("loading", "drive out", "turn to dump", "reverse to dump", "tip", "dump", "lower", "return", "turn to load", "reverse in")
+CARRIER_STAGES = ex.CARRIER_STAGES
+DOZER_STAGES = dozer_mod.STAGES
 
 
 class ExcavatorEnv(gym.Env):
@@ -99,6 +104,7 @@ class ExcavatorEnv(gym.Env):
             "truck_load": spaces.Box(0.0, np.inf, shape=(1,), dtype=np.float32),
             "delivered": spaces.Box(0.0, np.inf, shape=(1,), dtype=np.float32),
             "carrier": spaces.Box(-np.inf, np.inf, shape=(6,), dtype=np.float32),
+            "dozer": spaces.Box(-np.inf, np.inf, shape=(6,), dtype=np.float32),
         }
         if terrain:
             obs["terrain"] = spaces.Box(-np.inf, np.inf, shape=(ex.HM_NY, ex.HM_NX), dtype=np.float32)
@@ -179,6 +185,7 @@ class ExcavatorEnv(gym.Env):
             "truck_load": np.array([sim.truck_kg], dtype=np.float32),
             "delivered": np.array([sim.dumper.delivered_kg], dtype=np.float32),
             "carrier": np.array([CARRIER_STAGES.index(sim.dumper.stage), *sim.dumper.base, sim.dumper.yaw, sim.dumper.tip, sim.dumper.payload_kg], dtype=np.float32),
+            "dozer": np.array([DOZER_STAGES.index(sim.dozer.stage), sim.dozer.x, sim.dozer.y, sim.dozer.yaw, sim.dozer.lift, sim.dozer.force], dtype=np.float32),
         }
         if self.with_terrain:
             obs["terrain"] = sim.hm_np.reshape(ex.HM_NY, ex.HM_NX).astype(np.float32)
@@ -204,6 +211,8 @@ class ExcavatorEnv(gym.Env):
             "passes": sim.passes,
             "carrier_stage": sim.dumper.stage,
             "excavator_wait_s": sim.truck_wait,
+            "dozer_stage": sim.dozer.stage,
+            "carrier_wait_for_dozer_s": sim.dumper.dozer_wait,
         }
 
 

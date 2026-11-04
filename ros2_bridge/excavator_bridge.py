@@ -28,6 +28,10 @@ Published (stamps in simulation time; run your nodes with use_sim_time:=true):
     /carrier/joint_states               sensor_msgs/JointState  vessel_pin_joint (rad, negative = tipped, as the URDF)
     /carrier/stage                      std_msgs/String   haul stage (loading, drive out, ..., reverse in)
     /carrier/payload, /carrier/delivered  std_msgs/Float64  load carried, total dumped (kg)
+    /tf                                 world -> dozer/base_link (the Komatsu D37PXi-24 dozer, PWRI OPERA d37pxi_ros2)
+    /dozer/joint_states                 sensor_msgs/JointState  lift_joint (rad, + lowers the blade, as the URDF)
+    /dozer/stage                        std_msgs/String   parked, to lane, lower, push, raise, back, to park
+    /dozer/blade_force                  std_msgs/Float64  soil force on the blade against its travel (N)
 Subscribed:
     /excavator/levers     std_msgs/Float64MultiArray  [swing (+ left), boom (+ raise), stick (+ out), bucket (+ dump)],
                           each in [-1, 1]; publish at 10 Hz or more: levers return to neutral 0.5 s after the last
@@ -96,6 +100,9 @@ class Bridge(Node):
             "carrier_stage": self.create_publisher(String, "/carrier/stage", 10),
             "carrier_payload": self.create_publisher(Float64, "/carrier/payload", 10),
             "carrier_delivered": self.create_publisher(Float64, "/carrier/delivered", 10),
+            "dozer_joints": self.create_publisher(JointState, "/dozer/joint_states", 10),
+            "dozer_stage": self.create_publisher(String, "/dozer/stage", 10),
+            "dozer_force": self.create_publisher(Float64, "/dozer/blade_force", 10),
         }
         self.create_subscription(Float64MultiArray, "/excavator/levers", lambda m: self.send({"type": "levers", "levers": list(m.data)[:4]}), 10)
         self.create_subscription(Bool, "/excavator/autopilot", lambda m: self.send({"type": "autopilot", "on": bool(m.data)}), 10)
@@ -181,6 +188,15 @@ class Bridge(Node):
             self.pub["carrier_stage"].publish(String(data=h.get("carrier_stage", "")))
             self.pub["carrier_payload"].publish(Float64(data=payload))
             self.pub["carrier_delivered"].publish(Float64(data=delivered))
+        if "dozer" in a:
+            d = [float(v) for v in a["dozer"]]
+            tfs.append(transform("world", "dozer/base_link", t, d[0:3], d[3:7]))
+            dj = JointState()
+            dj.header.stamp = stamp(t)
+            dj.name, dj.position = ["lift_joint"], [d[7]]
+            self.pub["dozer_joints"].publish(dj)
+            self.pub["dozer_stage"].publish(String(data=h.get("dozer_stage", "")))
+            self.pub["dozer_force"].publish(Float64(data=d[8]))
         self.pub["tf"].publish(TFMessage(transforms=tfs))
         self.pub["levers"].publish(Float64MultiArray(data=a["levers"].tolist()))
         tip = PointStamped()

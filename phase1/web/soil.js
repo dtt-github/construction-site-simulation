@@ -13,6 +13,7 @@ const P_HEADER_BYTES = 20;
 const MAGIC_SOIL = 0x4c494f53; // "SOIL"
 const MAGIC_EXC = 0x32435845; // "EXC2"
 const MAGIC_CAR1 = 0x31524143; // "CAR1": crawler carrier trailer
+const MAGIC_DOZ1 = 0x315a4f44; // "DOZ1": dozer trailer
 const MAGIC_EXC3 = 0x33435845; // "EXC3": EXC2 + hydraulic cylinder and linkage poses, cylinder pressures
 
 export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, layerStatic, panel, view }) {
@@ -23,9 +24,10 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   // stay offline unless ?soil=host:port names a server explicitly.
   const tryConnect = Boolean(params.get("soil")) || location.protocol !== "https:";
   const QUICK_START = "https://github.com/dtt-github/construction-site-simulation#quick-start";
-  // one auto dig-swing-load pass recorded from excavator_server.py (phase2/record_replay.py), played
-  // back when no server is connected, so the static demo shows the real simulation
-  const REPLAY_URL = "../assets/replay/zx200_cycle.bin.gz";
+  // the autopilot recorded from excavator_server.py (phase2/record_replay.py), played back when no server
+  // is connected, so the static demo shows the real simulation: a whole haul cycle (dig, load, haul, dump,
+  // spread) as a time-lapse, or the older single dig pass if that is all there is
+  const REPLAY_URLS = ["../assets/replay/site_cycle.bin.gz", "../assets/replay/zx200_cycle.bin.gz"];
 
   // ------------------------------------------------------------ panel (controls depend on the server kind)
   const box = document.createElement("fieldset");
@@ -49,7 +51,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   const showOffline = (detail) => {
     if (replay) return; // the recorded cycle is playing
     buttonsEl.hidden = controlsEl.hidden = true;
-    statusEl.innerHTML = `<strong>Soil server not connected.</strong> The excavator and soil need the GPU server (NVIDIA Newton); see the <a href="${QUICK_START}" target="_blank" rel="noopener">README quick start</a>. ${detail} <button id="soil-replay" class="secondary">Play recorded dig cycle</button>`;
+    statusEl.innerHTML = `<strong>Soil server not connected.</strong> The excavator and soil need the GPU server (NVIDIA Newton); see the <a href="${QUICK_START}" target="_blank" rel="noopener">README quick start</a>. ${detail} <button id="soil-replay" class="secondary">Play recorded cycle</button>`;
     statusEl.querySelector("#soil-replay").addEventListener("click", startReplay);
   };
 
@@ -221,7 +223,9 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   const arm = { links: {}, parts: {}, base: null, truckSurface: null, tracks: null, model: false };
   // crawler dump carrier (dumper.py): base_link and vessel (pin frame) groups, posed from the frame trailer
   const carrier = (window.__carrier = { base: null, vessel: null, parkedPin: null, spoil: null, stage: "" });
-  const CARRIER_STAGES = ["loading", "drive out", "turn to dump", "reverse to dump", "tip", "dump", "lower", "return", "turn to load", "reverse in"];
+  const CARRIER_STAGES = ["loading", "drive out", "turn to dump", "reverse to dump", "tip", "dump", "lower", "return", "turn to load", "reverse in", "wait at dump"];
+  // dozer (dozer.py): base group posed from the "DOZ1" trailer; the blade arm turns about its lift joint
+  const dozer = (window.__dozer = { base: null, arm: null, cylinder: null, piston: null, pistonAxis: null, stages: [], stage: "" });
   function buildExcavator(geom) {
     for (const name of ["house", "boom", "stick", "bucket"]) {
       const g = new THREE.Group();
@@ -252,6 +256,69 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     arm.base = base;
     arm.capacity = geom.truck_capacity_kg;
     if (geom.carrier) buildCarrier(geom.carrier);
+    if (geom.dozer) buildDozer(geom.dozer);
+  }
+
+  // URDF frames are Z up: wrap a part in a -90 deg turn about x, as for the excavator
+  function wrapZup(obj) {
+    const w = new THREE.Group();
+    w.rotation.x = -Math.PI / 2;
+    w.add(obj);
+    w.traverse((o) => {
+      if (o.isMesh) o.castShadow = o.receiveShadow = true;
+    });
+    return w;
+  }
+
+  function buildDozer(d) {
+    const paint = new THREE.MeshStandardMaterial({ color: "#d9a520", metalness: 0.3, roughness: 0.6 });
+    dozer.stages = d.stages;
+    dozer.base = new THREE.Group();
+    // boxes (URDF base_link frame) until the model loads: body, and the blade on an arm turning at the pivot
+    const urdf = new THREE.Group();
+    const box = (parent, b, mat) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(b.size[0], b.size[1], b.size[2]), mat);
+      m.position.set(...b.center);
+      m.castShadow = true;
+      parent.add(m);
+    };
+    d.body_boxes.forEach((b, i) => box(urdf, b, i < 2 ? dark : paint));
+    dozer.arm = new THREE.Group();
+    dozer.arm.position.set(...d.arm_pivot);
+    const blade = new THREE.Group();
+    blade.position.set(...d.blade_on_arm);
+    box(blade, d.blade_box, paint);
+    dozer.arm.add(blade);
+    urdf.add(dozer.arm);
+    dozer.base.add(wrapZup(urdf));
+    dozer.base.visible = false;
+    scene.add(dozer.base);
+    if (loader) loadDozerModel(d);
+  }
+
+  async function loadDozerModel(d) {
+    let gltf;
+    try {
+      gltf = await loader.loadAsync(`../${d.file}`);
+    } catch (err) {
+      console.warn(`dozer: could not load ${d.file}, drawing boxes`, err);
+      return;
+    }
+    const base = gltf.scene.getObjectByName("base_link");
+    const arm = base?.getObjectByName(d.arm_node);
+    if (!arm) {
+      console.warn("dozer: model has unexpected structure, drawing boxes");
+      return;
+    }
+    base.position.set(0, 0, 0);
+    base.quaternion.identity();
+    dozer.arm = arm;
+    dozer.cylinder = base.getObjectByName(d.cylinder_node);
+    dozer.piston = base.getObjectByName(d.piston_node);
+    dozer.pistonRest = dozer.piston?.position.clone();
+    dozer.pistonAxis = new THREE.Vector3(1.0055, 0, -0.056785).normalize(); // blade_arm_piston_joint axis
+    dozer.base.clear();
+    dozer.base.add(wrapZup(base));
   }
 
   function buildCarrier(c) {
@@ -465,6 +532,12 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       o += 4 + 4 * 18;
       [f.spoilHm, o] = readHeightmap(dv, buf, o);
     }
+    // dozer trailer ("DOZ1"): base_link pose, lift angle, blade force (kN), stage
+    if (o + 4 <= buf.byteLength && dv.getUint32(o, true) === MAGIC_DOZ1) {
+      const g = (k) => dv.getFloat32(o + 4 + 4 * k, true);
+      f.dozer = { base: [0, 1, 2, 3, 4, 5, 6].map(g), lift: g(7), force: g(8), stage: dv.getUint32(o + 4 + 4 * 9, true) };
+      o += 4 + 4 * 10;
+    }
   }
 
   function handleFrame(buf) {
@@ -560,9 +633,13 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   let replay = null; // { frames: [{t, buf}], t0, k }
   async function startReplay() {
     if (replay) return;
-    statusEl.textContent = "Loading the recorded dig cycle…";
+    statusEl.textContent = "Loading the recorded cycle…";
     try {
-      const res = await fetch(REPLAY_URL);
+      let res = null;
+      for (const u of REPLAY_URLS) {
+        res = await fetch(u);
+        if (res.ok) break;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       let buf = await res.arrayBuffer();
       const head = new Uint8Array(buf, 0, 2);
@@ -572,25 +649,52 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       }
       const dv = new DataView(buf);
       if (dv.getUint32(0, true) !== 0x594c5052) throw new Error("not a replay file"); // "RPLY"
+      const version = dv.getUint32(4, true);
       const helloLen = dv.getUint32(8, true);
       const hello = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 12, helloLen)));
       let o = 12 + helloLen;
       const n = dv.getUint32(o, true);
       o += 4;
       const frames = [];
+      // version 2: head, grains, tail; head and tail XOR the previous frame's when the lengths match
+      const unxor = (piece, prev) => {
+        if (prev && prev.length === piece.length) for (let k = 0; k < piece.length; k++) piece[k] ^= prev[k];
+        return piece;
+      };
+      let prevHead = null;
+      let prevTail = null;
       for (let k = 0; k < n; k++) {
-        const len = dv.getUint32(o, true);
-        const frame = buf.slice(o + 4, o + 4 + len);
+        let frame;
+        if (version >= 2) {
+          const [lh, lg, lt] = [0, 4, 8].map((d) => dv.getUint32(o + d, true));
+          o += 12;
+          const head = unxor(new Uint8Array(buf.slice(o, o + lh)), prevHead);
+          const tail = unxor(new Uint8Array(buf.slice(o + lh + lg, o + lh + lg + lt)), prevTail);
+          const out = new Uint8Array(lh + lg + lt);
+          out.set(head, 0);
+          out.set(new Uint8Array(buf, o + lh, lg), lh);
+          out.set(tail, lh + lg);
+          frame = out.buffer;
+          [prevHead, prevTail] = [head, tail];
+          o += lh + lg + lt;
+        } else {
+          const len = dv.getUint32(o, true);
+          frame = buf.slice(o + 4, o + 4 + len);
+          o += 4 + len;
+        }
         frames.push({ t: new DataView(frame).getFloat32(8, true), buf: frame });
-        o += 4 + len;
       }
       onHello(hello);
-      replay = { frames, t0: performance.now() - frames[0].t * 1000, k: 0 };
+      const info = hello.replay ?? { speed: 1, what: "cycle" };
+      replay = { frames, speed: info.speed, t0: performance.now() - (frames[0].t * 1000) / info.speed, k: 0 };
       buttonsEl.hidden = controlsEl.hidden = false;
       autoBtn.hidden = box.querySelector("#soil-reset").hidden = true;
       controlsEl.querySelectorAll("input").forEach((el) => (el.disabled = true));
       const secs = frames[frames.length - 1].t.toFixed(0);
-      statusEl.innerHTML = `<strong>Recorded replay</strong> (${secs} s, loops): one auto dig–swing–load pass of the ZX200 with its hydraulic cylinders, in Newton MPM sand, recorded from the GPU server. For live control, run the server (<a href="${QUICK_START}" target="_blank" rel="noopener">quick start</a>).`;
+      const what = info.what === "site"
+        ? `a whole haul cycle, ${secs} s played ${info.speed}× faster: the ZX200 loads the IC120 carrier pass by pass, the carrier hauls the load to the spoil area and tips it, and the D37 dozer spreads it, all in Newton MPM soil`
+        : `one auto dig–swing–load pass of the ZX200 with its hydraulic cylinders, in Newton MPM sand (${secs} s)`;
+      statusEl.innerHTML = `<strong>Recorded replay</strong> (loops): ${what}, recorded from the GPU server. For live control, run the server (<a href="${QUICK_START}" target="_blank" rel="noopener">quick start</a>).`;
     } catch (err) {
       replay = null;
       statusEl.textContent = `Could not load the recorded cycle (${err.message}).`;
@@ -599,10 +703,10 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   function tickReplay() {
     const r = replay;
     const now = performance.now();
-    let t = (now - r.t0) / 1000;
-    if (t > r.frames[r.frames.length - 1].t + 1.0) {
+    let t = ((now - r.t0) / 1000) * r.speed;
+    if (t > r.frames[r.frames.length - 1].t + 1.0 * r.speed) {
       // loop: start over from the untouched pit
-      r.t0 = now - r.frames[0].t * 1000;
+      r.t0 = now - (r.frames[0].t * 1000) / r.speed;
       r.k = 0;
       t = r.frames[0].t;
     }
@@ -704,6 +808,19 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
         arm.truckSurface.matrixWorldNeedsUpdate = true;
       }
     }
+    if (f.dozer && dozer.base) {
+      const z = f.dozer;
+      dozer.base.visible = true;
+      dozer.base.position.set(...z.base.slice(0, 3));
+      dozer.base.quaternion.set(...z.base.slice(3));
+      const Y = new THREE.Vector3(0, 1, 0);
+      dozer.arm.quaternion.setFromAxisAngle(Y, z.lift); // lift_joint (URDF y axis)
+      // the lift cylinder follows the arm (URDF mimic joints): it turns 0.9 x lift and extends 0.6 x that
+      if (dozer.cylinder) dozer.cylinder.quaternion.setFromAxisAngle(Y, 0.9 * z.lift);
+      if (dozer.piston && dozer.pistonRest) dozer.piston.position.copy(dozer.pistonRest).addScaledVector(dozer.pistonAxis, 0.54 * z.lift);
+      dozer.stage = dozer.stages[z.stage] ?? "";
+      dozer.force = z.force;
+    }
     if (f.spoilHm) {
       const t = f.spoilHm;
       if (!carrier.spoil) carrier.spoil = makeSurface(t.nx, t.ny, t.x0, t.z0, t.cell);
@@ -781,6 +898,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     rows.push(["Bucket load", `${f.fill.toFixed(0)} kg`]);
     if (f.kind === "excavator") rows.push(["Truck load", `${(f.truck / 1000).toFixed(2)} t of ${(f.capacity / 1000).toFixed(0)} t (${Math.round((100 * f.truck) / f.capacity)}%)`]);
     if (f.carrier) rows.push(["Carrier", `${f.carrier.stage} · ${(f.carrier.delivered / 1000).toFixed(1)} t dumped`]);
+    if (f.dozer) rows.push(["Dozer", `${dozer.stage}${f.dozer.force > 0.5 ? ` · blade ${f.dozer.force.toFixed(0)} kN` : ""}`]);
     statsEl.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     window.__soil = { lastFrame: f, stats: { ...stats }, stalled, model: arm.model };
   }

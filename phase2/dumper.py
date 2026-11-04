@@ -7,7 +7,8 @@ leaving it are MPM particles like any other (excavator_server.py hands the load 
 vessel's soil zone when the carrier leaves, released as particles from the tipping vessel at the spoil).
 
 Route (zone frame, cab toward +x at the loading spot; the vessel tips about a pin at its rear):
-    loading -> drive out forward (+x) -> spin turn to face -x -> reverse to the dump point -> tip, dump,
+    loading -> drive out forward (+x) -> spin turn to face -x -> (wait while the dozer clears the dump
+    point) -> reverse to the dump point -> tip, dump,
     lower -> drive forward (-x) -> spin turn to face +x -> reverse into the loading spot
 Spin turns are made away from the excavator (its tracks are 2.5 m from the parked carrier's corner).
 
@@ -69,6 +70,8 @@ class Dumper:
         self.yaw, self.tip, self.speed, self.tip_rate, self.yaw_rate = 0.0, 0.0, 0.0, 0.0, 0.0
         self.stage, self.stage_time, self.cycle_start = "loading", 0.0, 0.0
         self.depart_requested = False
+        self.dump_clear = True  # set by the server: no dozer working at the dump point
+        self.dozer_wait = 0.0  # s held at the turn point for the dozer
         self.payload_kg = 0.0
         self.residual_kg, self.load_kg = 0.0, 0.0  # soil still in the vessel while dumping; the load taken
         self.delivered_kg, self.loads = 0.0, 0
@@ -140,6 +143,10 @@ class Dumper:
                 self._next("turn to dump")
         elif st == "turn to dump":
             if self._spin_to(math.pi, dt):
+                self._next("reverse to dump" if self.dump_clear else "wait at dump")
+        elif st == "wait at dump":  # the dozer is spreading where the carrier dumps: wait until it has parked
+            self.dozer_wait += dt
+            if self.dump_clear:
                 self._next("reverse to dump")
         elif st == "reverse to dump":
             if self._drive_to(self.dump_x, SPEED_REVERSE, -1, dt):

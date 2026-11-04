@@ -510,8 +510,10 @@ class SoilZones:
         return pos
 
     def update(self, box):
-        """box: (lo, hi) world AABB of the bucket. Sleeps resting columns away from it, wakes dormant
-        columns near it. Returns (woken, slept) column counts."""
+        """box: (lo, hi) world AABB of the bucket, or a list of such boxes (the bucket first, then other
+        tools such as a dozer blade). Sleeps resting columns away from them, wakes dormant columns near
+        them. Returns (woken, slept) column counts."""
+        boxes = box if isinstance(box, list) else [box]
         st, mm = self.state, self.mpm._mpm_model
         self.col_n.zero_()
         self.col_vmax.zero_()
@@ -523,7 +525,10 @@ class SoilZones:
 
         self.tick += 1
         rested = self.tick - self.woken_tick >= self.MIN_AWAKE
-        sleep = (n > 0) & rested & (vmax < self.V_SLEEP) & ~self._near(box, self.SLEEP_MARGIN, self.SLEEP_DZ, top)
+        near_any = np.zeros(self.n_cols, dtype=bool)
+        for b in boxes:
+            near_any |= self._near(b, self.SLEEP_MARGIN, self.SLEEP_DZ, top)
+        sleep = (n > 0) & rested & (vmax < self.V_SLEEP) & ~near_any
         slept = int(sleep.sum())
         self.sleep.assign(sleep.astype(np.int32))
         self.freed_n.zero_()
@@ -543,12 +548,12 @@ class SoilZones:
         has = self.count_np > 0
         dormant_top = np.where(has, self.col_floor + self.count_np * LAYER_PER_PARTICLE, -1.0e6)
         level = np.full(self.n_cols, np.inf)
-        near = has & self._near(box, self.WAKE_MARGIN, self.WAKE_DZ, dormant_top)
-        # down to just below the bucket's lowest point under it, rising 1:1 away from it (the soil that
+        # down to just below the tool's lowest point under it, rising 1:1 away from it (the soil that
         # fails ahead of and beside a cutting edge lies above a ~45 deg line from the edge)
-        lo, hi = box
-        dist = np.hypot(np.clip(lo[0] - self.col_x, 0, None) + np.clip(self.col_x - hi[0], 0, None), np.clip(lo[1] - self.col_y, 0, None) + np.clip(self.col_y - hi[1], 0, None))
-        level[near] = (lo[2] - self.WAKE_DEPTH + dist)[near]
+        for lo, hi in boxes:
+            near = has & self._near((lo, hi), self.WAKE_MARGIN, self.WAKE_DZ, dormant_top)
+            dist = np.hypot(np.clip(lo[0] - self.col_x, 0, None) + np.clip(self.col_x - hi[0], 0, None), np.clip(lo[1] - self.col_y, 0, None) + np.clip(self.col_y - hi[1], 0, None))
+            level[near] = np.minimum(level[near], (lo[2] - self.WAKE_DEPTH + dist)[near])
         # avalanche: dormant soil standing steeper than the angle of repose against a neighbour wakes
         # down to where it would rest, so cut faces slump instead of standing as rigid walls
         surface = np.maximum(np.where(has, dormant_top, self.col_floor), np.where(n > 0, ztop, -1.0e6))
@@ -561,9 +566,9 @@ class SoilZones:
         wake = np.flatnonzero(keep < self.count_np)
         woken = 0
         if len(wake):
-            # nearest columns first, in case the pool runs short
-            c = 0.5 * (np.array(box[0]) + np.array(box[1]))
-            wake = wake[np.argsort(np.hypot(self.col_x[wake] - c[0], self.col_y[wake] - c[1]))]
+            # columns nearest a tool first, in case the pool runs short
+            d = np.min([np.hypot(self.col_x[wake] - 0.5 * (lo[0] + hi[0]), self.col_y[wake] - 0.5 * (lo[1] + hi[1])) for lo, hi in boxes], axis=0)
+            wake = wake[np.argsort(d)]
             free = np.flatnonzero(~self.active_np)
             fit = int(np.searchsorted(np.cumsum(self.count_np[wake] - keep[wake]), len(free), side="right"))
             if fit < len(wake):

@@ -22,7 +22,7 @@ from tf2_msgs.msg import TFMessage
 TOPICS = {"/clock": Clock, "/joint_states": JointState, "/tf": TFMessage, "/lidar/points": PointCloud2,
           "/camera/depth/image_raw": Image, "/camera/depth/camera_info": CameraInfo, "/camera/labels/image_raw": Image,
           "/imu/data": Imu, "/excavator/bucket_load": Float64, "/carrier/stage": String, "/carrier/delivered": Float64,
-          "/carrier/joint_states": JointState}
+          "/carrier/joint_states": JointState, "/dozer/stage": String, "/dozer/joint_states": JointState}
 LABELS = ["none", "ground", "soil", "machine", "truck"]
 
 
@@ -96,6 +96,7 @@ def main():
     assert peak > 100.0, peak
     st = n.last.get("/carrier/stage")
     print(f"carrier: stage {st.data if st else None}, delivered {n.last['/carrier/delivered'].data:.0f} kg, vessel_pin_joint {n.last['/carrier/joint_states'].position[0]:+.2f} rad")
+    print(f"dozer: stage {n.last['/dozer/stage'].data}, lift_joint {n.last['/dozer/joint_states'].position[0]:+.2f} rad")
     print("bridge check: ok")
     n.destroy_node()
     rclpy.shutdown()

@@ -1065,6 +1065,69 @@ The static truck is now a crawler dump carrier, the IHI (Kato) IC120 of PWRI's O
 
 **Limits:**
 - **Driving:** the carrier is scripted; there is no track–soil contact, slip or tilt, and its route is fixed.
-- **Clay is slow:** it runs below real time (0.73×) because the dumped clay settles slowly; at the end of the run 11 of 21 t had settled.
+- **Clay is slow:** it runs below real time (0.73×) because the dumped clay settles slowly; at the end of the run 11 of 21 t had settled. (Fixed in part 2: moving clay slid on resting clay as on ice; it now settles, and clay runs at 1.09×.)
 - **Loam sometimes sticks:** one loam trip in three still carried 2.4 t back after 15 s of shaking.
 - **One carrier:** with one carrier and one excavator, there is no queueing between several carriers yet.
+
+## A living site, 2: the dozer spreads the spoil
+
+The carrier's loads no longer pile up where they are dumped. A dozer, the Komatsu D37PXi-24 of PWRI's OPERA project (open model, Apache-2.0), spreads each load into a layer. The site now runs the full earthmoving loop: dig, load, haul, dump, spread.
+
+**The dozer** (`dozer.py`): scripted kinematics, like the carrier.
+- **Geometry, from the model:**
+  - Lift arm pivot: 0.59 m ahead of `base_link` and 0.39 m up; lift range −0.41 to +0.19 rad.
+  - Blade: 3.21 m wide and 1.09 m high; the cutting edge reaches from 0.33 m below the ground to 0.86 m above it.
+  - Collider: three plates following the blade face from the mesh.
+- **Machine data:** operating weight 9.38 t listed (9.5 t used), net power 66.1 kW, blade 3.2 m.
+  - Drawbar power 70 % of that; traction 0.6 × weight, which is 56 kN.
+  - Speeds: 1.0 m/s pushing, 1.6 m/s in reverse, 1.4 m/s travelling; spin turns at 30°/s.
+- **The blade is a kinematic body:** the soil it pushes is MPM, and the sand's force on it is measured (low-passed over 0.15 s). The soil zone now wakes columns around every tool, the blade as well as the bucket.
+- **The tracks follow the ground:** height, pitch and roll come from the spoil surface under the track ends, so the dozer climbs onto what it has spread. They do not touch the soil.
+
+**Control, as on the real D37PXi** (its "i" is Komatsu's integrated machine control):
+- **Grade control:** the cutting edge is held at the design surface, one 0.3 m lift above the ground, within the lift cylinder's range.
+- **Load control:** when the blade load passes 85 % of traction, the blade lifts until the load drops below 60 %, then goes back to grade. The real machine does this to limit track slip.
+- **Speed:** travel speed falls as drawbar power allows. Above traction the dozer makes no headway (the tracks slip) until the blade has lifted.
+
+**The spreading plan:**
+- **Lanes:** three, 2.9 m apart along the spoil area, pushed toward +x from just east of the dump point (cutting edge from x = 25.2 to 33.4 m).
+- **Passes:**
+  - Each pass works the lane holding the most soil above grade, which is the dozer's measure of what is left to spread.
+  - A pass ends at the far end, or once the blade has carried less than 3 kN for 0.7 s.
+  - After each pass, the dozer backs up with the blade raised.
+- **Finishing:** the dozer parks north of the dump point once no lane holds more than 0.35 m³ above grade + 0.08 m. The design surface rises by a lift once 80 % of the area is at grade.
+- **Sharing the dump point:**
+  - The dozer works only while the carrier is loading or arriving there.
+  - It is recalled (backs out with the blade up) when the carrier leaves.
+  - The carrier waits at its turn point until the dozer has parked (new stage `wait at dump`).
+
+**Benchmark** (`bench_haul.py 600`, 600 simulated seconds per soil, logs `logs/haul_bench_<soil>.json`):
+
+| Soil | Delivered | Loads (passes) | Excavator waiting | Dozer passes | Dozer working | Mean blade force per pass | Spread area, RMS from grade | Real-time factor |
+|---|---|---|---|---|---|---|---|---|
+| Dry sand | 20.6 t, **124 t/h** | 2: 10.4–10.6 t (11) | 93 s | 4 | 129 s | 5.5–21 kN | 46 m², 0.14 m | 0.98 |
+| Loam | 30.2 t, **181 t/h** | 3: 9.8–10.6 t (6–8) | 156 s | 6 | 227 s | 6.8–25 kN | 44 m², 0.26 m (the 3rd load was still being spread) | 1.01 |
+| Clay | 21.0 t, **126 t/h** | 2: 11.0–11.6 t (8–9) | 114 s | 3 | 123 s | 24–28 kN | 35 m², 0.15 m | 1.09 |
+
+- **The dozer never held the carrier up:** it spent 60–75 s on each load, travel included, well inside the 2–3 minutes the carrier is away loading. The carrier waited 0 s at the dump in all three soils.
+- **The forces are the right size:**
+  - Pushing a blade load of loose soil is mostly sliding it along the ground: F ≈ μ · W. A full D37 blade (about 2 m³ of loose sand, 3.1 t at 1600 kg/m³ loose) at μ = tan 37° gives 23 kN.
+  - The mean per pass is 5–25 kN in sand and loam, and 24–28 kN in clay, which is pushed in larger, cohesive lumps.
+  - Momentary peaks reach 89–175 kN, two to three times traction. Load control and slip answer them: the tracks slipped for 1–4 s in total per run, and the blade lifted 19–51 times.
+- **The spread is about one lift deep:** a 10–11 t load covers 17–23 m² at the 0.3 m lift, 0.14–0.15 m RMS from the design surface in sand and clay. Loam left the most: its third load was dumped 70 s before the end of the run.
+
+**What the first runs got wrong, and the fixes:**
+- **The dozer did not see dumped clay:** its view of the ground counted only soil at rest, and dumped clay creeps for minutes. It now plans on all soil slower than 1 m/s.
+- **Clay slid on clay as on ice:**
+  - Dumped clay ran 8 m to the far wall as a 0.5 m sheet, with nothing left to push.
+  - The cause: resting (dormant) soil is a rigid collider, and a collider has only friction, which for undrained clay is 0.05.
+  - The fix (`soils.resting_friction`): use the larger of the soil's friction and its remoulded cohesion over the stress under 1 m of soil. Only clay changes (0.71).
+  - It also settles: 18.9 of 21 t of dumped clay was at rest at the end of the run, against 10.6 t before, and clay now runs faster than real time (1.09×, against 0.70–0.73×).
+- **Raw blade force:** single MPM steps' impulses are noisy, up to twice the filtered peak, so the force is low-passed for control and reports.
+
+**Limits:**
+- **The dozer is scripted:** its tracks neither push nor compact soil, and it does not slip sideways or sink. Its slip is a rule: no headway above traction.
+- **Clay carry-back:** clay now sticks in the vessel: 0.6–1.0 t rode back per trip after 15 s of shaking (5–9 % of the load).
+- **Momentary forces:** the kinematic blade can still meet more resistance than its tracks could pull, until load control lifts it. The particle pool sometimes runs short (79–434 times per run); a column that cannot be woken then stays rigid in front of the blade.
+- **No compaction:** the spread layers are loose. Compaction by the tracks and by rolling is not modelled.
+

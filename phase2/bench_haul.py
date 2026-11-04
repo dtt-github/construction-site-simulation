@@ -1,7 +1,8 @@
 """Haul-cycle benchmark: the autopilot loads the crawler carrier, which hauls each load to the spoil area,
 dumps it and comes back, for N simulated seconds. Reports what a site engineer would look at: loads, load
 mass, passes per load, loading time, the carrier's time away and its stages, the excavator's waiting time,
-and tonnes per hour delivered; plus the real-time factor.
+and tonnes per hour delivered; the dozer's passes, blade forces and how flat it left the spread layer, and
+how long the carrier waited for it; plus the real-time factor.
 
     ../phase0/.venv-newton/bin/python bench_haul.py 600                 # dry sand
     SOIL=loam ../phase0/.venv-newton/bin/python bench_haul.py 600
@@ -55,5 +56,8 @@ out = {
     "lost_particles": sim.zones.counters["lost"],
     "pool_short": sim.zones.counters["pool_short"],
     "skipped": sim.skipped,
+    "carrier_wait_for_dozer_s": round(d.dozer_wait, 1),
+    "dozer": {**{k: round(v, 2) for k, v in sim.dozer.counters.items()}, "mean_push_kN": sim.dozer.push_force},
+    "spread": sim.dozer.spread_report(sim._surface),
 }
 print(json.dumps(out))

@@ -58,8 +58,12 @@ Stamps are in simulation time, so run your nodes with `use_sim_time:=true`.
 | `/excavator/stage` | std_msgs/String | 30 Hz | `manual`, or the autopilot's stage |
 | `/tf` (carrier) | tf2_msgs/TFMessage | 30 Hz | `world → carrier/base_link`: the IC120 crawler carrier |
 | `/carrier/joint_states` | sensor_msgs/JointState | 30 Hz | `vessel_pin_joint` (rad, negative = tipped, as in PWRI OPERA's `ic120_ros2`) |
-| `/carrier/stage` | std_msgs/String | 30 Hz | haul stage: `loading`, `drive out`, `turn to dump`, `reverse to dump`, `tip`, `dump`, `lower`, `return`, `turn to load`, `reverse in` |
+| `/carrier/stage` | std_msgs/String | 30 Hz | haul stage: `loading`, `drive out`, `turn to dump`, `reverse to dump`, `tip`, `dump`, `lower`, `return`, `turn to load`, `reverse in`, `wait at dump` (held while the dozer works there) |
 | `/carrier/payload`, `/carrier/delivered` | std_msgs/Float64 | 30 Hz | load carried, total dumped (kg) |
+| `/tf` (dozer) | tf2_msgs/TFMessage | 30 Hz | `world → dozer/base_link`: the Komatsu D37PXi-24 dozer, tilting with the ground under its tracks |
+| `/dozer/joint_states` | sensor_msgs/JointState | 30 Hz | `lift_joint` (rad, positive lowers the blade, as in PWRI OPERA's `d37pxi_ros2`) |
+| `/dozer/stage` | std_msgs/String | 30 Hz | `parked`, `to lane`, `lower`, `push`, `raise`, `back`, `to park` |
+| `/dozer/blade_force` | std_msgs/Float64 | 30 Hz | soil force on the blade against its travel (N, low-passed over 0.15 s) |
 
 Subscribed:
 - **`/excavator/levers`** (std_msgs/Float64MultiArray): [swing (+ left), boom (+ raise), stick (+ out), bucket (+ dump)], each in [−1, 1]. Publish at 10 Hz or more: the levers return to neutral 0.5 s after the last message (a dead-man switch).

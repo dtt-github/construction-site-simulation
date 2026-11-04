@@ -73,6 +73,15 @@ def critical_height(soil):
     return 2.67 * k, 3.83 * k
 
 
+def resting_friction(soil):
+    """Friction for moving soil on resting (dormant) soil. The soil zone's resting soil is a rigid collider,
+    and a collider has friction only, no cohesion; a soil's own friction then lets an undrained clay
+    (friction 0.05) slide on clay as on ice. Use the larger of the friction and the remoulded cohesion over
+    the vertical stress under 1 m of soil (c_r / gamma 1 m): clay 0.71; the other presets keep their friction."""
+    s = SOILS[soil]
+    return max(s["friction"], s["cohesion"] * s.get("remoulded", 1.0) / (s["density"] * G * 1.0))
+
+
 def mckyes(density, cohesion, depth, width, phi, delta, adhesion=0.0, rake=math.pi / 2):
     """Fundamental earthmoving equation (McKyes 1985) for a flat tool at `rake` (rad from the horizontal)
     cutting `depth` in flat ground: F = (gamma d^2 N_gamma + c d N_c + c_a d N_ca) w, minimised over the

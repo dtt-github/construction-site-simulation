@@ -4,7 +4,7 @@
 #   _site/web/        index.html, site.js, showcase.js, soil.js, site.json, hulls/
 #   _site/glb/        NVIDIA SimReady props (CC BY 4.0), downloaded here by assets/fetch_assets.py
 #   _site/assets/     open machines and site items from git (machinery/, site/) plus licenses, and
-#                     replay/: a dig cycle recorded from the GPU server (phase2/record_replay.py)
+#                     replay/: a haul cycle and a dig pass recorded from the GPU server (phase2/record_replay.py)
 # The GPU soil server is not part of the demo; the soil panel plays the recorded cycle instead.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -26,7 +26,8 @@ out = pathlib.Path(sys.argv[1])
 site = json.loads((out / "web/site.json").read_text())
 need = {f"glb/{p['asset']}.glb" for p in site.get("placements", [])}
 need |= {i["file"] for i in site.get("showcase", [])}
-need.add("assets/replay/zx200_cycle.bin.gz")  # soil panel replay
+need.add("assets/replay/zx200_cycle.bin.gz")  # soil panel replays
+need.add("assets/replay/site_cycle.bin.gz")
 missing = sorted(n for n in need if not (out / n).is_file())
 if missing:
     sys.exit("missing from the Pages build: " + ", ".join(missing))
