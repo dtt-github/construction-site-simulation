@@ -1361,8 +1361,7 @@ class ExcavatorSim:
             spool = self._respond(spool)
         self.spool = spool
         omega, v_cyl = hyd.speeds(spool, self.cyl_J)  # swing and cylinders share the pumps
-        J = np.where(np.abs(self.cyl_J) < hyd.J_MIN, np.copysign(hyd.J_MIN, self.cyl_J), self.cyl_J)
-        v_cmd = np.concatenate([[omega], v_cyl / J])
+        v_cmd = np.concatenate([[omega], v_cyl / hyd.speed_arm(self.cyl_J)])
         lo, hi = hyd.torque_limits(self.cyl_J, hyd.P_RELIEF * self.relief, spool[1:])
         tau = SWING_TAU * self.relief
         self.v_cmd.assign(v_cmd.astype(np.float32))

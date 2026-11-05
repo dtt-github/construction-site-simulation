@@ -62,12 +62,18 @@ LPM = 1 / 60000.0  # m3/s per L/min
 # name: joint index, cylinders, bore, rod, max spool flow (m3/s) (head side, rod side), head pin (link, x, z),
 # rod pin (link, x, z). Boom and arm flows give the joint speeds PWRI measured in each direction at full command
 # (1800 min^-1, eco; ISARC 2025 above); their flow channels, read as indicative, agree for the arm. The bucket
-# keeps one pump each way: its measured speeds aren't matched yet (the four-bar's speed near its stroke ends).
+# flows match its curl and dump speeds with PWRI's bucket angle read as PWRI_BUCKET_OFFSET + ours (provisional);
+# they are well above its flow channels (about 230 / 215 L/min), so the four-bar's moment arm may be too long.
 CYLINDERS = {
     "boom": (1, 2, 0.120, 0.085, (375 * LPM, 270 * LPM), ("house", 0.686, 0.247), ("boom", 1.776, 2.249)),  # raise, lower
     "arm": (2, 1, 0.135, 0.095, (495 * LPM, 265 * LPM), ("boom", 2.276, 2.789), ("stick", -0.778, -0.367)),  # crowd, out
-    "bucket": (3, 1, 0.115, 0.080, (PUMP_FLOW / 2, PUMP_FLOW / 2), ("stick", -0.248, 0.733), None),  # rod end: linkage pin C
+    "bucket": (3, 1, 0.115, 0.080, (332 * LPM, 315 * LPM), ("stick", -0.248, 0.733), None),  # curl, dump; rod end: linkage pin C
 }
+# rad: PWRI's bucket angle less the URDF bucket angle. Their angle reads 0.007 at the dump end of every run and
+# is 0.62 more than ours wherever the model's four-bar matches the speed-vs-angle shape of their constant-pilot
+# steps (with no offset the model's moment arm collapses toward curl while the machine's doesn't). Not confirmed
+# by PWRI yet (provisional); the free-air pressures, also unverified, put the bucket's balance point elsewhere
+PWRI_BUCKET_OFFSET = 0.622
 
 # command -> spool response of PWRI's ZX200 under its automation controller (velocity commands), for a
 # simulator driven the same way: dead time (s) per joint for (+, -) joint direction, a first-order lag (s) on
@@ -149,7 +155,14 @@ def torque_limits(J, p_relief, spool=(0.0, 0.0, 0.0), p_port=P_PORT):
     return lo, hi
 
 
-J_MIN = 0.05  # m/rad: moment arm floor for speed commands near a stroke end (the boom nears toggle there)
+J_MIN = 0.05  # m/rad: moment arm floor for speed commands near a stroke end (boom and bucket near toggle there)
+
+
+def speed_arm(J):
+    """Moment arm dL/dq used to turn cylinder speed into joint speed: J itself away from the stroke ends, easing
+    onto the J_MIN floor near toggle without a kink, so joint speed stays smooth (within 1.5 % of J above
+    2 J_MIN, 0.3 % above 3 J_MIN)."""
+    return np.copysign((np.abs(J) ** 4 + J_MIN**4) ** 0.25, J)
 
 
 def speeds(spool, J):

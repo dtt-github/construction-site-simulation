@@ -1416,7 +1416,8 @@ The joint angles and speeds are the reliable part of the recordings. The pressur
 | House inertia about the swing axis | about 60 t·m² in total, boom raised and arm in (mesh shells) | about 112 t·m² (house Izz +52.8 t·m²) | acceleration and braking at that torque (**provisional**, scales with the relief) |
 | Boom flow, raise / lower | 388 / 388 L/min | 375 / 270 L/min | joint speed per direction |
 | Arm flow, crowd / out | 388 / 388 L/min | 495 / 265 L/min (crowd regenerates rod oil, so it exceeds the pumps) | joint speed per direction |
-| Bucket flow | 194 L/min | unchanged | see below |
+| Bucket flow, curl / dump | 194 / 194 L/min | 332 / 315 L/min | joint speed per direction, with PWRI's bucket angle read as ours + 0.622 rad (**provisional**, see below) |
+| Moment-arm floor for speed commands | a hard 5 cm floor: joint speed jumps where dL/dq crosses it | eases onto 5 cm, (J⁴ + J_min⁴)^¼: no kink, within 1.5 % of J above 10 cm | boom and bucket near their stroke ends |
 | Command response | none | optional: dead time 0.30 s swing (+0.30 s from rest), 0.42 / 0.62 s boom up / down, 0.55 / 0.45 s arm crowd / out, 0.33 s bucket; 0.15 s lag | delay to 10 % speed |
 | Port relief | 39.2 MPa | unchanged | the boom's head side spikes to the 41 MPa sensor limit for about 0.05 s when a lowering boom stops: overshoot, not a setting |
 
@@ -1433,11 +1434,33 @@ The command response is off by default (`ExcavatorSim(command_response=True)`, `
 | Boom down | within 4 % | +43 % | within 0.03 s |
 | Arm crowd | within 1 % | −17 % | within 0.03 s |
 | Arm out | within 1 % | +46 % | within 0.03 s |
-| Bucket curl / dump | −31 % / −6 % | not comparable (see below) | within 0.03 s |
+| Bucket curl / dump | within 1 % / within 1 % (**provisional** angle reading) | −31 % / −6 % (angle read as ours, 194 L/min) | within 0.03 s |
 
 Swing details, model now against measured: acceleration within 4 %, braking within 3 %, 90° from the command 0.13 s sooner, stopping angle 4° longer. Before, the house accelerated twice as hard, braked 1.4 times as hard, and reached 90° 1.4 s sooner.
 
-**The bucket isn't matched yet.** Near the ends of the four-bar's stroke the model's bucket speed jumps (the 5 cm floor on the moment arm), so its speed over a full step isn't comparable with the machine's. The bucket keeps one pump each way until its linkage near the stroke ends is fixed.
+**The bucket: its angle and its moment arm (provisional).** In PWRI's ±0.3 rad/s bucket steps the pilot pressure stays constant over the whole sweep, so the valve opening and the flow are fixed. The bucket's speed then changes with angle only through the four-bar's moment arm dL/dq, and curl and dump give the same curve. With PWRI's bucket angle read as our URDF angle, the model can't follow that curve. Toward curl the machine's moment arm falls to 46 % of its peak at 1.92 rad; the model's falls to 8 %, close to toggle.
+
+- **Read as ours + 0.622 rad,** the model's own geometry follows the curve to about 10 % rms over 0.1–1.9 rad. Fitting the offset to the curve alone gives 0.585–0.625 rad. The lowest bucket angle in every PWRI run (0.007) then falls on the URDF's dump limit (−0.622).
+- **Moving pins instead** would put the bucket's link pin 0.31 m off its boss in the mesh, and the digging force would drop to about 120 kN against the published 151–158 kN.
+
+So the geometry stays, and the comparison reads PWRI's bucket angle as ours + 0.622 rad (`hydraulics.PWRI_BUCKET_OFFSET`). PWRI hasn't confirmed this convention yet. One check disagrees: in free air the bucket cylinder's force (from the unverified pressure channels) changes sign at about 1.15 rad of PWRI's angle, while the URDF bucket's centre of mass passes under its pin at 0.98 rad of ours (1.6 rad of theirs). The URDF masses aren't verified either.
+
+With that reading, the bucket takes 332 L/min to curl and 315 L/min to dump. Both are well above PWRI's bucket flow channels (about 230 and 215 L/min, indicative), so through the measured range the model's moment arm may be about a quarter too long. Full-command steps against the machine:
+
+| | Curl | Dump |
+|---|---|---|
+| Speed over the last 40 % of the step | −0.6 % | +0.6 % |
+| Peak speed | +6 % | +18 % |
+| Travel during the step | −2 % | +15 % |
+| Delay to 10 % | within 0.03 s | within 0.03 s |
+
+The model's dump reaches speed sooner than the machine's and peaks higher, so it travels further in the 1.2 s step. The ±0.3 rad/s bucket steps aren't compared: there the real controller holds the speed, which the open-loop lever can't reproduce. Boom, arm and swing came out as before. The house inertia in the swing test changed by about 2 % because the bucket now starts more open.
+
+Benchmarks after the bucket change (default settings), against the "Now" column below:
+- Trench (`bench_trench.py 8`), passes 1–6: 15.7–22.2 s, mean 17.7 s, unchanged. Pass 5 timed out one stage.
+- 130 s cycle (`bench_zone.py 130`): 7 passes, 7.6 t (7.8 t before), within the spread between runs.
+- `test_env.py` passes.
+- The 1500 s haul benches weren't re-run.
 
 **Benchmarks** (default settings: the command response off):
 
@@ -1462,3 +1485,4 @@ Haul logs: `logs/haul_bench_fill_long_<soil>_1carrier.json` (before) and `logs/h
 - The swing relief, and so the absolute inertia, depend on unverified pressure channels and on the 2.27 L/rad displacement derived from the spec sheet. The speeds and the ratio of torque to inertia come from joint data alone.
 - The real swing's pressure falls as the house speeds up, while its acceleration stays nearly constant. The model accelerates at the relief torque. This doesn't affect the times above but would show in the pressures.
 - Nothing here checks digging forces: the tests are in free air.
+- The bucket flows rest on reading PWRI's bucket angle as ours + 0.622 rad, which PWRI hasn't confirmed. If the reading is wrong, the four-bar's geometry is wrong instead, and so is the bucket's digging force.
