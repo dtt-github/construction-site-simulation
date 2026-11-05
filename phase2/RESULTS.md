@@ -1508,7 +1508,7 @@ Whether the tear rule suits loam, and whether either change helps over a long sh
 
 **Open: the clay strip 20° left.** The planner expects 0.8–1.2 m³ in that strip, but its passes bring out 3–59 kg. When its rest ends it is chosen again, and it fails again. Most thin clay passes come from it.
 
-Logs: `logs/haul_quick25_<main|fix>_<soil>_1carrier.json`.
+Logs: `logs/haul_quick25_<main|fix>_<soil>_1carrier.json`. The 1500 s runs before the bucket calibration are `logs/haul_bench_pwri_face_long_<soil>_1carrier.json`, with the half-bucket rule in every soil, and `logs/haul_bench_pwri_tear_long_<loam|clay>_1carrier.json`, with the tear guard. `logs/haul_bench_pwri_rest_long_clay_1carrier.json` adds the earlier set-aside.
 
 **Limits:**
 - Every value is for 1800 min⁻¹ in eco mode. At full power the pumps deliver more: the spec swing speed is 19 % higher.
