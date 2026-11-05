@@ -1460,7 +1460,10 @@ Benchmarks after the bucket change (default settings), against the "Now" column 
 - Trench (`bench_trench.py 8`), passes 1–6: 15.7–22.2 s, mean 17.7 s, unchanged. Pass 5 timed out one stage.
 - 130 s cycle (`bench_zone.py 130`): 7 passes, 7.6 t (7.8 t before), within the spread between runs.
 - `test_env.py` passes.
-- The 1500 s haul benches weren't re-run.
+- 1500 s haul benches (one carrier; before → now): dry sand 20.6 → 20.3 s per pass, 1.27 → 1.55 t per pass, 149 → 168 t/h loaded;
+  loam 20.3 → 19.7 s, 1.28 → 1.50 t, 163 → 166 t/h; clay 21.1 → 20.5 s, 0.81 → 0.69 t, 119 → 104 t/h. Stages skipped 7/10/12 → 13/5/13.
+  Cycles are slightly faster everywhere; the faster curl fills sand and loam better but clay worse, and the skip counts move both
+  ways, so these single runs show the trend, not a settled figure. Logs: `logs/haul_bench_pwri_bucket_long_<soil>_1carrier.json`.
 
 **Benchmarks** (default settings: the command response off):
 
