@@ -1368,3 +1368,32 @@ All in kg/m³.
   - Clay may be cut too thin for its lumps to fill the bucket.
 - **Everything else holds:** the particle pool ran short only 0–46 times per run, carry-back stayed at 0.1–0.4 t per trip, and the Gym checks pass.
 
+## Bucket fill: payloads per pass against the handbooks
+
+With bulking in, the autopilot's bucket came up only 65–70 % full by volume in dry sand and clay. A per-stage trace of the bucket's contents (struck and heaped, at the start of each stage of each pass) found where the payload went:
+
+- **Dry sand ran out during the swing:**
+  - The bucket held 0.75–1.48 t when the swing to the carrier began, and 0.52–1.16 t when the dump began, about a third less.
+  - The autopilot opened the bucket from fully curled (−180°) to −165° on the way, and sand at its 37° angle of repose runs out of a tilted mouth.
+  - For free-flowing soil the bucket now stays fully curled until it is over the carrier, as operators keep it.
+  - Tried for all soils, this broke clay and loam: packed into a fully curled bucket, they stuck in it at the dump (0.4–0.9 t left in). Cohesive soil keeps the old 15° opening, since it does not run out.
+- **Air passes in dry sand:**
+  - The dig planner set the cut 0.42 m below the strip's 90th-percentile surface, so a strip with an earlier trench between high edges was cut too shallow and the bucket passed through the trench.
+  - Free-flowing soil now uses the strip's median surface.
+  - Tried for all soils, the median cut made clay take slabs the bucket could not keep (0.54 t per pass), because clay cut faces stand. Cohesive soil keeps the 90th percentile.
+- **Clay aimed too low:**
+  - The autopilot curls when the bucket reaches the soil preset's payload (heaped capacity × fill factor × loose density). Clay's fill factor was 0.85, from Caterpillar's hard tough clay (80–90 %), and about 20 % is lost between that decision and the carrier.
+  - Komatsu's handbook rates clay 110–120 %. Clay now takes 1.0, between the two.
+
+**1500 s, one carrier** (logs `logs/haul_bench_{bulk,fill}_long_<soil>_1carrier.json`):
+
+| Soil | Handbook per pass (0.8 m³ × fill × loose density, calculated) | Bulking only | Now | Passes per load | Delivered |
+|---|---|---|---|---|---|
+| Dry sand | 1.09–1.26 t | 0.77 t | **1.30 t** | 6–8 (11 at the end) | 140 t/h |
+| Loam | 1.0–1.4 t | 1.47 t | **1.47 t** (unchanged, same settings) | 4–10 | 166 t/h |
+| Clay | 0.92–1.04 t | 0.81 t | **0.93 t** | 10–12 | 120 t/h |
+
+- **Within 5 % in all three soils:** clay inside the range, sand 3 % and loam 5 % over its top. Loose densities are within 6 % too (Bulking).
+- **Loam runs heavy:** its lumps compact in the bucket, and it overshoots the preset target (1.24 t) by about 18 %.
+- **Delivered tonnes are not comparable with earlier runs:** they now follow from realistic loose volumes, so loose soil fills the carrier sooner (clay: 10–12 passes per load instead of 9–10 before bulking).
+

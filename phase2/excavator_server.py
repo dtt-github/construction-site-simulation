@@ -945,7 +945,10 @@ class ExcavatorSim:
                 band = (along > self.EDGE_REACH[0] + shift) & (along < self.EDGE_REACH[1] + shift) & (np.abs(across) < self.STRIP_HALF_W)
                 if band.sum() < 10 or self.face_rest.get((psi, shift), -1) > p:
                     continue
-                band_top = float(np.percentile(top[band], 90))
+                # free-flowing soil: from the strip's median surface (the high edges of an earlier cut would set
+                # the cut too shallow and the bucket would pass through the trench); cohesive soil: from its
+                # high points, since its cut faces stand and a cut from the median takes slabs the bucket loses
+                band_top = float(np.median(top[band]) if not self.heap_check else np.percentile(top[band], 90))
                 # the cut goes FIRST_CUT into the strip, but stays clear of its highest hard floor (a slope)
                 lowest = max(float(hard[band].max()) + self.FLOOR_CLEARANCE, band_top - self.FIRST_CUT)
                 avail = float(np.clip(top[band] - lowest, 0.0, None).sum() * CELL * CELL)  # what this pass can cut
@@ -1133,7 +1136,13 @@ class ExcavatorSim:
         dx = self.DUMP_SPOTS[self.passes % len(self.DUMP_SPOTS)]
         x, y = BED_CENTER[0] + dx - SWING_POS[0], BED_CENTER[1] - SWING_POS[1]
         psi = math.degrees(math.atan2(-y, -x))  # the arm points along (-cos psi, -sin psi)
-        return (w[0], psi, math.hypot(x, y) + w[2] - math.hypot(BED_CENTER[0] - SWING_POS[0], BED_CENTER[1] - SWING_POS[1]), *w[3:])
+        r = math.hypot(x, y) + w[2] - math.hypot(BED_CENTER[0] - SWING_POS[0], BED_CENTER[1] - SWING_POS[1])
+        if w[0] == "swing to truck" and not self.heap_check:
+            # free-flowing soil: the bucket stays fully curled (as at the end of "curl") until over the carrier,
+            # as operators keep it: opened even 15 deg on the way, dry sand runs out of the mouth (a third of
+            # the load). Cohesive soil does not run out, and packed into a fully curled bucket it sticks there
+            return (w[0], psi, r, w[3], self.CYCLE[4][4], *w[5:])
+        return (w[0], psi, r, *w[3:])
 
     def _after_dump(self):
         """A pass is in the carrier: if the next would not fit, send it off (it leaves once the bucket is clear)."""
