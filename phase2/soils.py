@@ -49,11 +49,15 @@ def drucker_prager(phi, c):
     return math.sin(phi), math.sqrt(2.0) * c * math.cos(phi)
 
 
-def mpm_attributes(soil):
-    """Per-particle Newton MPM material attributes for a preset."""
+def mpm_attributes(soil, dilatancy=0.0):
+    """Per-particle Newton MPM material attributes for a preset. dilatancy: the flow rule's dilation (normal
+    velocity = dilatancy x friction x shear velocity): sheared soil opens up, and with the solver's packing
+    limit it settles back only as far as its particle volumes allow (bulking, soil_zone.py)."""
     s = SOILS[soil]
     c, t = s.get("mpm_cohesion", s["cohesion"]), s.get("mpm_tensile", s["tensile"])
     attrs = {"mpm:friction": s["friction"]}
+    if dilatancy > 0.0:
+        attrs["mpm:dilatancy"] = dilatancy
     if c > 0.0 or t > 0.0:
         attrs.update({"mpm:yield_stress": c, "mpm:yield_pressure": YIELD_PRESSURE, "mpm:tensile_yield_ratio": t / YIELD_PRESSURE})
     return attrs

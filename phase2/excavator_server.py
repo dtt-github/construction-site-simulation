@@ -659,11 +659,13 @@ class ExcavatorSim:
             dim_x=side, dim_y=side, dim_z=int(math.ceil(pool / side**2)),
             cell_x=SPACING, cell_y=SPACING, cell_z=SPACING,
             mass=self.particle_mass, jitter=0.0, radius_mean=self.radius,
-            custom_attributes=soils.mpm_attributes(soil),
+            custom_attributes=soils.mpm_attributes(soil, self.DILATANCY),
         )
         self.sand_model = sb.finalize()
         self.n_particles = self.sand_model.particle_count
-        self.zones = SoilZones([TRUCK_REGION, GROUND_REGION, ROAD_REGION, SPOIL_REGION], self.n_particles, SPACING**3)
+        self.swell = material["swell"]  # bank to loose volume of dug soil
+        self.zones = SoilZones([TRUCK_REGION, GROUND_REGION, ROAD_REGION, SPOIL_REGION], self.n_particles, SPACING**3,
+                               swell=self.swell, loose_regions=("truck", "road", "spoil"))
         z = self.zones
         # dormant faces lower than a cohesive soil's critical height stand; only higher ones are woken to fail
         z.AVALANCHE_DROP = max(SoilZones.AVALANCHE_DROP, 0.8 * soils.critical_height(soil)[0])
@@ -692,9 +694,9 @@ class ExcavatorSim:
         cfg = SolverImplicitMPM.Config()
         cfg.voxel_size = voxel
         cfg.max_iterations = iterations
-        cfg.critical_fraction = 0.0
+        cfg.critical_fraction = self.CRITICAL_FRACTION
         cfg.strain_basis = "P0"
-        if "mpm:yield_stress" in soils.mpm_attributes(soil):
+        if "mpm:yield_stress" in soils.mpm_attributes(soil, self.DILATANCY):
             cfg.warmstart_mode = "particles"  # keeps per-particle stress and plastic volume (Jp) for cracking
         self.mpm = SolverImplicitMPM(self.sand_model, config=cfg)
         # colliders: static shapes, the stick and bucket, and the dormant soil columns
@@ -716,7 +718,7 @@ class ExcavatorSim:
         self.n_gamma, self.n_c = fac["N_gamma"], fac["N_c"]
         self.fee_scale = math.cos(math.atan(0.4))  # horizontal part of the tool force (vertical tool)
         self.cohesion = material["cohesion"]
-        attrs = soils.mpm_attributes(soil)
+        attrs = soils.mpm_attributes(soil, self.DILATANCY)
         self.bond = (attrs["mpm:yield_stress"], attrs["mpm:tensile_yield_ratio"], soils.CRACK_STRAIN, material["remoulded"]) if "mpm:yield_stress" in attrs else None
         self.bond_state = wp.ones(self.n_particles, dtype=float)  # 1 intact .. remoulded, per particle
         if self.bond is not None:
@@ -897,6 +899,14 @@ class ExcavatorSim:
     # reach) holding the most resting soil above its hard floor, cutting FIRST_CUT below that strip's own
     # surface; the strip is a bucket width along the dig path (cutting edge EDGE_REACH from the swing axis,
     # shifted in or out). It works across the face and around into the sloped sides as the middle is dug out.
+    # MPM: the largest fraction of a grid cell particles may fill. With the limit, a particle's volume is the
+    # room it takes: soil in place fills the cells (the 4 cm lattice) and dug soil, at (1 + swell) times
+    # the volume, spreads out at lower density (bulking, soil_zone.py)
+    CRITICAL_FRACTION = 1.0
+    # flow-rule dilation (soils.mpm_attributes). Off: the packing limit alone brings dug soil to its loose
+    # density (within 6 % for the three soils); 0.1-0.3 cut the payload per pass by up to a third and change
+    # the soil's cutting strength, which the force validations were done without
+    DILATANCY = 0.0
     adaptive_face = True
     FACE_PSI = (20.0, 10.0, 0.0, -10.0, -20.0, -30.0, -40.0)  # swing offsets (deg; negative toward the truck side)
     # m: reach in or out of the standard dig path. Only the standard one: reaching 1 m further runs the arm into
@@ -921,7 +931,7 @@ class ExcavatorSim:
         z = self.zones
         has = self._pit_cols & (z.count_np > 0)
         cx, cy = z.col_x[has], z.col_y[has]
-        top = z.col_floor[has] + z.count_np[has] * LAYER_PER_PARTICLE
+        top = z.col_floor[has] + z.count_np[has] * z.col_layer_np[has]
         hard = ground_height(cx, cy)
         dx, dy = cx - SWING_POS[0], cy - SWING_POS[1]
         best, best_score = None, -1.0
@@ -1471,7 +1481,7 @@ class ExcavatorSim:
                 m = k % PER_LAYER
                 x = -BED_L / 2 + (ix + 0.5) * CELL + ((m % 2) - 0.5) * SPACING
                 y = -BED_W / 2 + (iy + 0.5) * CELL + ((m // 2) - 0.5) * SPACING
-                zz = (k // PER_LAYER + 0.5) * SPACING
+                zz = (k // PER_LAYER + 0.5) * SPACING * (1.0 + self.swell)  # the load is loose
                 pos.append(np.stack([x, y, zz], axis=1))
                 counts[iy, ix] = 0
                 budget -= n
@@ -1759,7 +1769,7 @@ class ExcavatorSim:
         gy = BED_LO[1] + (np.arange(TRUCK_NY) + 0.5) * TRUCK_CELL
         ix = np.clip(((gx - x0) / CELL).astype(int), 0, nx - 1)
         iy = np.clip(((gy - y0) / CELL).astype(int), 0, ny - 1)
-        h = BED_FLOOR_Z + d.counts[np.ix_(iy, ix)] * LAYER_PER_PARTICLE
+        h = BED_FLOOR_Z + d.counts[np.ix_(iy, ix)] * LAYER_PER_PARTICLE * (1.0 + self.swell)  # loose
         return h.astype(np.float32).ravel()
 
     def stats(self):

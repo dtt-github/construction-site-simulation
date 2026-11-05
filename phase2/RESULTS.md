@@ -1311,7 +1311,7 @@ The site's productivity figures were compared with published references. The sou
 |---|---|---|
 | Excavator cycle 16.6 s (15.2–18.0), loam, 103° swing, 2 m pit | Komatsu PC200 16–19 s at 90–180° × 0.9–1.1 = 14.4–20.9 s; Cat 320B 13.8 s at 60–90° + 1 s per 10° = 16.6 s; BML 17.5–19.7 s; field 20.8–23.6 s | **Within** the handbooks; faster than field operators |
 | Phase split: dig 8.3, swing loaded 3.3, dump 2.3, swing back 2.8 s | Cat 320B: 5.4 / 3.6 / 1.8 / 3.0 s; field (30 t): 7.4 / 5.0 / 4.2 / 4.3 s | Dig **long** (it includes the approach, which Cat counts in swing empty), swings and dump **short** |
-| Payload per pass, loam, 1.55 t | 0.8 m³ × fill 1.00–1.10 × loose 1250–1600 kg/m³ = 1.0–1.4 t | **Heavy** by 15–45 %: no bulking, and 1850 kg/m³ in the bucket |
+| Payload per pass, loam, 1.55 t (the peak in the bucket; 1.35 t reached the carrier) | 0.8 m³ × fill 1.00–1.10 × loose 1250–1600 kg/m³ = 1.0–1.4 t | Peak heavy, delivered within (see "Bulking" below) |
 | Passes per 11 t load: loam 6–9, clay 9–10, dry sand 9–12 | 8–9 (calculated); clay ≈ 10; sand 7–10 | Within; loam low and sand high (sand fill ≈ 0.75–0.9) |
 | Excavator waiting 19–20 % (1 carrier), 10 % (2) | Field 20–44 %; 0.7 min exchange ≈ 22 % | **Within** |
 | Two-carrier swap ≈ 15–30 s | Cat ideal: at most one excavator cycle (18–24 s) | Within |
@@ -1325,4 +1325,46 @@ The site's productivity figures were compared with published references. The sou
   - Dug soil does not bulk. A bucket carries in-situ density, so the tonnes per pass are high, the loose volumes low, and a 0.3 m spread lift is effectively compacted.
   - The phase boundaries differ from the handbooks', so per-phase times do not compare directly. Whether the swings are genuinely too fast needs Cat's four segments and a swing sweep (45–180°).
 - **What the open literature cannot validate:** crawler-carrier cycles, ZX200 estimating tables, 9–10 t dozer production curves and blade forces. A video time study of a real ZX200 and IC120, about 50 cycles per soil, would close that gap.
+
+## Bulking: dug soil takes more room
+
+Validation 3 found payload per pass heavy in loam and blamed missing bulking. Measuring first showed the premise was only half right:
+- **1.55 t was the wrong figure:** it was the peak in the bucket during a pass, including soil that spills before the dump. What reached the carrier was 1.35 t per pass, inside the handbook's 1.0–1.4 t.
+- **Dug soil already bulked:** cohesive soil breaks into lumps with gaps between them, and the solver never re-compacted anything (no packing limit). Bulk density in the carrier's vessel (load mass over the volume under its surface, which is how a surveyor measures loose volume) was 4–20 % below the preset loose density (bank ÷ (1 + swell)), not above it. Clay was the loosest, at 1152 kg/m³ against 1444.
+
+**The model now** (`soil_zone.py`, `CRITICAL_FRACTION`):
+- **Swelling:** a particle that has moved 0.3 m from where it woke is dug. Its MPM volume grows by (1 + swell): dry sand 12 %, loam 25 %, clay 35 %.
+- **The packing limit:** the solver's packing limit (critical fraction 1.0) lets poured soil settle under its own weight only until it fills its cells. Soil in place therefore stays at bank density, and dug soil settles at its loose density, with mass unchanged.
+- **Loose columns:** resting soil in the vessel, on the haul road and in the spoil area keeps its loose height. Its columns rise (1 + swell) times faster per particle, and particles woken there keep the loose volume.
+- **Dilatancy was tried and left off:**
+  - The flow rule's dilatancy (0.1–0.3) opens sheared soil.
+  - It cut the payload per pass by up to a third and changes how hard the soil is to cut, and the force validations were done without it.
+
+**Vessel bulk density** (one carrier load in each case):
+
+| Soil | Target (bank ÷ (1 + swell)) | No packing limit | Packing limit + swollen volumes | Same + dilatancy 0.3 |
+|---|---|---|---|---|
+| Dry sand | 1429 | 1370 (−4 %) | **1435 (+0.4 %)** | 1502 (+5 %) |
+| Loam | 1480 | 1388 (−6 %) | **1395 (−6 %)** | 1481 (0 %) |
+| Clay | 1444 | 1152 (−20 %) | **1448 (+0.3 %)** | 1324 (−8 %) |
+
+All in kg/m³.
+
+**1500 s, one carrier** (logs `logs/haul_bench_bulk_long_<soil>_1carrier.json`, against the dry-sand-fix runs of part 6):
+
+| Soil | Per pass, before → after | Handbook per pass (0.8 m³ × fill × loose density, calculated) | Passes per load | Delivered |
+|---|---|---|---|---|
+| Dry sand | 1.01 → 0.77 t | 1.09–1.26 t | 9–12 → 11–16 | 149 → 123 t/h |
+| Loam | 1.30 → 1.47 t | 1.0–1.4 t | 5–9 → 4–10 | 158 → 166 t/h |
+| Clay | 1.19 → 0.81 t | 0.92–1.04 t | 9–10 → 12–15 | 170 → 104 t/h |
+
+- **The densities are right now.** Dug soil sits within 6 % of its loose density in all three soils.
+- **What bulking exposed:**
+  - In dry sand and clay the autopilot's bucket comes up only about 65–70 % full by volume (0.77 t ÷ 1429 kg/m³ and 0.81 t ÷ 1448 kg/m³, over 0.8 m³), against the handbooks' 80–110 %.
+  - Before bulking, the soil in the bucket was denser than real, which hid this: the tonnes per pass looked right while the volume per pass was low.
+  - Loam is the reverse: its lumps compact to about 1.47 t per pass, a little above the range.
+- **The next step is how the autopilot fills the bucket, not the soil:**
+  - Dry sand runs off the heap during the swing.
+  - Clay may be cut too thin for its lumps to fill the bucket.
+- **Everything else holds:** the particle pool ran short only 0–46 times per run, carry-back stayed at 0.1–0.4 t per trip, and the Gym checks pass.
 

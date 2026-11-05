@@ -8,7 +8,9 @@ rest and away from the bucket "sleep": their particles are counted back into the
     soil region   grid of columns over a soil-bearing area (the pit with its slopes and the ground
                   around it, the truck bed); each column has a floor height (the lowest point of the
                   ground under it)
-    count[c]      dormant particles in column c; its top is floor + count * LAYER_PER_PARTICLE
+    count[c]      dormant particles in column c; its top is floor + count * layer[c], where layer is
+                  LAYER_PER_PARTICLE for soil in place (bank) and (1 + swell) times that in the regions
+                  holding dug, loose soil (the vessel, the haul road, the spoil area)
     pool          fixed-size particle array; inactive slots are parked in a compact storage block far
                   away (Newton's sparse grid allocates voxels for every particle, so parked particles
                   are packed ~26 per voxel to keep that cost small)
@@ -22,6 +24,12 @@ Waking is partial: a column becomes particles only from its top down to just bel
 1:1 away from it), and the soil underneath stays dormant as a base, so a deep bed costs little more than
 a shallow one. Dormant soil standing steeper than a 0.2 m drop to a neighbour wakes on its own
 (avalanche), so cut faces slump to the angle of repose instead of standing as rigid walls.
+
+Bulking: dug soil takes more room than soil in place (swell: sand about 12 %, loam 25 %, clay 35 %). A
+particle woken from a bank column is in place; once it has moved DUG_M from where it woke, it is dug, and
+its MPM volume grows by (1 + swell), so with the solver's packing limit (critical fraction) the loose soil
+spreads out at lower density, mass unchanged. Loose particles keep that volume when they sleep in a loose
+region and wake again; one sleeping in the pit is counted back as soil in place.
 
 Dormant columns are as rigid as the pit walls. That is the approximation: soil outside the zone does not
 fail, so the zone has to cover the bucket's failure wedge (WAKE_MARGIN).
@@ -70,6 +78,44 @@ def column_of(p: wp.vec3, regions: Regions):
             if p[2] > f - BELOW_FLOOR and p[2] < f + TOP_LIMIT:
                 return c
     return -1
+
+
+@wp.kernel
+def swell_dug_kernel(
+    q: wp.array[wp.vec3],
+    flags: wp.array[wp.int32],
+    woke_at: wp.array[wp.vec3],
+    loose: wp.array[int],
+    dug_m: float,
+    loose_volume: float,
+    volume: wp.array[float],
+):
+    """Particles in place that have moved dug_m from where they woke are dug: loose, at the larger volume."""
+    i = wp.tid()
+    if (flags[i] & ACTIVE) == 0 or loose[i] != 0:
+        return
+    if wp.length(q[i] - woke_at[i]) > dug_m:
+        loose[i] = 1
+        volume[i] = loose_volume
+
+
+@wp.kernel
+def mark_spawned_kernel(
+    slots: wp.array[int],
+    q: wp.array[wp.vec3],
+    is_loose: wp.array[int],
+    loose_volume: float,
+    woke_at: wp.array[wp.vec3],
+    loose: wp.array[int],
+    volume: wp.array[float],
+):
+    """Newly woken or injected particles: remember where they started, and whether they are loose."""
+    k = wp.tid()
+    i = slots[k]
+    woke_at[i] = q[i]
+    loose[i] = is_loose[k]
+    if is_loose[k] != 0:
+        volume[i] = loose_volume
 
 
 @wp.func
@@ -225,10 +271,10 @@ def spawn_kernel(
 
 
 @wp.kernel
-def column_top_kernel(count: wp.array[int], floor_z: wp.array[float], points: wp.array[wp.vec3]):
+def column_top_kernel(count: wp.array[int], floor_z: wp.array[float], layer: wp.array[float], points: wp.array[wp.vec3]):
     """Collider: each column's top quad at its dormant soil height (the floor when it has none)."""
     c = wp.tid()
-    z = floor_z[c] + float(count[c]) * LAYER_PER_PARTICLE
+    z = floor_z[c] + float(count[c]) * layer[c]
     for k in range(4):
         p = points[4 * c + k]
         points[4 * c + k] = wp.vec3(p[0], p[1], z)
@@ -242,6 +288,7 @@ def merge_heightmap_kernel(
     cell: float,
     nx: int,
     count: wp.array[int],
+    layer: wp.array[float],
     regions: Regions,
 ):
     """Display heightmap: the higher of the particle surface and the dormant column top."""
@@ -256,7 +303,7 @@ def merge_heightmap_kernel(
             c = regions.offset[r] + iy * regions.nx[r] + ix
             n = count[c]
             if n > 0:
-                hm[k] = wp.max(hm[k], regions.floor[c] + float(n) * LAYER_PER_PARTICLE)
+                hm[k] = wp.max(hm[k], regions.floor[c] + float(n) * layer[c])
             return
 
 
@@ -265,6 +312,7 @@ def dormant_grains_kernel(
     count: wp.array[int],
     col_xy: wp.array[wp.vec2],
     floor_z: wp.array[float],
+    layer: wp.array[float],
     show: wp.array[int],
     max_out: int,
     counter: wp.array[int],
@@ -284,7 +332,7 @@ def dormant_grains_kernel(
             out[slot] = wp.vec3(
                 col_xy[c][0] + (float(m % 2) - 0.5) * SPACING,
                 col_xy[c][1] + (float(m // 2) - 0.5) * SPACING,
-                floor_z[c] + (float(k // 4) + 0.5) * SPACING,
+                floor_z[c] + (float(k // 4) + 0.5) * SPACING * layer[c] / LAYER_PER_PARTICLE,
             )
 
 
@@ -346,9 +394,13 @@ class SoilZones:
     REPOSE_SLOPE = 0.75  # tan of the angle of repose (sand friction 0.75, 37 deg)
     AVALANCHE_DROP = 0.2  # m to a neighbour: faces this high slump (smaller steps are below MPM's 8 cm resolution)
 
-    def __init__(self, regions, pool, particle_volume):
+    DUG_M = 0.3  # m: a particle that has moved this far from where it woke has been dug (it bulks)
+
+    def __init__(self, regions, pool, particle_volume, swell=0.0, loose_regions=()):
         """regions: list of (name, x0, y0, nx, ny, ground) with ground(x, y) -> ground height (numpy),
-        raised regions first; pool: particle capacity."""
+        raised regions first; pool: particle capacity; swell: bank to loose volume increase of dug soil;
+        loose_regions: the regions whose dormant soil is loose (dug)."""
+        self.swell = swell
         self.names = [r[0] for r in regions]
         self.ground = [r[5] for r in regions]
         spec, cx, cy, fz, off = [], [], [], [], 0
@@ -369,6 +421,10 @@ class SoilZones:
         self.col_x, self.col_y = np.concatenate(cx), np.concatenate(cy)
         self.col_floor = np.concatenate(fz).astype(np.float64)
         self.col_region = np.concatenate([np.full(s[2] * s[3], k) for k, s in enumerate(spec)])
+        self.col_loose = np.isin(self.col_region, [self.names.index(n) for n in loose_regions])
+        self.col_layer_np = np.where(self.col_loose, LAYER_PER_PARTICLE * (1.0 + swell), LAYER_PER_PARTICLE)
+        self.col_layer = wp.array(self.col_layer_np.astype(np.float32), dtype=float)
+        self.loose_volume = particle_volume * (1.0 + swell)
         self.floor_z = wp.array(self.col_floor.astype(np.float32), dtype=float)
         self.col_xy = wp.array(np.stack([self.col_x, self.col_y], axis=1).astype(np.float32), dtype=wp.vec2)
 
@@ -386,6 +442,8 @@ class SoilZones:
         self.sleep = wp.zeros(self.n_cols, dtype=int)
         self.show = wp.zeros(self.n_cols, dtype=int)
         self.freed = wp.zeros(pool, dtype=int)
+        self.woke_at = wp.zeros(pool, dtype=wp.vec3)  # where each particle woke (or was injected)
+        self.loose = wp.zeros(pool, dtype=int)  # 1: dug, at the loose volume
         self.freed_n = wp.zeros(1, dtype=int)
         self.lost = wp.zeros(1, dtype=int)
 
@@ -470,9 +528,9 @@ class SoilZones:
         wp.launch(remove_kernel, dim=len(slots), inputs=[wp.array(slots, dtype=int), self.model.particle_flags, mm.particle_flags, mm.material_particle_flags, mm.material_particle_volume, st.particle_q, st.particle_qd, self.park, self.freed, self.freed_n])
         self.active_np[slots] = False
 
-    def inject(self, pos, vel):
-        """Add fresh, unstressed particles at pos with velocities vel (as many as the pool has room for);
-        returns how many were added and their pool slots."""
+    def inject(self, pos, vel, loose=True):
+        """Add fresh, unstressed particles at pos with velocities vel (as many as the pool has room for),
+        loose (dug) or in place; returns how many were added and their pool slots."""
         free = np.flatnonzero(~self.active_np)
         n = min(len(free), len(pos))
         if n < len(pos):
@@ -488,12 +546,17 @@ class SoilZones:
             inputs=[slots_wp, wp.array(np.asarray(pos[:n], dtype=np.float32), dtype=wp.vec3), self.particle_volume, self.model.particle_flags, mm.particle_flags, mm.material_particle_flags, mm.material_particle_volume, st.particle_q, st.particle_qd, ext.particle_qd_grad, ext.particle_elastic_strain, ext.particle_Jp, ext.particle_stress, ext.particle_transform],
         )
         wp.launch(set_velocity_kernel, dim=n, inputs=[slots_wp, wp.array(np.asarray(vel[:n], dtype=np.float32), dtype=wp.vec3), st.particle_qd])
+        self._mark(slots_wp, np.full(n, int(loose), dtype=np.int32))
         if self.on_spawn is not None:
             self.on_spawn(slots_wp)
         return n, slots_wp
 
+    def _mark(self, slots_wp, is_loose):
+        st, mm = self.state, self.mpm._mpm_model
+        wp.launch(mark_spawned_kernel, dim=len(is_loose), inputs=[slots_wp, st.particle_q, wp.array(is_loose, dtype=int), self.loose_volume, self.woke_at, self.loose, mm.material_particle_volume])
+
     def _refit(self):
-        wp.launch(column_top_kernel, dim=self.n_cols, inputs=[self.count, self.floor_z, self.mesh_points])
+        wp.launch(column_top_kernel, dim=self.n_cols, inputs=[self.count, self.floor_z, self.col_layer, self.mesh_points])
         self.mesh.refit()
 
     def _near(self, box, margin, dz, top):
@@ -521,7 +584,7 @@ class SoilZones:
             y = self.col_y[col] + ((m // 2) - 0.5) * SPACING
             # stack each lattice sub-column on the real ground under it (it differs from the column
             # floor on slopes), so no particle starts inside the ground
-            z = self.ground[self.col_region[col]](x, y) + (k // PER_LAYER + 0.5) * SPACING
+            z = self.ground[self.col_region[col]](x, y) + (k // PER_LAYER + 0.5) * SPACING * self.col_layer_np[col] / LAYER_PER_PARTICLE
             pos.append(np.stack(np.broadcast_arrays(x, y, z), axis=1))
         pos = np.concatenate(pos)
         pos[:, :2] += self.rng.uniform(-0.1, 0.1, (len(pos), 2)) * SPACING  # break the lattice symmetry
@@ -533,12 +596,14 @@ class SoilZones:
         them. Returns (woken, slept) column counts."""
         boxes = box if isinstance(box, list) else [box]
         st, mm = self.state, self.mpm._mpm_model
+        if self.swell > 0.0:  # particles moved DUG_M from where they woke are dug: they bulk
+            wp.launch(swell_dug_kernel, dim=self.pool, inputs=[st.particle_q, self.model.particle_flags, self.woke_at, self.loose, self.DUG_M, self.loose_volume, mm.material_particle_volume])
         self.col_n.zero_()
         self.col_vmax.zero_()
         self.col_ztop.fill_(-1.0e6)
         wp.launch(column_stats_kernel, dim=self.pool, inputs=[st.particle_q, st.particle_qd, self.model.particle_flags, self.regions], outputs=[self.col_n, self.col_vmax, self.col_ztop])
         n, vmax, ztop = self.col_n.numpy(), self.col_vmax.numpy(), self.col_ztop.numpy()
-        dormant_top = np.where(self.count_np > 0, self.col_floor + self.count_np * LAYER_PER_PARTICLE, -1.0e6)
+        dormant_top = np.where(self.count_np > 0, self.col_floor + self.count_np * self.col_layer_np, -1.0e6)
         top = np.maximum(dormant_top, ztop)
 
         self.tick += 1
@@ -564,7 +629,7 @@ class SoilZones:
 
         # wake: each column wakes from its top down to a level; the soil below stays dormant as a base
         has = self.count_np > 0
-        dormant_top = np.where(has, self.col_floor + self.count_np * LAYER_PER_PARTICLE, -1.0e6)
+        dormant_top = np.where(has, self.col_floor + self.count_np * self.col_layer_np, -1.0e6)
         level = np.full(self.n_cols, np.inf)
         # down to just below the tool's lowest point under it, rising 1:1 away from it (the soil that
         # fails ahead of and beside a cutting edge lies above a ~45 deg line from the edge)
@@ -578,7 +643,7 @@ class SoilZones:
         low = self._lowest_neighbour(surface)
         steep = has & (dormant_top - low > self.AVALANCHE_DROP)
         level[steep] = np.minimum(level[steep], low[steep] + CELL * self.REPOSE_SLOPE)
-        keep = np.clip(np.floor((level - self.col_floor) / LAYER_PER_PARTICLE / PER_LAYER) * PER_LAYER, 0, None)
+        keep = np.clip(np.floor((level - self.col_floor) / self.col_layer_np / PER_LAYER) * PER_LAYER, 0, None)
         keep = np.where(np.isfinite(keep), keep, self.count_np).astype(np.int64)
         keep = np.minimum(keep, self.count_np)
         wake = np.flatnonzero(keep < self.count_np)
@@ -603,6 +668,7 @@ class SoilZones:
                 spawn_kernel, dim=len(slots),
                 inputs=[slots_wp, wp.array(pos.astype(np.float32), dtype=wp.vec3), self.particle_volume, self.model.particle_flags, mm.particle_flags, mm.material_particle_flags, mm.material_particle_volume, st.particle_q, st.particle_qd, ext.particle_qd_grad, ext.particle_elastic_strain, ext.particle_Jp, ext.particle_stress, ext.particle_transform],
             )
+            self._mark(slots_wp, np.repeat(self.col_loose[wake], (self.count_np[wake] - keep[wake]).astype(np.int64)).astype(np.int32))
             if self.on_spawn is not None:
                 self.on_spawn(slots_wp)
             self.count_np[wake] = keep[wake]
@@ -615,7 +681,7 @@ class SoilZones:
         return woken, slept
 
     def merge_heightmap(self, hm, x0, y0, cell, nx, ny):
-        wp.launch(merge_heightmap_kernel, dim=nx * ny, inputs=[hm, x0, y0, cell, nx, self.count, self.regions])
+        wp.launch(merge_heightmap_kernel, dim=nx * ny, inputs=[hm, x0, y0, cell, nx, self.count, self.col_layer, self.regions])
 
     def stream_dormant(self, max_out, counter, out):
-        wp.launch(dormant_grains_kernel, dim=self.n_cols, inputs=[self.count, self.col_xy, self.floor_z, self.show, max_out, counter, out])
+        wp.launch(dormant_grains_kernel, dim=self.n_cols, inputs=[self.count, self.col_xy, self.floor_z, self.col_layer, self.show, max_out, counter, out])
