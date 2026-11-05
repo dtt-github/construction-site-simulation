@@ -13,8 +13,10 @@ hydraulic cylinders (hydraulics.py: real bores, pins from the OPERA meshes, buck
   * relief valve   - the torque is capped at relief pressure x piston area x moment arm, separately
                      for pushing (head side) and pulling (rod side); the reference can't run further
                      ahead than that torque can pull, so a joint that meets more resistance slows down
-                     and stalls instead of pushing through. Swing is a joint-space motor with a fixed
-                     torque limit.
+                     and stalls instead of pushing through. Swing is a hydraulic motor: speed from its
+                     flow, torque capped at the swing relief, with friction.
+  * response       - optional (command_response=True): the levers reach the spools through the dead time
+                     and lag PWRI measured on their ZX200 under velocity commands (hydraulics.py).
 
 The arm is a Newton articulation solved with MuJoCo; its bucket is a dynamic MPM collider, so the
 sand pushes back on the arm (two-way coupling as in Newton's mpm_twoway_coupling example).
@@ -34,6 +36,7 @@ Usage:
 
 import argparse
 import asyncio
+import collections
 import json
 import math
 import struct
@@ -111,7 +114,12 @@ BUCKET_RATED_KG = BUCKET_RATED_M3 * 1600.0
 # from the area-weighted shells of the OPERA meshes, scaled to these masses (plate structures).
 MASS = {"house": 9800.0, "boom": 1450.0, "stick": 680.0, "bucket": 640.0}
 COM = {"house": (-0.48, 0.17, 0.79), "boom": (2.00, 0.01, 1.95), "stick": (0.34, -0.01, 0.73), "bucket": (0.29, -0.01, 0.72)}
-INERTIA = {"house": (10518.0, 17319.0, 20667.0), "boom": (1028.0, 3635.0, 2661.0), "stick": (304.0, 673.0, 383.0), "bucket": (131.0, 159.0, 183.0)}
+# The house's inertia about its vertical axis (and its pitch axis, as mass further out behind the swing axis
+# adds to both) is raised by 52.8 t m2 over the mesh shells: the total about the swing axis then matches PWRI's
+# ZX200 swing tests (about 112 t m2 with the boom raised, arm in, bucket empty, at the swing torque in
+# hydraulics.py; ISARC 2025, doi:10.22260/ISARC2025/0054), where the mesh-based masses gave about 60. The
+# counterweight sits further out than a uniform house shell puts it.
+INERTIA = {"house": (10518.0, 70149.0, 73497.0), "boom": (1028.0, 3635.0, 2661.0), "stick": (304.0, 673.0, 383.0), "bucket": (131.0, 159.0, 183.0)}
 JOINTS = ["swing", "boom", "stick", "bucket"]
 LINKS = ["house", "boom", "stick", "bucket"]
 GLB_NODES = {"house": "body_link", "boom": "boom_link", "stick": "arm_link", "bucket": "bucket_link"}
@@ -123,7 +131,7 @@ LIMITS = {"swing": (-3.0, 3.0), "boom": (-1.137, 1.0), "stick": (0.594, 2.687), 
 LEVER_SIGN = np.array([1.0, -1.0, -1.0, -1.0])
 # swing: a joint-space actuator (swing motor); boom, stick and bucket are driven by their cylinders
 # (hydraulics.py), whose flow and relief set the joint speed and torque limits for each pose
-SWING_VMAX, SWING_TAU = hyd.SWING_SPEED, hyd.SWING_TORQUE  # 13.3 min^-1, 68.9 kN m (hydraulics.py)
+SWING_VMAX, SWING_TAU, SWING_FRICTION = hyd.SWING_SPEED, hyd.SWING_TORQUE, hyd.SWING_FRICTION  # 1.17 rad/s, 77.9 kN m, 16 kN m (hydraulics.py)
 KP = {"swing": 2.0e6, "boom": 3.0e7, "stick": 8.0e6, "bucket": 1.5e6}
 KD = {"swing": 8.0e5, "boom": 3.0e6, "stick": 6.0e5, "bucket": 4.0e4}
 
@@ -354,6 +362,7 @@ def hydraulics_kernel(
     tau_hi: wp.array[float],
     q_lo: wp.array[float],
     q_hi: wp.array[float],
+    friction: wp.array[float],
     dt: float,
     joint_f: wp.array[float],
     torque: wp.array[float],
@@ -373,7 +382,8 @@ def hydraulics_kernel(
     over = wp.max(q - q_hi[j], 0.0) - wp.max(q_lo[j] - q, 0.0)
     if over != 0.0:
         tau = tau - 10.0 * kp[j] * over - kd[j] * joint_qd[j]
-    joint_f[j] = tau
+    # Coulomb friction against the motion (smoothed over 0.02 rad/s); the actuator torque above doesn't include it
+    joint_f[j] = tau - friction[j] * wp.tanh(joint_qd[j] / 0.02)
 
 
 @wp.kernel
@@ -527,9 +537,12 @@ class ExcavatorSim:
         ("swing back", 0, 6.0, 2.6 + DIG_Z, -95),  # lowers while swinging, once clear of the truck
     ]
 
-    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1):
+    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, command_response=False):
         wp.init()
-        self.kwargs = {"voxel": voxel, "ppc": ppc, "soil": soil, "iterations": iterations, "fps": fps, "pool": pool, "mpm_every": mpm_every, "carriers": carriers}
+        self.kwargs = {"voxel": voxel, "ppc": ppc, "soil": soil, "iterations": iterations, "fps": fps, "pool": pool, "mpm_every": mpm_every, "carriers": carriers, "command_response": command_response}
+        # levers reach the spools through the dead time and lag of PWRI's ZX200 under velocity commands
+        # (hydraulics.COMMAND_DEAD; off: the spools follow the levers at once, as before)
+        self.command_response = command_response
         self.soil = soil
         material = soils.SOILS[soil]
         density, friction = material["density"], material["friction"]
@@ -736,6 +749,7 @@ class ExcavatorSim:
         # actuator parameters on the GPU
         arr = lambda d: wp.array([float(d[j]) for j in JOINTS], dtype=float)  # noqa: E731
         self.kp, self.kd = arr(KP), arr(KD)
+        self.friction = wp.array([SWING_FRICTION, 0.0, 0.0, 0.0], dtype=float)
         self.tau_lo, self.tau_hi = wp.zeros(4, dtype=float), wp.zeros(4, dtype=float)
         self.linkage = hyd.Linkage(self.link_frames, pitch)
         self.vmax = self.nominal_vmax()
@@ -783,6 +797,8 @@ class ExcavatorSim:
         self.rigid_graph = None  # new state buffers: record the rigid graph again
         self.q_ref.assign(self.q0.astype(np.float32))
         self.levers = np.zeros(4)
+        self.spool = np.zeros(4)  # spool openings (-1..1, sign = joint direction) after the command response
+        self.lever_log = collections.deque(maxlen=int((max(max(d) for d in hyd.COMMAND_DEAD.values()) + hyd.SWING_START_DEAD) * self.kwargs["fps"]) + 2)
         self.auto = False
         self.fleet.reset()
         self.dozer.reset()
@@ -802,7 +818,7 @@ class ExcavatorSim:
         self.swing_inertia = self.SWING_INERTIA_GUESS
         self._z_cache = {}
         self._faces, self.face_log, self.pit_done = {}, [], False
-        self.face_rest, self.pass_fill = {}, 0.0  # strips set aside after a poor pass (until pass n); this pass's best fill
+        self.face_rest, self.pass_fill, self.pass_carried = {}, 0.0, 0.0  # strips set aside after a poor pass (until pass n); this pass's best fill and what it carried
         self.stage_time = 0.0
         self.auto_wait = 0.0
         self.low_prev, self.low_rate, self.swing_held, self.arm_held = None, 0.0, 0.0, 0.0
@@ -916,6 +932,10 @@ class ExcavatorSim:
     STRIP_HALF_W = 0.55  # m: half the bucket width
     PIT_DONE_M3 = 0.3  # no strip's cut holds more than this: the excavation is finished (within reach)
     POOR_PASS, POOR_REST = 0.3, 12  # a pass bringing back less than this fraction of a full bucket sets its strip aside for this many passes
+    # in these soils, also a pass carrying less than this fraction to the carrier. A clay strip whose cut takes
+    # slabs the bucket loses on the way out kept being chosen at about 0.4 t a pass, since its soil stays in the
+    # pit. Not in sand: what spills on the swing is no sign of a poor strip (resting on it took dry sand from 1.37 to 1.11 t a pass)
+    POOR_CARRIED = {"clay": 0.5}
 
     def _face(self, p):
         """The cut for pass p: swing offset, reach shift, deepen and the lowest the bucket may go (None in
@@ -935,7 +955,9 @@ class ExcavatorSim:
         hard = ground_height(cx, cy)
         dx, dy = cx - SWING_POS[0], cy - SWING_POS[1]
         best, best_score = None, -1.0
-        for psi in self.FACE_PSI:
+        for psi, rested in ((psi, rested) for rested in (False, True) for psi in self.FACE_PSI):
+            if rested and best is not None and best["avail_m3"] >= self.PIT_DONE_M3:
+                break  # strips set aside are a fallback, when no other strip has a cut worth taking
             # psi = 0 digs toward -x, positive toward -y (swing + left)
             ux, uy = -math.cos(math.radians(psi)), -math.sin(math.radians(psi))
             along, across = dx * ux + dy * uy, -dx * uy + dy * ux
@@ -943,7 +965,7 @@ class ExcavatorSim:
                 if shift < 0 and abs(psi) > 10.0:
                     continue  # reaching in is for the slope under the machine, straight ahead
                 band = (along > self.EDGE_REACH[0] + shift) & (along < self.EDGE_REACH[1] + shift) & (np.abs(across) < self.STRIP_HALF_W)
-                if band.sum() < 10 or self.face_rest.get((psi, shift), -1) > p:
+                if band.sum() < 10 or (self.face_rest.get((psi, shift), -1) > p) != rested:
                     continue
                 # free-flowing soil: from the strip's median surface (the high edges of an earlier cut would set
                 # the cut too shallow and the bucket would pass through the trench); cohesive soil: from its
@@ -1064,7 +1086,7 @@ class ExcavatorSim:
 
     def _sweep(self, direction, steps=8, ahead=0.07):
         """House angles it passes through if it brakes from now, plus `ahead` rad more."""
-        v, brake = abs(self.qd[0]), SWING_TAU * self.relief / self.swing_inertia
+        v, brake = abs(self.qd[0]), self._swing_brake()
         t = np.linspace(0.0, v / brake, steps)
         d = v * t - 0.5 * brake * t * t
         return self.q[0] + direction * np.append(d, d[-1] + ahead)
@@ -1081,21 +1103,25 @@ class ExcavatorSim:
             return math.inf
         k = bad[0]
         dist = max(abs(psi[k] - self.q[0]) - 0.07, 0.0)
-        v = math.sqrt(2.0 * SWING_TAU * self.relief / self.swing_inertia * dist)
+        v = math.sqrt(2.0 * self._swing_brake() * dist)
         deficit = -float(m[k:].min())
         if self.low_rate > 0.02 and deficit <= rise_to_end + 0.02:
             v = min(v, dist * self.low_rate / deficit)
         return v
 
-    SWING_INERTIA_GUESS = 55e3  # kg m2 about the swing axis, until measured (boom raised, bucket empty)
+    SWING_INERTIA_GUESS = 110e3  # kg m2 about the swing axis, until measured (boom raised, bucket empty)
     SWING_STAGE_DEG = 20  # stages that turn the house further than this are swung like an operator does
+
+    def _swing_brake(self):
+        """Deceleration (rad/s2) of the house in neutral: the cross-over reliefs and friction both stop it."""
+        return (SWING_TAU * self.relief + SWING_FRICTION) / self.swing_inertia
 
     def _swing_lever(self, target, allow=None):
         """Operator swing: full lever, then neutral once the house would coast to the target on the
         cross-over reliefs; small corrections once it has nearly stopped. `allow(direction)` is the fastest
         the bucket's clearance lets the house swing: the lever is eased to it, or neutral (brake) above it."""
         err, v = target - self.q[0], self.qd[0]
-        brake = SWING_TAU * self.relief / self.swing_inertia
+        brake = self._swing_brake()
         stop = v * v / (2 * brake) * 1.1 + 0.02
         if abs(v) > 0.15:
             lever = math.copysign(1.0, err) if (err * v < 0 or abs(err) > stop) else 0.0
@@ -1284,6 +1310,8 @@ class ExcavatorSim:
                 self.shaking = 0.0  # sticky load still in the bucket: shake it out before swinging back
                 self.shakes += 1
                 return
+            if b[0] == "swing to truck":
+                self.pass_carried = self._bucket_fill()  # what this pass brings to the carrier
             if b[0] == "dump":
                 self._after_dump()
             self.auto_stage = (self.auto_stage + 1) % n
@@ -1293,12 +1321,14 @@ class ExcavatorSim:
             self.low_prev, self.low_rate = None, 0.0
             if self.auto_stage == 0:
                 face = self._faces.get(self.passes) if self.adaptive_face else None
-                if face is not None and self.pass_fill < self.POOR_PASS * self.full_kg:
+                carried = self.POOR_CARRIED.get(self.soil)
+                if face is not None and (self.pass_fill < self.POOR_PASS * self.full_kg
+                                         or carried is not None and self.pass_carried < carried * self.full_kg):
                     self.face_rest[(face["psi"], face["shift"])] = self.passes + self.POOR_REST  # little came out of it
                     for f in self.face_log[-2:]:
                         if f["pass"] == self.passes:
                             f["poor_kg"] = round(self.pass_fill)
-                self.pass_fill = 0.0
+                self.pass_fill, self.pass_carried = 0.0, 0.0
                 self.passes += 1
                 self.ease = 0.0
                 self.curl_out, self.curl_from = None, None
@@ -1327,6 +1357,9 @@ class ExcavatorSim:
         """Levers -> joint speed commands and torque limits for this frame, from the cylinders."""
         self.cyl_pts, self.cyl_L, self.cyl_J = self.linkage.state(self.q)
         spool = self.levers * LEVER_SIGN  # desired joint direction and opening
+        if self.command_response:
+            spool = self._respond(spool)
+        self.spool = spool
         omega, v_cyl = hyd.speeds(spool, self.cyl_J)  # swing and cylinders share the pumps
         J = np.where(np.abs(self.cyl_J) < hyd.J_MIN, np.copysign(hyd.J_MIN, self.cyl_J), self.cyl_J)
         v_cmd = np.concatenate([[omega], v_cyl / J])
@@ -1335,6 +1368,19 @@ class ExcavatorSim:
         self.v_cmd.assign(v_cmd.astype(np.float32))
         self.tau_lo.assign(np.concatenate([[-tau], lo]).astype(np.float32))
         self.tau_hi.assign(np.concatenate([[tau], hi]).astype(np.float32))
+
+    def _respond(self, cmd):
+        """Spool openings from the lever history: each joint's dead time for the direction it was asked to move
+        (a longer one when the swing starts from rest), then a first-order lag."""
+        self.lever_log.append(cmd.copy())
+        n, fps = len(self.lever_log), self.kwargs["fps"]
+        target = np.zeros(4)
+        for j, name in enumerate(JOINTS):
+            extra = hyd.SWING_START_DEAD if j == 0 and abs(self.qd[0]) < 0.02 and abs(self.spool[0]) < 0.01 else 0.0
+            ago = [int(round((d + extra) * fps)) for d in hyd.COMMAND_DEAD[name]]  # frames, for +/- direction
+            up, down = (self.lever_log[-1 - k][j] if k < n else 0.0 for k in ago)
+            target[j] = up if up > 0 else min(down, 0.0)
+        return self.spool + (target - self.spool) * min(1.0, self.frame_dt / hyd.COMMAND_LAG)
 
     def part_poses(self):
         """Zone-frame poses (xyz, quaternion xyzw) of the cylinder barrels, rods and linkage plates."""
@@ -1354,7 +1400,7 @@ class ExcavatorSim:
             wp.launch(
                 hydraulics_kernel,
                 dim=4,
-                inputs=[self.state_0.joint_q, self.state_0.joint_qd, self.v_cmd, self.q_ref, self.kp, self.kd, self.tau_lo, self.tau_hi, self.q_lo, self.q_hi, self.sim_dt],
+                inputs=[self.state_0.joint_q, self.state_0.joint_qd, self.v_cmd, self.q_ref, self.kp, self.kd, self.tau_lo, self.tau_hi, self.q_lo, self.q_hi, self.friction, self.sim_dt],
                 outputs=[self.control.joint_f, self.torque],
             )
             self.collision.collide(self.state_0, self.contacts)
@@ -1557,11 +1603,12 @@ class ExcavatorSim:
         self.tau = self.torque.numpy().astype(float)
         # house inertia about the swing axis, measured while the swing runs at relief (for the auto operator)
         acc = (self.qd[0] - qd_prev[0]) / self.frame_dt
-        if abs(self.tau[0]) > 0.95 * SWING_TAU * self.relief and abs(acc) > 0.3 and acc * self.tau[0] > 0:
-            self.swing_inertia += 0.1 * (abs(self.tau[0] / acc) - self.swing_inertia)
+        # (speeding up: the relief torque less friction)
+        if abs(self.tau[0]) > 0.95 * SWING_TAU * self.relief and abs(acc) > 0.3 and acc * self.tau[0] > 0 and acc * self.qd[0] > 0:
+            self.swing_inertia += 0.1 * ((abs(self.tau[0]) - SWING_FRICTION) / abs(acc) - self.swing_inertia)
         self.cyl_p, self.cyl_head = hyd.pressures(self.tau[1:], self.cyl_J)
         # gauges: loaded-side pressure as a fraction of the nominal relief setting
-        self.press = np.concatenate([[abs(self.tau[0]) / SWING_TAU], self.cyl_p / hyd.P_RELIEF])  # swing: of its 30.4 MPa relief
+        self.press = np.concatenate([[abs(self.tau[0]) / SWING_TAU], self.cyl_p / hyd.P_RELIEF])  # swing: of its relief
 
     BUCKET_LOCAL_BOX = (
         np.array([min(BUCKET_SHELL[:, 0].min(), TOOTH_TIP[0]) - PLATE, -BUCKET_W / 2 - PLATE, min(BUCKET_SHELL[:, 1].min(), TOOTH_TIP[1]) - PLATE]),

@@ -4,9 +4,16 @@ Data
   * cylinders (Hitachi ZAXIS 200 brochure): boom 2 x bore 120 / rod 85 mm, arm 135 / 95 mm,
     bucket 115 / 80 mm; implement relief 34.3 MPa (36.3 MPa power boost), swing relief 30.4 MPa;
     two main pumps of 194 L/min each
-  * swing: 13.3 min^-1 and 68.9 kN m (ZX200-3 and ZX210-6 spec listings). At the 30.4 MPa swing relief that
-    torque means 2.27 L/rad at the house, and 13.3 min^-1 then takes 189 L/min, about one pump
+  * swing: 13.3 min^-1 and 68.9 kN m (ZX200-3 and ZX210-6 spec listings). At the brochure's 30.4 MPa swing
+    relief that torque means 2.27 L/rad at the house, and 13.3 min^-1 then takes 189 L/min, about one pump
   * port (overload) reliefs: 39.2 MPa, typical for this class; not confirmed for the ZX200
+  * identified from PWRI's ZX200 step-test measurements (1800 min^-1, eco mode, free air; Abe, Matsusaka,
+    Endo, Yamauchi, Hashimoto, "Dynamics Model of an Excavator in an Open Source Physical Simulator for
+    Developing Autonomous Construction", ISARC 2025, doi:10.22260/ISARC2025/0054): SWING_*, CYLINDERS and
+    COMMAND_* below, and phase2/RESULTS.md "Calibration against PWRI's ZX200 step tests". From joint angles and speeds:
+    swing speed, swing friction, the cylinder flows per direction and the command delays. From the motor
+    pressures, which are not yet verified (provisional): the swing relief, and so the swing torque and the
+    house inertia that goes with it
   * pin positions: found in the PWRI OPERA ZX200 meshes (zx200_ros2, Apache-2.0) by voting for the
     bore axes of the pin bosses; each mesh is in its URDF link frame (x forward, z up, pins along y).
     Over the URDF joint limits they give cylinder travels of 1.28 m (boom), 1.465 m (arm) and 1.04 m
@@ -23,9 +30,12 @@ Model
   * port reliefs: the pump feeds the side the spool opens, capped by the main relief; the other side
     (or both, with the spool closed) holds an outside load up to the port relief, then gives way
   * flow: a lever opens its spool in proportion; the cylinder speed is flow / area of the side being
-    filled, and when the open spools ask for more than the two pumps deliver, all are slowed alike
+    filled, with its own maximum flow for each side (the valve meters each direction differently, and arm
+    crowd regenerates rod oil into the head side, so it takes more than the pumps). When the open spools ask
+    the pumps for more than they deliver, all are slowed alike
   * swing: a fixed-displacement motor through the swing reduction; speed = flow / displacement, torque
-    capped at the swing relief both ways (cross-over reliefs: they also brake the house in neutral)
+    capped at the swing relief both ways (cross-over reliefs: they also brake the house in neutral), and a
+    Coulomb friction torque (bearing, gear, motor) against the motion
   * the bucket cylinder drives the bucket through a four-bar: guide link (arm pin G) and side link
     (bucket pin K) meet the cylinder rod at pin C
 """
@@ -36,21 +46,35 @@ import numpy as np
 
 P_RELIEF = 34.3e6  # Pa, implement circuit
 P_POWER_BOOST = 36.3e6
-P_PORT = 39.2e6  # Pa, port (overload) reliefs on the cylinder lines
-P_SWING = 30.4e6  # Pa, swing relief
-SWING_TORQUE = 68.9e3  # N m at the house
-SWING_SPEED = 13.3 * 2 * math.pi / 60  # rad/s
-SWING_DISP = SWING_TORQUE / P_SWING  # m3/rad at the house (motor displacement x reduction)
-SWING_FLOW = SWING_SPEED * SWING_DISP  # m3/s at full lever
+# Pa, port (overload) reliefs on the cylinder lines. PWRI's recordings show the boom's head side briefly at the
+# sensor's 41 MPa full scale when a lowering boom is stopped: a spike above the setting, so they don't pin it down
+P_PORT = 39.2e6
+SWING_DISP = 68.9e3 / 30.4e6  # m3/rad at the house (motor displacement x reduction): spec torque at the brochure relief
+P_SWING = 34.3e6  # Pa, swing relief: peak motor pressure accelerating and braking (PWRI; provisional, brochure 30.4 MPa)
+SWING_TORQUE = P_SWING * SWING_DISP  # N m at the house, 77.9 kN m
+SWING_FRICTION = 16e3  # N m at the house: why the house speeds up more slowly than it brakes (PWRI)
+SWING_SPEED = 1.17  # rad/s at full lever (PWRI, 1800 min^-1 eco; the spec's 13.3 min^-1 = 1.39 rad/s is full power)
+SWING_FLOW = SWING_SPEED * SWING_DISP  # m3/s at full lever, 159 L/min
 PUMP_FLOW = 2 * 194.0 / 60000.0  # m3/s, two main pumps
 LINKS = ("house", "boom", "stick", "bucket")
+LPM = 1 / 60000.0  # m3/s per L/min
 
-# name: joint index, cylinders, bore, rod, max spool flow (m3/s), head pin (link, x, z), rod pin (link, x, z)
+# name: joint index, cylinders, bore, rod, max spool flow (m3/s) (head side, rod side), head pin (link, x, z),
+# rod pin (link, x, z). Boom and arm flows give the joint speeds PWRI measured in each direction at full command
+# (1800 min^-1, eco; ISARC 2025 above); their flow channels, read as indicative, agree for the arm. The bucket
+# keeps one pump each way: its measured speeds aren't matched yet (the four-bar's speed near its stroke ends).
 CYLINDERS = {
-    "boom": (1, 2, 0.120, 0.085, PUMP_FLOW, ("house", 0.686, 0.247), ("boom", 1.776, 2.249)),
-    "arm": (2, 1, 0.135, 0.095, PUMP_FLOW, ("boom", 2.276, 2.789), ("stick", -0.778, -0.367)),
-    "bucket": (3, 1, 0.115, 0.080, PUMP_FLOW / 2, ("stick", -0.248, 0.733), None),  # rod end: linkage pin C
+    "boom": (1, 2, 0.120, 0.085, (375 * LPM, 270 * LPM), ("house", 0.686, 0.247), ("boom", 1.776, 2.249)),  # raise, lower
+    "arm": (2, 1, 0.135, 0.095, (495 * LPM, 265 * LPM), ("boom", 2.276, 2.789), ("stick", -0.778, -0.367)),  # crowd, out
+    "bucket": (3, 1, 0.115, 0.080, (PUMP_FLOW / 2, PUMP_FLOW / 2), ("stick", -0.248, 0.733), None),  # rod end: linkage pin C
 }
+
+# command -> spool response of PWRI's ZX200 under its automation controller (velocity commands), for a
+# simulator driven the same way: dead time (s) per joint for (+, -) joint direction, a first-order lag (s) on
+# the spool, and a dead time on starting the swing from rest (swing parking-brake release) on top of its own
+COMMAND_DEAD = {"swing": (0.30, 0.30), "boom": (0.62, 0.42), "stick": (0.55, 0.45), "bucket": (0.33, 0.33)}  # boom +: lowering
+COMMAND_LAG = 0.15
+SWING_START_DEAD = 0.30
 GUIDE_PIN = ("stick", 1.577, 1.878)  # guide link on the arm
 SIDE_PIN = ("bucket", -0.328, 0.548)  # side link on the bucket
 GUIDE_LEN, SIDE_LEN = 0.561, 0.583
@@ -136,8 +160,9 @@ def speeds(spool, J):
         a_head, a_rod = area(name)
         extend = spool[k + 1] * J[k] > 0
         a = a_head if extend else a_rod
-        flow[k] = abs(spool[k + 1]) * c[4]
-        v[k] = math.copysign(flow[k] / a, spool[k + 1] * J[k])
+        q = abs(spool[k + 1]) * c[4][0 if extend else 1]
+        v[k] = math.copysign(q / a, spool[k + 1] * J[k])
+        flow[k] = min(q, PUMP_FLOW)  # from the pumps: arm crowd tops up from its own rod side
     omega = spool[0] * SWING_SPEED
     total = flow.sum() + abs(spool[0]) * SWING_FLOW
     if total > PUMP_FLOW:

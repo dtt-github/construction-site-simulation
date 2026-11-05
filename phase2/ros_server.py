@@ -155,7 +155,7 @@ class Server:
 
 
 async def main_async(args):
-    sim = ex.ExcavatorSim(soil=args.soil, carriers=args.carriers)
+    sim = ex.ExcavatorSim(soil=args.soil, carriers=args.carriers, command_response=args.command_response)
     sim.auto = args.autopilot
     server = Server(sim, sensors.SensorRig(sim), fast=args.fast)
     srv = await asyncio.start_server(server.handle, args.host, args.port)
@@ -172,6 +172,7 @@ def main():
     ap.add_argument("--carriers", type=int, default=1, choices=(1, 2), help="crawler carriers in the haul cycle")
     ap.add_argument("--autopilot", action="store_true", help="start with the built-in operator driving")
     ap.add_argument("--fast", action="store_true", help="run as fast as possible instead of in real time")
+    ap.add_argument("--command-response", action="store_true", help="levers reach the spools with the measured ZX200 dead time and lag (hydraulics.COMMAND_DEAD)")
     asyncio.run(main_async(ap.parse_args()))
 
 
