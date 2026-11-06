@@ -1483,32 +1483,46 @@ Haul logs: `logs/haul_bench_fill_long_<soil>_1carrier.json` (before) and `logs/h
 - **Clay passes come up light:** 0.81 t against the handbooks' 0.92–1.04 t and 0.93 t before. Loam moved from 5 % over its range to inside it (1.0–1.4 t).
 - **Clay and the face planner.** With the new hydraulics and the old planner, clay fell to 0.71 t a pass and one load took 25 passes. Per-pass traces showed no steady difference in what the bucket held at the start of the swing. The planner kept choosing one strip whose cut took slabs the bucket lost on the way out, at about 0.43 t a pass for some 30 passes. It brought back more than 30 % of a bucket at the start of the swing, so the planner never set it aside. Now, in clay, a pass that carries less than half a bucket to the carrier also sets its strip aside (`POOR_CARRIED`), and in every soil, strips set aside are taken again only when no other strip has a cut worth taking. That brought clay to 0.81 t and the longest load to 16 passes. The half-bucket rule hurt dry sand (1.11 t a pass): what spills on the swing there is no sign of a poor strip, so it applies to clay only. The remaining gap in clay is open.
 
-**Autopilot changes after the bucket calibration.** Two changes for clay, which loaded less with the new hydraulics:
-
-- **The curl gain isn't learned from a slab tear.** The operator learns how much the curl adds and curls that much short of a full bucket. In one 1500 s clay run, one curl lost 842 of 882 kg, and that single sample pulled the learned gain down. It ended at 18 kg, against 357 kg on the old hydraulics. So the bucket was curled only once overfull, and that tore out more slabs (11 against 6). A curl losing more than a quarter of the load (`CURL_TEAR`) is now counted (`curl_tears`) and not learned from. In that run the gain then stayed at 410–430 kg, and clay went from 0.81 to 0.85 t a pass.
-- **A poor strip is set aside at the carrier** (`_rest_if_poor`), not at the next approach. The next pass's strip is planned as the bucket swings back, so a poor strip used to be dug once more before its rest began. A log of the planner over 40 clay passes shows each poor strip set aside at once, and none taken again as a fallback.
+**The approach aimed at the previous strip.** Most thin clay passes came from the strip 20° left: the planner expected 0.8–1.2 m³ there, but its first pass brought out 3–59 kg, with three stages timed out. Neither the cut depth nor the drag was the cause. The pass count goes up only when the approach is reached, so the segment into the approach was planned with the previous pass's strip. The house swung back toward the new strip, turned to the old one for the approach, and then swung across to the new one again while penetrating. From −10° to +20° that is 37° of swing during the cut. The calibrated swing brakes at 0.82 rad/s², so it overshot to +27°, and the bucket stuck on the pit wall. A second pass in the same strip had no swing to make, which is why that strip dug well when chosen again. 'Swing back' and the approach now both aim for the next pass's strip (`_lane_pass`). The traced pass now carries 1.06 t with no stage skipped, and every pass that changes strip skips the detour.
 
 `bench_haul.py` now logs every pass (`pass_log`: strip, most held while digging, at the swing, carried, left after the dump) and stops after `PASSES=N` passes for a quick check.
 
-25-pass check against `main` (one run each, about 600 s; kg per pass, since t/h over 25 passes depends on where each run stops in a load):
+**Two other changes, tried and reverted.** Two other changes were tried for clay:
 
-| | Carried to the carrier | Dumped | Thin passes (under half a bucket at the swing) |
+- **The tear rule.** A curl that lost more than a quarter of the load would not be learned from (`CURL_TEAR`). One curl losing 842 of 882 kg had pulled the learned curl gain down to 18 kg.
+- **Setting a poor strip aside at the carrier** (`_rest_if_poor`) instead of at the next approach.
+
+Both were tested with the approach fix in place: 3 runs of 25 passes per variant. The figures are mean kg dumped per pass, with each run in brackets:
+
+| | Neither change | Both changes | Set-aside change only |
 |---|---|---|---|
-| Dry sand: main / with the changes | 1336 / 1332 kg | 1331 / 1329 kg | 1 / 1 |
-| Loam | 1220 / 1010 kg | 1116 / **906** kg | 3 / 6 |
-| Clay | 1180 / 1107 kg | 1025 / 973 kg | 2 / 3 |
+| Clay | **1041** (1071, 1085, 968) | 940 (1009, 844, 967) | 985 (1037, 969, 949) |
+| Loam | 1165 (1186, 1142, 1166) | 1093 (1103, 1112, 1063) | **1188** (1166, 1227, 1172) |
+| Dry sand | 1326 (1331, 1323, 1325) | 1331 (1338, 1313, 1342) | n/a: neither change acts in sand |
 
-The check doesn't show the changes helping:
+- **The tear rule lowered both cohesive soils:** clay 5 % and loam 8 % below the set-aside change alone. So limiting it to clay would not help either.
+- **The learned gain no longer collapses:** it ended at 136–273 kg in the 9 clay runs.
+- **The set-aside change made no difference** in 25 passes, nor over 1500 s of clay. That is where the deep pit gives repeated thin passes from one strip: 55.5 and 53.0 t loaded with the change, against 52.3 and 58.4 t without it.
 
-- **Loam** dumped 19 % less with them. Two of its curls counted as tears, and its learned gain fell to −69 kg.
-- **Clay** dumped 5 % less, which is within the run-to-run spread.
-- **The collapse they guard against hadn't happened yet** on `main`: clay's learned gain was still 60 kg after 25 passes.
+Both are reverted.
 
-Whether the tear rule suits loam, and whether either change helps over a long shift, needs several runs per soil.
+**The approach fix alone**, against the same autopilot without it:
 
-**Open: the clay strip 20° left.** The planner expects 0.8–1.2 m³ in that strip, but its passes bring out 3–59 kg. When its rest ends it is chosen again, and it fails again. Most thin clay passes come from it.
+- **25 passes:** clay and loam dump about 11 % more per pass (clay 935 → 1041 kg, mean of 4 old runs; loam 1047 → 1165 kg, 3 old runs), and passes are 1.5–2 s shorter.
+- **1500 s, clay (one carrier):** 43.5 → 52.3 and 58.4 t loaded, 0.65 → 0.73 and 0.85 t per pass (`loaded_t` over all passes), 104 → 125 and 140 t/h loaded. Stages skipped fell from 13 to 3 and 8.
+- **1500 s, dry sand:** no change beyond the spread: 70.0 and 62.2 t loaded before, 61.3 and 70.3 t after.
+- **1500 s, loam:** no change beyond the spread either: 69.2 and 70.0 t before, 63.8 and 69.4 t after. Every loam run dug out all the soil within reach before 1500 s.
+- **Other benches:** the trench (passes 1–6: 15.6–18.2 s) and the 130 s zone cycle (7 passes, 10.4 t) don't change strip between passes. `test_env.py` passes.
 
-Logs: `logs/haul_quick25_<main|fix>_<soil>_1carrier.json`.
+**Still open:**
+
+- **Clay still has thin passes once the pit is deep:** 17–26 of about 70 passes in the 1500 s runs. These passes barely fill while digging (160–600 kg at most), unlike the early failures, which filled and then lost the load. Half of them are in the strip 20° left.
+- **Dry sand stalls when a load is full.** When the last pass fills the carrier, the house sometimes stays over it, and the next 6 stages time out, losing about 30 s. This happened once to four times per 1500 s, with or without the fix, and sets most of dry sand's run-to-run spread.
+
+Logs:
+
+- 25-pass runs: `logs/haul_quick25_lane_<base|fix|rest>_<soil>_<n>.json`; the earlier checks are `logs/haul_quick25_<main|fix>_<soil>_1carrier.json`.
+- 1500 s runs: `logs/haul_bench_lane_fix_long[2]_<soil>_1carrier.json`, `logs/haul_bench_lane_old_long2_<soil>_1carrier.json` and `logs/haul_bench_lane_restearly_long<n>_clay_1carrier.json`.
 
 **Limits:**
 - Every value is for 1800 min⁻¹ in eco mode. At full power the pumps deliver more: the spec swing speed is 19 % higher.

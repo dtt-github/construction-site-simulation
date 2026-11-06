@@ -117,7 +117,6 @@ out = {
     "pit_done": sim.pit_done,
     "faces": [(f["psi"], f["shift"]) for f in sim.face_log],
     "curl_gain_kg": round(sim.curl_gain),
-    "curl_tears": sim.curl_tears,
     "mean_carried_kg": round(float(np.mean([x["carried_kg"] for x in done]))) if done else None,
     "mean_dumped_kg": round(float(np.mean([x["carried_kg"] - x["left_kg"] for x in done]))) if done else None,
     "thin_passes": sum(1 for x in done if x["at_swing_kg"] < 0.5 * sim.full_kg),

@@ -811,7 +811,7 @@ class ExcavatorSim:
         self.auto_s = 0.0
         self.passes = 0
         self.skipped = []
-        self.ease, self.seg_from, self.auto_frame, self.auto_fill, self.early_curls, self.curl_tears = 0.0, None, 0, 0.0, 0, 0
+        self.ease, self.seg_from, self.auto_frame, self.auto_fill, self.early_curls = 0.0, None, 0, 0.0, 0
         self.curl_out = None  # curl waypoint replaced for this pass (lifting out of a full cohesive cut)
         self.curl_gain = self.CURL_GAIN_GUESS * self.payload_kg if self.heap_check else 0.0
         self.curl_from = None  # load when this pass's early curl began
@@ -947,23 +947,6 @@ class ExcavatorSim:
             self._faces[p] = self._plan_face(p)
         return self._faces[p]
 
-    def _rest_if_poor(self):
-        """Over the carrier: if little came out of this pass's strip, set it aside. Now, not at the next
-        approach: the next pass's strip is planned as the bucket swings back, so a strip judged later was
-        dug once more before the rest took hold (a clay strip losing its soil in the drag gave three thin
-        passes in a row)."""
-        face = self._faces.get(self.passes) if self.adaptive_face else None
-        carried = self.POOR_CARRIED.get(self.soil)
-        if face is None or (self.pass_fill >= self.POOR_PASS * self.full_kg
-                            and (carried is None or self.pass_carried >= carried * self.full_kg)):
-            return
-        self.face_rest[(face["psi"], face["shift"])] = self.passes + self.POOR_REST
-        for f in self.face_log[-2:]:
-            if f["pass"] == self.passes:
-                f["poor_kg"] = round(self.pass_fill)
-        if self._faces.pop(self.passes + 1, None) is not None:
-            self.face_log = [f for f in self.face_log if f["pass"] != self.passes + 1]  # planned already: again
-
     def _plan_face(self, p):
         z = self.zones
         has = self._pit_cols & (z.count_np > 0)
@@ -1001,13 +984,18 @@ class ExcavatorSim:
         return best
 
     def _stage_r(self, wp_, start=False):
-        """Waypoint reach (m): dig-side stages shift with the current pass's cut, 'swing back' heads for the
-        next pass's (as _stage_psi)."""
-        if self.adaptive_face and wp_[0] in self.LANE_STAGES:
-            return wp_[2] + self._face(self.passes)["shift"]
-        if self.adaptive_face and wp_[0] == "swing back":
-            return wp_[2] + self._face(self.passes + (0 if start else 1))["shift"]
+        """Waypoint reach (m): dig-side stages shift with the current pass's cut, 'swing back' and the approach
+        head for the next pass's (as _stage_psi)."""
+        if self.adaptive_face and (wp_[0] in self.LANE_STAGES or wp_[0] == "swing back"):
+            return wp_[2] + self._face(self._lane_pass(wp_, start))["shift"]
         return wp_[2]
+
+    def _lane_pass(self, wp_, start):
+        """The pass whose lane a waypoint is in. The count goes up as the approach is reached, so until then
+        'swing back' and the approach belong to the next pass: aimed at the current one, the house swung back
+        toward the new strip, then to the last one for the approach, then across to the new one again while
+        penetrating (37 deg from -10 to +20 deg: it overshot to +27 deg and the bucket stuck on the pit wall)."""
+        return self.passes + (1 if wp_[0] == "swing back" or (wp_[0] == "approach" and not start) else 0)
 
     def set_trench(self, deepen=0.25):
         """Auto cycle digs a single lane and goes deeper every pass (a trench), down to the floor."""
@@ -1017,18 +1005,14 @@ class ExcavatorSim:
         self._z_cache = {}
 
     def _stage_psi(self, wp_, start=False):
-        """Waypoint swing angle (deg): dig-side stages shift to the current pass's lane; the final
-        'swing back' stage already heads for the next pass's lane. As the start of the next segment (after
-        the pass count went up) 'swing back' is in the current lane."""
-        if self.adaptive_face and wp_[0] in self.LANE_STAGES:
-            return wp_[1] + self._face(self.passes)["psi"]
-        if self.adaptive_face and wp_[0] == "swing back":
-            return wp_[1] + self._face(self.passes + (0 if start else 1))["psi"]
-        if wp_[0] in self.LANE_STAGES:
-            return wp_[1] + self.LANES[self.passes % len(self.LANES)]
-        if wp_[0] == "swing back":
-            return wp_[1] + self.LANES[(self.passes + (0 if start else 1)) % len(self.LANES)]
-        return wp_[1]
+        """Waypoint swing angle (deg): dig-side stages shift to the current pass's lane; 'swing back' and the
+        approach into the next pass already head for the next pass's lane (_lane_pass)."""
+        if wp_[0] not in self.LANE_STAGES and wp_[0] != "swing back":
+            return wp_[1]
+        p = self._lane_pass(wp_, start)
+        if self.adaptive_face:
+            return wp_[1] + self._face(p)["psi"]
+        return wp_[1] + self.LANES[p % len(self.LANES)]
 
     def _waypoint_q(self, wp_, start=False):
         r, phi = self._stage_r(wp_, start), wp_[4]
@@ -1154,7 +1138,6 @@ class ExcavatorSim:
         return lever
 
     CURL_GAIN_GUESS = 0.3  # of the payload a cohesive load gains (< 0: loses) curling out, until measured
-    CURL_TEAR = 0.25  # a curl losing more than this fraction of the load tore out a slab: not learned from
     SHAKE_IF = 0.25  # fraction of a full bucket still in it after the dump that makes the operator shake it out
     SHAKE_S, SHAKE_PERIOD = 2.5, 0.32  # most time spent shaking; one rap: dump to the stop, then a short curl back
 
@@ -1322,21 +1305,14 @@ class ExcavatorSim:
             return
         if timed_out or (self.auto_s >= 1.0 and np.max(np.abs(q_end - self.q)) < tol):
             if b[0] == "curl" and self.curl_from is not None:
-                # learn how much the curl adds (< 0: the heap fell off), to curl that much short next time. Not
-                # from a curl that tore out a slab: one losing most of a clay load set the gain so low that the
-                # bucket was curled only once overfull, which tore out more slabs
-                gain = self._bucket_fill() - self.curl_from
-                if gain > -self.CURL_TEAR * self.curl_from:
-                    self.curl_gain += 0.5 * (gain - self.curl_gain)
-                else:
-                    self.curl_tears += 1
+                # learn how much the curl adds (< 0: the heap fell off), to curl that much short next time
+                self.curl_gain += 0.5 * (self._bucket_fill() - self.curl_from - self.curl_gain)
             if b[0] == "dump" and self._bucket_fill() > self.SHAKE_IF * self.full_kg:
                 self.shaking = 0.0  # sticky load still in the bucket: shake it out before swinging back
                 self.shakes += 1
                 return
             if b[0] == "swing to truck":
                 self.pass_carried = self._bucket_fill()  # what this pass brings to the carrier
-                self._rest_if_poor()
             if b[0] == "dump":
                 self._after_dump()
             self.auto_stage = (self.auto_stage + 1) % n
@@ -1345,6 +1321,14 @@ class ExcavatorSim:
             self.seg_from = None
             self.low_prev, self.low_rate = None, 0.0
             if self.auto_stage == 0:
+                face = self._faces.get(self.passes) if self.adaptive_face else None
+                carried = self.POOR_CARRIED.get(self.soil)
+                if face is not None and (self.pass_fill < self.POOR_PASS * self.full_kg
+                                         or carried is not None and self.pass_carried < carried * self.full_kg):
+                    self.face_rest[(face["psi"], face["shift"])] = self.passes + self.POOR_REST  # little came out of it
+                    for f in self.face_log[-2:]:
+                        if f["pass"] == self.passes:
+                            f["poor_kg"] = round(self.pass_fill)
                 self.pass_fill, self.pass_carried = 0.0, 0.0
                 self.passes += 1
                 self.ease = 0.0
@@ -1872,7 +1856,6 @@ class ExcavatorSim:
             "active": self.zones.n_active,
             "ease_m": round(self.ease, 2),
             "early_curls": self.early_curls,
-            "curl_tears": self.curl_tears,
             "payload_kg": round(self.payload_kg),
             "curl_gain_kg": round(self.curl_gain),
             "zone": dict(self.zones.counters),
