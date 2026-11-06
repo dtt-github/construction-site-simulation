@@ -1587,3 +1587,35 @@ Stage timeouts broke it after about 30 s.
 - `test_env.py` passes.
 
 Logs: `logs/haul_bench_lift_long<n>_<soil>_1carrier.json`.
+
+## Spill at the loading spot: aiming the dump where the soil lands
+
+In 12 minutes, 10–13 t of soil piled up on the ground around the parked carrier. A tally of the ground beside the vessel, by side, showed where it came from. In loam and clay it was almost all over the vessel's far side, with a heap up to 3.5 m high. The dump put the pin over the middle of the vessel. But the soil pours out between the pin and the cutting edge, which at the dump pose reaches 1.15 m beyond the pin, right at the far wall. Each load landed about 0.6 m past the middle and its heap slid over.
+
+A fixed inset of 0.6 m (the pin stops that much short) fixed loam and clay. It sent dry sand over the near side instead (15 t), because sand runs out as soon as the bucket opens. Where a load lands depends on the soil, so **the dump now aims from where the previous passes landed.** Once the bucket has swung back out, the vessel's surface is compared with the one before the pass. The dump then moves in or out by half the distance, along the arm, between where that pass landed and its spot (`INSET_GAIN`), within 0–1 m. An operator does the same. Read while the bucket is still over the vessel, the surface also counts the soil in the bucket, and the aim drifted the wrong way.
+
+**Ground spill gained beside the parked carrier, t = 60 s to 720 s (t):**
+
+| | Far side | Near (pit) side | Swing-in side | Under the carrier | Aim learnt |
+|---|---|---|---|---|---|
+| Loam, before | 6.6 | 0.0 | 1.0 | 1.3 | |
+| **Loam, after** | **0.8** | 1.1 | 0.5 | 1.1 | 0.55–0.92 m |
+| Clay, before | 9.9 | 0.3 | 1.6 | 0.8 | |
+| **Clay, after** | **0.9** | 1.1 | 2.3 | 0.4 | 0.40–0.93 m |
+| Dry sand, before | 2.9 | 2.8 | 5.1 | 1.8 | |
+| Dry sand, fixed 0.6 m | 0.8 | 15.0 | 1.8 | 3.7 | |
+| Dry sand, after | 3.0 | 4.2 | 5.4 | 2.0 | 0–0.28 m |
+
+**1500 s, one carrier, against the runs above (`logs/haul_bench_lift_long<n>_<soil>_1carrier.json`):**
+
+| | Loaded | t per pass | Stages skipped | Loaded t/h |
+|---|---|---|---|---|
+| Clay, before → after | 68.5 → **81.6 t** | 1.04 → 1.32 | 0 → 0 | 165 → **196** |
+| Loam, before → after | 69.2 → **77.5 t** | 1.26 → 1.55 | 0 → 0 | 166 → **186** |
+| Dry sand, before → after | 73.3 → 73.3 t | 1.09 → 1.11 | 3 → 1 | 176 → 176 |
+
+- **Loam and clay spill 90% less over the far side, and load 12–19% more.** They dump the same bucketfuls as before (1.0–1.2 t per pass), so the gain is soil that stays in the carrier. Loaded per pass (1.3–1.6 t) is now above dumped per pass; how the bench splits a carrier's load between passes is not yet checked. Clay and loam now both dig out all the soil within reach before 1500 s.
+- **Dry sand** settles on the old aim, and its numbers are unchanged. Its spill does not come from where the dump lands: most of it is on the swing-in side and the near side, where sand runs off the bucket on the way over. That is the next fix.
+- `test_env.py` passes.
+
+Logs: `logs/haul_bench_aim_long1_<soil>_1carrier.json`; with the fixed inset, `logs/haul_bench_inset_long1_<soil>_1carrier.json`.

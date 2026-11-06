@@ -806,6 +806,7 @@ class ExcavatorSim:
         self.zones.set_region_floor("truck", self.truck_floor)
         self.dispatch_pending, self.truck_wait = False, 0.0
         self.pass_kg, self.truck_mark = 0.0, 0.0
+        self.dump_inset, self.vessel_before = self.DUMP_INSET[0], None
         self.was_waiting = False
         self.auto_stage = 0
         self.auto_s = 0.0
@@ -1158,19 +1159,52 @@ class ExcavatorSim:
         self.auto_frame += 1
 
     DUMP_SPOTS = (0.9, -0.9, 0.0)  # m along the vessel (+ toward the cab): passes spread the load, front first
+    # m the pin stays short of the spot, learnt from where each pass lands: the soil pours out between the pin
+    # and the cutting edge, which at the dump pose reaches 1.15 m beyond it, and where along that depends on the
+    # soil. Aimed with the pin over the spot, loam and clay landed 0.6 m toward the vessel's far side and their heap
+    # slid over it (7-10 t on the ground there in 12 min); a fixed 0.6 m sent dry sand, which runs out as soon as
+    # the bucket opens, over the near side instead (15 t)
+    DUMP_INSET = (0.3, 0.0, 1.0)  # start, least, most
+    INSET_GAIN = 0.5  # of the miss along the arm each pass corrects
 
     def _dump_waypoint(self, w):
         """Swing and pin radius over this pass's spot in the vessel (the CYCLE entry aims at its middle)."""
         dx = self.DUMP_SPOTS[self.passes % len(self.DUMP_SPOTS)]
         x, y = BED_CENTER[0] + dx - SWING_POS[0], BED_CENTER[1] - SWING_POS[1]
         psi = math.degrees(math.atan2(-y, -x))  # the arm points along (-cos psi, -sin psi)
-        r = math.hypot(x, y) + w[2] - math.hypot(BED_CENTER[0] - SWING_POS[0], BED_CENTER[1] - SWING_POS[1])
+        r = math.hypot(x, y) + w[2] - math.hypot(BED_CENTER[0] - SWING_POS[0], BED_CENTER[1] - SWING_POS[1]) - self.dump_inset
         if w[0] == "swing to truck" and not self.heap_check:
             # free-flowing soil: the bucket stays fully curled (as at the end of "curl") until over the carrier,
             # as operators keep it: opened even 15 deg on the way, dry sand runs out of the mouth (a third of
             # the load). Cohesive soil does not run out, and packed into a fully curled bucket it sticks there
             return (w[0], psi, r, w[3], self.CYCLE[4][4], *w[5:])
         return (w[0], psi, r, *w[3:])
+
+    def _vessel_surface(self):
+        """The load's surface in the carrier at the loading spot (TRUCK_NY x TRUCK_NX), or None."""
+        spot = self.fleet.at_spot
+        if spot is None or self._load_owner() is not spot:
+            return None
+        return self.truck_hm_np.reshape(TRUCK_NY, TRUCK_NX).copy()
+
+    def _aim_dump(self):
+        """Move the dump in or out by part of how far this pass landed from its spot, along the arm. Read with
+        the bucket swung back out: over the vessel, the soil still in it shows in the vessel's surface too"""
+        self.measure()
+        now, before, self.vessel_before = self._vessel_surface(), self.vessel_before, self._vessel_surface()
+        if now is None or before is None:
+            return
+        d = np.clip(now - before, 0.0, None)
+        if d.sum() * TRUCK_CELL ** 2 < 0.1:  # m3: too little landed to tell where
+            return
+        xs = BED_LO[0] + (np.arange(TRUCK_NX) + 0.5) * TRUCK_CELL - SWING_POS[0]
+        ys = BED_LO[1] + (np.arange(TRUCK_NY) + 0.5) * TRUCK_CELL - SWING_POS[1]
+        sx = BED_CENTER[0] + self.DUMP_SPOTS[self.passes % len(self.DUMP_SPOTS)] - SWING_POS[0]
+        sy = BED_CENTER[1] - SWING_POS[1]
+        r = np.hypot(xs[None, :], ys[:, None])
+        miss = float((d * r).sum() / d.sum()) - math.hypot(sx, sy)
+        lo, hi = self.DUMP_INSET[1:]
+        self.dump_inset = min(max(self.dump_inset + self.INSET_GAIN * miss, lo), hi)
 
     def _after_dump(self):
         """A pass is in the carrier: if the next would not fit, send it off (it leaves once the bucket is clear)."""
@@ -1328,6 +1362,8 @@ class ExcavatorSim:
                 self.pass_carried = self._bucket_fill()  # what this pass brings to the carrier
             if b[0] == "dump":
                 self._after_dump()
+            if b[0] == "swing back":
+                self._aim_dump()
             self.auto_stage = (self.auto_stage + 1) % n
             self.auto_s = 0.0
             self.stage_time = 0.0
