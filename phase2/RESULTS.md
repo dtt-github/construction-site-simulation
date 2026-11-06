@@ -1531,3 +1531,31 @@ Logs:
 - The real swing's pressure falls as the house speeds up, while its acceleration stays nearly constant. The model accelerates at the relief torque. This doesn't affect the times above but would show in the pressures.
 - Nothing here checks digging forces: the tests are in free air.
 - The bucket flows rest on reading PWRI's bucket angle as ours + 0.622 rad, which PWRI hasn't confirmed. If the reading is wrong, the four-bar's geometry is wrong instead, and so is the bucket's digging force.
+
+## Clay's thin passes: easing back down after a stall
+
+The autopilot raises the dig path while the arm or bucket is stalled at relief (`EASE_RATE`, up to `EASE_MAX`). Until now the raise held for the rest of the pass. Instrumented clay runs showed what that did once the pit was deep. The teeth go in about 8.2–8.3 m from the swing axis, and there a 0.8–1.1 m bank of clay often still stands. The bucket stalled in the bank on the way in, the path rose, and the whole drag then ran 0.2–0.6 m above the strip it was meant to cut. Those passes came back with 0–124 kg.
+
+**The change:** once the pressure on both cylinders is back below 60 % of relief (`EASE_SETTLE`), the raised path settles back toward the planned cut at the same rate it rose.
+
+**1500 s, one carrier, against the same autopilot without the change (`logs/haul_bench_lane_fix_long[2]_<soil>_1carrier.json`):**
+
+| | Loaded | Passes | t per pass | Mean dumped | Thin passes | Loaded t/h |
+|---|---|---|---|---|---|---|
+| Clay, before | 52.3, 58.4 t | 72, 69 | 0.73, 0.85 | 767, 811 kg | 24, 18 | 125, 140 |
+| **Clay, after** | **62.6, 62.7 t** | 65, 67 | **0.96, 0.94** | 930, 994 kg | **6, 7** | **150, 150** |
+| Dry sand, before | 61.3, 70.4 t | 64, 68 | 0.96, 1.03 | 1114, 1026 kg | 3, 10 | |
+| Dry sand, after | 70.1 t | 64 | 1.09 | 1077 kg | 8 | 168 |
+| Loam, before | 63.8, 69.4 t | 49, 58 | 1.30, 1.20 | 1148, 1070 kg | 3, 7 | |
+| Loam, after | 68.2 t | 53 | 1.29 | 1138 kg | 5 | 164 |
+
+- **Clay now loads 0.94–0.96 t per pass,** inside the 0.92–1.04 t the handbooks give for this bucket in clay (*Bucket fill*, above). Thin passes fell from 18–24 to 6–7, and the two runs agree within 0.1 t.
+- **Dry sand and loam** are within their run-to-run spread. Loam again dug out all the soil within reach before 1500 s.
+- `test_env.py` passes.
+
+**Two other changes, tried and reverted:**
+
+- **Judging each strip out to where the teeth go in** (8.3 m instead of 7.4 m): clay 0.50–0.53 t per pass, loam 0.88. The far bank raised each strip's planned surface, so cuts were planned too high (`logs/haul_bench_reach_long<n>_<soil>_1carrier.json`).
+- **Skipping strips where the bucket's full width would touch a pit wall** (only the strip 20° left): clay 0.57 and 0.71 t per pass, loam 1.26. No gain (`logs/haul_bench_wall_long<n>_<soil>_1carrier.json`).
+
+Logs: `logs/haul_bench_settle_long<n>_<soil>_1carrier.json`.

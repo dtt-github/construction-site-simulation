@@ -1022,6 +1022,7 @@ class ExcavatorSim:
     # curl as soon as the bucket is full instead of finishing the planned drag
     EASE_PRESSURE = 0.9  # fraction of relief on the arm or bucket cylinder that counts as stalling
     EASE_RATE, EASE_MAX = 0.4, 0.8  # m/s the dig path rises while stalled; most it rises in one pass
+    EASE_SETTLE = 0.6  # fraction of relief below which an eased path settles back at EASE_RATE
     HEAP_STANDS_M = 1.2  # m: critical cut height above which a heap stands on the bucket as it lifts out
     CURL_OUT = (0.2, 1.0)  # m the pin moves in and up while curling out of a full cut in cohesive soil
 
@@ -1282,6 +1283,10 @@ class ExcavatorSim:
         # stalled in the cut (arm or bucket at relief and falling behind): raise the dig path
         if digging and max(self.press[2], self.press[3]) >= self.EASE_PRESSURE * self.relief and np.max(np.abs(err)) > 0.05:
             self.ease = min(self.ease + self.EASE_RATE * self.frame_dt, self.EASE_MAX)
+        # through it (pressure well off relief): back down to the planned cut. Kept up, a clay bank met as the teeth
+        # went in lifted the whole drag 0.2-0.6 m over the strip it was meant to cut (0-124 kg in the bucket)
+        elif digging and self.ease > 0.0 and max(self.press[2], self.press[3]) < self.EASE_SETTLE * self.relief:
+            self.ease = max(self.ease - self.EASE_RATE * self.frame_dt, 0.0)
         # advance along the segment at the pace the slowest joint allows, but only if tracking is good
         if held:  # waiting for the house to swing clear is not a stall
             self.arm_held += self.frame_dt
