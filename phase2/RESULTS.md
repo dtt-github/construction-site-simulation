@@ -1523,6 +1523,7 @@ Logs:
 
 - 25-pass runs: `logs/haul_quick25_lane_<base|fix|rest>_<soil>_<n>.json`; the earlier checks are `logs/haul_quick25_<main|fix>_<soil>_1carrier.json`.
 - 1500 s runs: `logs/haul_bench_lane_fix_long[2]_<soil>_1carrier.json`, `logs/haul_bench_lane_old_long2_<soil>_1carrier.json` and `logs/haul_bench_lane_restearly_long<n>_clay_1carrier.json`.
+- 1500 s runs before the bucket calibration: `logs/haul_bench_pwri_face_long_<soil>_1carrier.json`, with the half-bucket rule in every soil; `logs/haul_bench_pwri_tear_long_<loam|clay>_1carrier.json`, with the tear guard; `logs/haul_bench_pwri_rest_long_clay_1carrier.json`, which adds the earlier set-aside.
 
 **Limits:**
 - Every value is for 1800 min⁻¹ in eco mode. At full power the pumps deliver more: the spec swing speed is 19 % higher.
