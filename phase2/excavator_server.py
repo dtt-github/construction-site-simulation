@@ -1258,7 +1258,15 @@ class ExcavatorSim:
             self.low_rate += 0.3 * ((low - self.low_prev) / self.frame_dt - self.low_rate) if self.low_prev is not None else 0.0
             self.low_prev = low
             psi_now = self._sweep(math.copysign(1.0, self.qd[0]) if abs(self.qd[0]) > 0.05 else 0.0)
-            if s < 1.0:
+            m_here = float(self._clearance(local, self.q[0]).min()) if b[0] == "swing back" else 0.0
+            if s < 1.0 and m_here < 0.0 and b[0] == "swing back":
+                # the bucket starts below what it must clear (after the pass that fills the carrier, it sits in
+                # the heap it has just dumped): lift it straight up first. Swung out at that height, it was held
+                # in the sand, and the full carrier, which leaves only once the house swings away, with it (~30 s)
+                pin = self._pin_pose()
+                q_goal = ik(self.q[0], pin[1], pin[2] - m_here + self.ARM_MARGIN, math.radians(pin[3]))
+                held = True
+            elif s < 1.0:
                 m_now = float(self._clearance(local, psi_now).min())
                 m_next = float(self._clearance(self._bucket_local(pose(min(1.0, s + self.frame_dt / seg_time))), psi_now).min())
                 held = m_next < self.ARM_MARGIN and m_next < m_now

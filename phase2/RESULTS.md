@@ -1559,3 +1559,31 @@ The autopilot raises the dig path while the arm or bucket is stalled at relief (
 - **Skipping strips where the bucket's full width would touch a pit wall** (only the strip 20° left): clay 0.57 and 0.71 t per pass, loam 1.26. No gain (`logs/haul_bench_wall_long<n>_<soil>_1carrier.json`).
 
 Logs: `logs/haul_bench_settle_long<n>_<soil>_1carrier.json`.
+
+## The stall after the pass that fills the carrier
+
+In dry sand the excavator lost about 30 s at one to four full loads in every 1500 s run: the swing back and the next five stages timed out one after another. An instrumented run showed a deadlock:
+
+- **The house would not swing.** After the dump that fills the carrier, the bucket hangs about 4.2 m up, inside the heap it has just dumped. The carrier's heap, estimated from its mass, plus its margin asks for up to 4.9 m, so the swing is held. Swung anyway, the bucket stays held in the sand: the swing lever went fully on and the house did not move.
+- **The carrier would not leave.** A full carrier is sent off only once the house has swung past −70°, and the house was at −91° to −100°.
+
+Stage timeouts broke it after about 30 s.
+
+**The change:** at the start of the swing back, a bucket below what it must clear first lifts straight up until it is `ARM_MARGIN` above it, then swings as before. An operator does the same. Letting the house swing out at the bucket's height instead was tried first; it changed nothing (dry sand 19 and 28 stages skipped, clay 36, in `logs/haul_bench_unstall_long<n>_<soil>_1carrier.json`).
+
+**1500 s, one carrier, against the runs with the clay fix above (`logs/haul_bench_settle_long<n>_<soil>_1carrier.json`):**
+
+| | Loaded | t per pass | Stages skipped | Loaded t/h |
+|---|---|---|---|---|
+| Dry sand, before | 70.1 t (61.3–70.4 in earlier runs) | 1.09 | 14 | 168 |
+| **Dry sand, after** | **73.3, 73.5 t** | 1.09, 1.10 | **3, 0** | **176** |
+| Clay, before | 62.6, 62.7 t | 0.96, 0.94 | 10, 9 | 150 |
+| Clay, after | 68.5 t | 1.04 | 0 | 165 |
+| Loam, before | 68.2 t | 1.29 | 0 | 164 |
+| Loam, after | 69.2 t | 1.26 | 0 | 166 |
+
+- **Dry sand no longer stalls at a full load.** The two runs agree within 0.3 t, against a spread of 9 t before. The three stages still skipped in one run are single timeouts at the carrier, not the chain of six.
+- **Clay** gained too: its full loads had the same stall, less often. Loam dug out all the soil within reach before 1500 s, as before.
+- `test_env.py` passes.
+
+Logs: `logs/haul_bench_lift_long<n>_<soil>_1carrier.json`.
