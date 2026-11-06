@@ -2,11 +2,17 @@
 dumps it and comes back, for N simulated seconds. Reports what a site engineer would look at: loads, load
 mass, passes per load, loading time, the carrier's time away and its stages, the excavator's waiting time,
 and tonnes per hour delivered; the dozer's passes, blade forces and how flat it left the spread layer, and
-how long the carrier waited for it; plus the real-time factor.
+how long the carrier waited for it; plus the real-time factor. Each pass is logged too (`pass_log`): its strip,
+the most the bucket held while digging, what it held at the swing, what it carried to the carrier and what it
+left after the dump, so one run shows where a soil's loads go.
+
+A quick check stops after a number of passes instead (PASSES=25 is about 500 s): enough to compare two
+versions of the autopilot pass by pass, in a quarter of the time. Progress goes to stderr every 100 s.
 
     ../phase0/.venv-newton/bin/python bench_haul.py 600                 # dry sand
     SOIL=loam ../phase0/.venv-newton/bin/python bench_haul.py 600
     SOIL=loam CARRIERS=2 ../phase0/.venv-newton/bin/python bench_haul.py 600   # two carriers sharing the road
+    SOIL=clay PASSES=25 ../phase0/.venv-newton/bin/python bench_haul.py 1500   # quick check: the first 25 passes
 """
 
 import json
@@ -21,6 +27,7 @@ import excavator_server as ex
 secs = float(sys.argv[1]) if len(sys.argv) > 1 else 600.0
 soil = os.environ.get("SOIL", ex.soils.DEFAULT_SOIL)
 n_carriers = int(os.environ.get("CARRIERS", "1"))
+max_passes = int(os.environ.get("PASSES", "0")) or None
 sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers)
 sim.auto = True
 fleet = sim.fleet
@@ -28,8 +35,36 @@ loads, start_load, passes_at = [], {}, {}
 t0 = time.perf_counter()
 prev = {c.index: c.stage for c in fleet}
 idle_spot = 0.0
-while sim.sim_time < secs:
+pass_log, cur, prev_stage, next_report = [], None, None, 100.0
+DIG = ("penetrate", "drag", "drag-curl", "curl")
+while sim.sim_time < secs and (max_passes is None or sim.passes < max_passes):
     sim.step()
+    if sim.stage_name != prev_stage:
+        st, fill = sim.stage_name, round(sim._bucket_fill())
+        if st == "approach" and cur is not None:
+            pass_log.append(cur)
+            cur = None
+        if cur is None:
+            n = sim.passes + (st == "approach")  # the count goes up as the approach ends
+            f = sim._faces.get(n) if sim.adaptive_face else None
+            cur = {"pass": n, "t": round(sim.sim_time, 1), "face": None if f is None else [f["psi"], f["shift"], round(f["avail_m3"], 2)],
+                   "dig_max_kg": 0, "early_curl": False, "skips": len(sim.skipped)}
+        if prev_stage in DIG:
+            cur["dig_max_kg"] = max(cur["dig_max_kg"], fill)
+        if st == "curl" and prev_stage not in ("drag-curl", "curl"):
+            cur["early_curl"] = True  # curled before the planned curl point (the load was there)
+        if st == "swing to truck":
+            cur["at_swing_kg"] = fill
+        elif st == "dump":
+            cur["carried_kg"] = fill
+        elif st == "swing back":
+            cur["left_kg"] = fill
+        prev_stage = st
+    if cur is not None and prev_stage in DIG:
+        cur["dig_max_kg"] = max(cur["dig_max_kg"], round(sim.auto_fill))
+    if sim.sim_time >= next_report:
+        print(f"{sim.sim_time:.0f} s: {sim.passes} passes, {sum(x['load_kg'] for x in loads) / 1000:.1f} t in {len(loads)} loads", file=sys.stderr, flush=True)
+        next_report += 100.0
     if fleet.at_spot is None:
         idle_spot += sim.frame_dt  # no carrier at the loading spot
     for c in fleet:
@@ -42,12 +77,19 @@ while sim.sim_time < secs:
             prev[c.index] = c.stage
 wall = time.perf_counter() - t0
 sim.measure()
+if cur is not None and "left_kg" in cur:
+    pass_log.append(cur)
+for x, nxt in zip(pass_log, pass_log[1:] + [{"skips": len(sim.skipped)}]):
+    x["skips"] = nxt["skips"] - x["skips"]  # stages skipped in this pass
+secs = sim.sim_time  # a quick check stops early
+done = [x for x in pass_log if "carried_kg" in x]
 trips = fleet.trips
 delivered_t = fleet.delivered_kg / 1000.0
 out = {
     "soil": soil,
     "carriers": n_carriers,
-    "sim_s": secs,
+    "sim_s": round(secs, 1),
+    "stopped_after_passes": max_passes,
     "realtime_factor": round(secs / wall, 3),
     "loads": loads,
     "trips": trips,
@@ -74,6 +116,11 @@ out = {
     "pit_left_t": round(float((sim.zones.count_np * sim._pit_cols).sum()) * sim.particle_mass / 1000, 1),
     "pit_done": sim.pit_done,
     "faces": [(f["psi"], f["shift"]) for f in sim.face_log],
+    "curl_gain_kg": round(sim.curl_gain),
+    "mean_carried_kg": round(float(np.mean([x["carried_kg"] for x in done]))) if done else None,
+    "mean_dumped_kg": round(float(np.mean([x["carried_kg"] - x["left_kg"] for x in done]))) if done else None,
+    "thin_passes": sum(1 for x in done if x["at_swing_kg"] < 0.5 * sim.full_kg),
+    "pass_log": pass_log,
     "dozer": {**{k: round(v, 2) for k, v in sim.dozer.counters.items()}, "mean_push_kN": sim.dozer.push_force},
     "spread": sim.dozer.spread_report(sim._surface),
 }

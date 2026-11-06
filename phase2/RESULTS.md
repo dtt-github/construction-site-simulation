@@ -1242,7 +1242,7 @@ Part 4 put the late slowdown down to the pit being dug out. That was wrong: at t
 **The fix:** before each pass the operator looks at the pit and chooses where to cut (`_plan_face`).
 - **The choice:** seven swing directions (+20° to −40°, negative toward the truck side) along the standard dig path (cutting edge 4.4–7.4 m from the swing axis), each a bucket-width strip.
 - **The score:** the soil the cut can take. The cut goes 0.42 m into the strip but stays 0.08 m above the highest hard floor under it, which matters on the sloped sides.
-- **Learning from poor passes:** a strip whose pass brings back less than 30 % of a full bucket is set aside for 12 passes.
+- **Learning from poor passes:** a strip whose pass brings back less than 30 % of a full bucket is set aside for 12 passes. (Since the PWRI calibration, also, in clay, one that carries less than half a bucket to the carrier; set-aside strips come back when no other has a cut worth taking.)
 - **Finishing:** when no strip's cut holds 0.3 m³, the excavation is finished within reach. The operator stops and sends the carrier off.
 
 **What did not work, found with per-pass logs:**
@@ -1397,3 +1397,137 @@ With bulking in, the autopilot's bucket came up only 65–70 % full by volume in
 - **Loam runs heavy:** its lumps compact in the bucket, and it overshoots the preset target (1.24 t) by about 18 %.
 - **Delivered tonnes are not comparable with earlier runs:** they now follow from realistic loose volumes, so loose soil fills the carrier sooner (clay: 10–12 passes per load instead of 9–10 before bulking).
 
+
+## Calibration against PWRI's ZX200 step tests
+
+PWRI (the OPERA team) recorded single-joint velocity steps on a real ZX200 under its automation controller: free air, empty bucket, 1800 min⁻¹, eco mode. The model parameters below were identified from those measurements (Abe, Matsusaka, Endo, Yamauchi, Hashimoto, "Dynamics Model of an Excavator in an Open Source Physical Simulator for Developing Autonomous Construction", ISARC 2025, [doi:10.22260/ISARC2025/0054](https://doi.org/10.22260/ISARC2025/0054)). The recordings themselves are PWRI's and are not published here.
+
+The joint angles and speeds are the reliable part of the recordings. The pressure channels are not verified yet, so the parameters that rest on them are marked provisional.
+
+**Method.** The simulator ran each recorded step from the same start pose, in free air. A full-command step is full lever; a ±0.3 rad/s step opens the lever to the share of the model's speed at that pose. Each joint and direction was compared on steady speed, delay to 10 % of it, and for the swing, acceleration, braking, the time to 90° and the stopping angle.
+
+**What changed** (`hydraulics.py`, `excavator_server.py`):
+
+| | Before | Now | Source |
+|---|---|---|---|
+| Swing speed at full lever | 1.39 rad/s (13.3 min⁻¹ spec, full power) | 1.17 rad/s | joint speed |
+| Swing relief | 30.4 MPa (brochure) | 34.3 MPa, so 77.9 kN·m at 2.27 L/rad | peak motor pressure, accelerating and braking (**provisional**) |
+| Swing friction | none | 16 kN·m (Coulomb) | the house speeds up more slowly than it brakes |
+| House inertia about the swing axis | about 60 t·m² in total, boom raised and arm in (mesh shells) | about 112 t·m² (house Izz +52.8 t·m²) | acceleration and braking at that torque (**provisional**, scales with the relief) |
+| Boom flow, raise / lower | 388 / 388 L/min | 375 / 270 L/min | joint speed per direction |
+| Arm flow, crowd / out | 388 / 388 L/min | 495 / 265 L/min (crowd regenerates rod oil, so it exceeds the pumps) | joint speed per direction |
+| Bucket flow, curl / dump | 194 / 194 L/min | 332 / 315 L/min | joint speed per direction, with PWRI's bucket angle read as ours + 0.622 rad (**provisional**, see below) |
+| Moment-arm floor for speed commands | a hard 5 cm floor: joint speed jumps where dL/dq crosses it | eases onto 5 cm, (J⁴ + J_min⁴)^¼: no kink, within 1.5 % of J above 10 cm | boom and bucket near their stroke ends |
+| Command response | none | optional: dead time 0.30 s swing (+0.30 s from rest), 0.42 / 0.62 s boom up / down, 0.55 / 0.45 s arm crowd / out, 0.33 s bucket; 0.15 s lag | delay to 10 % speed |
+| Port relief | 39.2 MPa | unchanged | the boom's head side spikes to the 41 MPa sensor limit for about 0.05 s when a lowering boom stops: overshoot, not a setting |
+
+The auto operator plans swing stops with friction included: the house brakes at (relief torque + friction) / inertia. It measures the inertia online from relief torque less friction while speeding up.
+
+The command response is off by default (`ExcavatorSim(command_response=True)`, `ros_server.py --command-response`). The dead time is mostly PWRI's controller and the pilot circuit, so it belongs with velocity commands, not with the browser's levers.
+
+**Result.** The simulator ran PWRI's steps with the command response on (`command_response=True`), and its response was compared with what was measured:
+
+| Full-command step | Speed, model now | Speed, before | Delay to 10 %, now (before: about 0) |
+|---|---|---|---|
+| Swing | 1.17 rad/s, within 0.5 % | +19 % | within 0.05 s |
+| Boom up | within 1 % | +13 % | within 0.04 s |
+| Boom down | within 4 % | +43 % | within 0.03 s |
+| Arm crowd | within 1 % | −17 % | within 0.03 s |
+| Arm out | within 1 % | +46 % | within 0.03 s |
+| Bucket curl / dump | within 1 % / within 1 % (**provisional** angle reading) | −31 % / −6 % (angle read as ours, 194 L/min) | within 0.03 s |
+
+Swing details, model now against measured: acceleration within 4 %, braking within 3 %, 90° from the command 0.13 s sooner, stopping angle 4° longer. Before, the house accelerated twice as hard, braked 1.4 times as hard, and reached 90° 1.4 s sooner.
+
+**The bucket: its angle and its moment arm (provisional).** In PWRI's ±0.3 rad/s bucket steps the pilot pressure stays constant over the whole sweep, so the valve opening and the flow are fixed. The bucket's speed then changes with angle only through the four-bar's moment arm dL/dq, and curl and dump give the same curve. With PWRI's bucket angle read as our URDF angle, the model can't follow that curve. Toward curl the machine's moment arm falls to 46 % of its peak at 1.92 rad; the model's falls to 8 %, close to toggle.
+
+- **Read as ours + 0.622 rad,** the model's own geometry follows the curve to about 10 % rms over 0.1–1.9 rad. Fitting the offset to the curve alone gives 0.585–0.625 rad. The lowest bucket angle in every PWRI run (0.007) then falls on the URDF's dump limit (−0.622).
+- **Moving pins instead** would put the bucket's link pin 0.31 m off its boss in the mesh, and the digging force would drop to about 120 kN against the published 151–158 kN.
+
+So the geometry stays, and the comparison reads PWRI's bucket angle as ours + 0.622 rad (`hydraulics.PWRI_BUCKET_OFFSET`). PWRI hasn't confirmed this convention yet. One check disagrees: in free air the bucket cylinder's force (from the unverified pressure channels) changes sign at about 1.15 rad of PWRI's angle, while the URDF bucket's centre of mass passes under its pin at 0.98 rad of ours (1.6 rad of theirs). The URDF masses aren't verified either.
+
+With that reading, the bucket takes 332 L/min to curl and 315 L/min to dump. Both are well above PWRI's bucket flow channels (about 230 and 215 L/min, indicative), so through the measured range the model's moment arm may be about a quarter too long. Full-command steps against the machine:
+
+| | Curl | Dump |
+|---|---|---|
+| Speed over the last 40 % of the step | −0.6 % | +0.6 % |
+| Peak speed | +6 % | +18 % |
+| Travel during the step | −2 % | +15 % |
+| Delay to 10 % | within 0.03 s | within 0.03 s |
+
+The model's dump reaches speed sooner than the machine's and peaks higher, so it travels further in the 1.2 s step. The ±0.3 rad/s bucket steps aren't compared: there the real controller holds the speed, which the open-loop lever can't reproduce. Boom, arm and swing came out as before. The house inertia in the swing test changed by about 2 % because the bucket now starts more open.
+
+Benchmarks after the bucket change (default settings), against the "Now" column below:
+- Trench (`bench_trench.py 8`), passes 1–6: 15.7–22.2 s, mean 17.7 s, unchanged. Pass 5 timed out one stage.
+- 130 s cycle (`bench_zone.py 130`): 7 passes, 7.6 t (7.8 t before), within the spread between runs.
+- `test_env.py` passes.
+- 1500 s haul benches (one carrier; before → now): dry sand 20.6 → 20.3 s per pass, 1.27 → 1.55 t per pass, 149 → 168 t/h loaded;
+  loam 20.3 → 19.7 s, 1.28 → 1.50 t, 163 → 166 t/h; clay 21.1 → 20.5 s, 0.81 → 0.69 t, 119 → 104 t/h. Stages skipped 7/10/12 → 13/5/13.
+  Cycles are slightly faster everywhere; the faster curl fills sand and loam better but clay worse, and the skip counts move both
+  ways, so these single runs show the trend, not a settled figure. Logs: `logs/haul_bench_pwri_bucket_long_<soil>_1carrier.json`.
+
+**Benchmarks** (default settings: the command response off):
+
+| | Before | Now |
+|---|---|---|
+| Trench (`bench_trench.py 8`), passes 1–6 | 15.4–17.9 s per pass (mean 16.4) | 16.0–19.2 s (mean 17.7) |
+| 130 s cycle (`bench_zone.py 130`) | 7–8 passes, 8.7–9.2 t (two runs) | 7 passes, 7.8 t |
+| 1500 s haul, s per pass: dry sand / loam / clay | 19.8 / 19.5 / 19.6 | 20.6 / 20.3 / 21.1 |
+| 1500 s haul, per pass into the carrier | 1.30 / 1.49 / 0.93 t | 1.27 / 1.28 / **0.81** t |
+| 1500 s haul, loaded | 161 / 168 / 141 t/h | 149 / 163 / **119** t/h |
+| 1500 s haul, stages skipped | 16 / 12 / 17 | 7 / 10 / 12 |
+
+Haul logs: `logs/haul_bench_fill_long_<soil>_1carrier.json` (before) and `logs/haul_bench_pwri_soil_long_<soil>_1carrier.json` (now, with the face planner change below). `logs/haul_bench_pwri_long_<soil>_1carrier.json` is the new hydraulics with the old planner.
+
+- **Passes take about 1 s longer** (5 %): the swing is slower and gentler, as on the machine.
+- **Fewer stages time out** in every soil.
+- **Clay passes come up light:** 0.81 t against the handbooks' 0.92–1.04 t and 0.93 t before. Loam moved from 5 % over its range to inside it (1.0–1.4 t).
+- **Clay and the face planner.** With the new hydraulics and the old planner, clay fell to 0.71 t a pass and one load took 25 passes. Per-pass traces showed no steady difference in what the bucket held at the start of the swing. The planner kept choosing one strip whose cut took slabs the bucket lost on the way out, at about 0.43 t a pass for some 30 passes. It brought back more than 30 % of a bucket at the start of the swing, so the planner never set it aside. Now, in clay, a pass that carries less than half a bucket to the carrier also sets its strip aside (`POOR_CARRIED`), and in every soil, strips set aside are taken again only when no other strip has a cut worth taking. That brought clay to 0.81 t and the longest load to 16 passes. The half-bucket rule hurt dry sand (1.11 t a pass): what spills on the swing there is no sign of a poor strip, so it applies to clay only. The remaining gap in clay is open.
+
+**The approach aimed at the previous strip.** Most thin clay passes came from the strip 20° left: the planner expected 0.8–1.2 m³ there, but its first pass brought out 3–59 kg, with three stages timed out. Neither the cut depth nor the drag was the cause. The pass count goes up only when the approach is reached, so the segment into the approach was planned with the previous pass's strip. The house swung back toward the new strip, turned to the old one for the approach, and then swung across to the new one again while penetrating. From −10° to +20° that is 37° of swing during the cut. The calibrated swing brakes at 0.82 rad/s², so it overshot to +27°, and the bucket stuck on the pit wall. A second pass in the same strip had no swing to make, which is why that strip dug well when chosen again. 'Swing back' and the approach now both aim for the next pass's strip (`_lane_pass`). The traced pass now carries 1.06 t with no stage skipped, and every pass that changes strip skips the detour.
+
+`bench_haul.py` now logs every pass (`pass_log`: strip, most held while digging, at the swing, carried, left after the dump) and stops after `PASSES=N` passes for a quick check.
+
+**Two other changes, tried and reverted.** Two other changes were tried for clay:
+
+- **The tear rule.** A curl that lost more than a quarter of the load would not be learned from (`CURL_TEAR`). One curl losing 842 of 882 kg had pulled the learned curl gain down to 18 kg.
+- **Setting a poor strip aside at the carrier** (`_rest_if_poor`) instead of at the next approach.
+
+Both were tested with the approach fix in place: 3 runs of 25 passes per variant. The figures are mean kg dumped per pass, with each run in brackets:
+
+| | Neither change | Both changes | Set-aside change only |
+|---|---|---|---|
+| Clay | **1041** (1071, 1085, 968) | 940 (1009, 844, 967) | 985 (1037, 969, 949) |
+| Loam | 1165 (1186, 1142, 1166) | 1093 (1103, 1112, 1063) | **1188** (1166, 1227, 1172) |
+| Dry sand | 1326 (1331, 1323, 1325) | 1331 (1338, 1313, 1342) | n/a: neither change acts in sand |
+
+- **The tear rule lowered both cohesive soils:** clay 5 % and loam 8 % below the set-aside change alone. So limiting it to clay would not help either.
+- **The learned gain no longer collapses:** it ended at 136–273 kg in the 9 clay runs.
+- **The set-aside change made no difference** in 25 passes, nor over 1500 s of clay. That is where the deep pit gives repeated thin passes from one strip: 55.5 and 53.0 t loaded with the change, against 52.3 and 58.4 t without it.
+
+Both are reverted.
+
+**The approach fix alone**, against the same autopilot without it:
+
+- **25 passes:** clay and loam dump about 11 % more per pass (clay 935 → 1041 kg, mean of 4 old runs; loam 1047 → 1165 kg, 3 old runs), and passes are 1.5–2 s shorter.
+- **1500 s, clay (one carrier):** 43.5 → 52.3 and 58.4 t loaded, 0.65 → 0.73 and 0.85 t per pass (`loaded_t` over all passes), 104 → 125 and 140 t/h loaded. Stages skipped fell from 13 to 3 and 8.
+- **1500 s, dry sand:** no change beyond the spread: 70.0 and 62.2 t loaded before, 61.3 and 70.3 t after.
+- **1500 s, loam:** no change beyond the spread either: 69.2 and 70.0 t before, 63.8 and 69.4 t after. Every loam run dug out all the soil within reach before 1500 s.
+- **Other benches:** the trench (passes 1–6: 15.6–18.2 s) and the 130 s zone cycle (7 passes, 10.4 t) don't change strip between passes. `test_env.py` passes.
+
+**Still open:**
+
+- **Clay still has thin passes once the pit is deep:** 17–26 of about 70 passes in the 1500 s runs. These passes barely fill while digging (160–600 kg at most), unlike the early failures, which filled and then lost the load. Half of them are in the strip 20° left.
+- **Dry sand stalls when a load is full.** When the last pass fills the carrier, the house sometimes stays over it, and the next 6 stages time out, losing about 30 s. This happened once to four times per 1500 s, with or without the fix, and sets most of dry sand's run-to-run spread.
+
+Logs:
+
+- 25-pass runs: `logs/haul_quick25_lane_<base|fix|rest>_<soil>_<n>.json`; the earlier checks are `logs/haul_quick25_<main|fix>_<soil>_1carrier.json`.
+- 1500 s runs: `logs/haul_bench_lane_fix_long[2]_<soil>_1carrier.json`, `logs/haul_bench_lane_old_long2_<soil>_1carrier.json` and `logs/haul_bench_lane_restearly_long<n>_clay_1carrier.json`.
+- 1500 s runs before the bucket calibration: `logs/haul_bench_pwri_face_long_<soil>_1carrier.json`, with the half-bucket rule in every soil; `logs/haul_bench_pwri_tear_long_<loam|clay>_1carrier.json`, with the tear guard; `logs/haul_bench_pwri_rest_long_clay_1carrier.json`, which adds the earlier set-aside.
+
+**Limits:**
+- Every value is for 1800 min⁻¹ in eco mode. At full power the pumps deliver more: the spec swing speed is 19 % higher.
+- The swing relief, and so the absolute inertia, depend on unverified pressure channels and on the 2.27 L/rad displacement derived from the spec sheet. The speeds and the ratio of torque to inertia come from joint data alone.
+- The real swing's pressure falls as the house speeds up, while its acceleration stays nearly constant. The model accelerates at the relief torque. This doesn't affect the times above but would show in the pressures.
+- Nothing here checks digging forces: the tests are in free air.
+- The bucket flows rest on reading PWRI's bucket angle as ours + 0.622 rad, which PWRI hasn't confirmed. If the reading is wrong, the four-bar's geometry is wrong instead, and so is the bucket's digging force.
