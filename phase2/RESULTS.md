@@ -1736,3 +1736,51 @@ On 40-minute runs the soil zones ran out of active particles: 1033 times in the 
 
 - **Production is unchanged**, as it should be: the shortfalls were brief and mostly at the spoil area.
 - **Speed:** the real-time factor rose rather than fell, but the GPU is shared, so the two runs are not a fair speed comparison; a larger pool did not slow the run noticeably.
+
+## A living site, 10: tracks that sink, rut and slip
+
+The dozer used to pull a flat 56 kN (0.6 × its weight) in every soil, and the carriers rolled over the ground without marking it. Both now meet the soil through classical terramechanics (Bekker, Janosi–Hanamoto, as in Wong, *Theory of Ground Vehicles*), in `tracks.py`:
+
+- **Sinkage** under the machine's weight: z = (p / (kc/b + kphi))^(1/n), with p the track pressure and b the shoe width.
+- **Thrust** at slip i: F(i) = (A c + W tan φ)(1 − K/(iL)(1 − e^(−iL/K))). The dozer slips at the i where the thrust equals the blade force plus the compaction resistance of its ruts. When no slip gives enough thrust, the tracks spin in place and the dozer stands while it lifts its blade.
+- **Ruts:** the tracks press the soil columns under them by their sinkage. The column's soil is packed denser, never beyond bank density and never deeper than it already is. Soil dug or pushed off a column clears its rut.
+
+**Values and sources.**
+
+- **Bekker values** (n, kc, kphi) for dry sand, sandy loam (15 %) and clayey soil (38 %) come from NASA TM-20250006958, which attributes them to Wong. They describe natural ground, so loose fill likely sinks more than shown.
+- **Shear strength** (c, φ) is the MPM soil's own, from `soils.py`, at remoulded cohesion. The tracks and the blade therefore see the same soil.
+- **K is assumed:** 2.5 cm for sand and loam, 1 cm for clay.
+- **Komatsu D37PX-24** (dealer specification): 610 mm shoes, 2.235 m of track on the ground.
+- **IHI IC120** (dealer listing): 14.1 t, 32.5 kPa empty and 58.6 kPa loaded, so 3.55 m of track per side with 600 mm shoes. The shoe width is assumed.
+
+| | Dry sand | Loam | Clay |
+|---|---|---|---|
+| Dozer sinkage | 3.2 cm | 0.44 cm | 0.23 cm |
+| Carrier sinkage, empty / loaded | 3.0 / 5.1 cm | 0.4 / 0.9 cm | 0.2 / 0.7 cm |
+| Dozer pull at full slip (was 56 kN) | 68.5 kN | 57.0 kN | 41.2 kN |
+
+**Benchmark** (one carrier, 1500 s). Both columns use the same code and differ only in the tracks. Logs: `logs/haul_bench_{notracks,tracks}_long1_<soil>_1carrier.json`.
+
+| | Dry sand: before | Dry sand: tracks | Loam: before | Loam: tracks | Clay: before | Clay: tracks |
+|---|---|---|---|---|---|---|
+| Loaded | 72.7 t | 76.5 t | 81.0 t | 76.8 t | 73.8 t | 75.8 t |
+| Dozer passes | 28 | 34 | 42 | 34 | 30 | 47 |
+| Blade lifts under load | 2 | 1 | 31 | 28 | 69 | 141 |
+| Time spinning in place | 0.02 s | 0 s | 0.5 s | 1.3 s | 1.6 s | 4.4 s |
+| Mean slip while pushing | – | 0.3 % | – | 1.3 % | – | 2.2 % |
+| Peak blade force | 57 kN | 61 kN | 74 kN | 91 kN | 72 kN | 78 kN |
+| Spread rms from grade | 0.33 m | 0.33 m | 0.37 m | 0.40 m | 0.41 m | 0.41 m |
+| Columns pressed by the dozer | – | 8.6 k | – | 23.9 k | – | 75.4 k |
+
+- **Production is unchanged.** The loaded tonnage varies by ±4 t from run to run either way, about half a load.
+- **The spread grade is as before**, within 3 cm rms.
+- **The dozer's pull now depends on the soil.** In clay it has 27 % less pull than before. It lifts its blade twice as often and needs half as many passes again to spread the same soil. In dry sand it has more pull.
+- **Slip stays small while pushing (0.3–2.2 %)**, as expected for a crawler loaded well below its traction limit. Real crawlers on loose fill commonly run at 5–15 % slip near full drawbar pull.
+
+**Limits.**
+
+- The Bekker values describe natural ground, so the sinkage in loose spoil is likely understated.
+- K and the carrier's shoe width are assumed.
+- When a pressed column's particles wake, they return to loose volume, so the compaction is lost (left to item #7, compaction).
+- Soil that settles onto a pressed column takes on its packed layer, an error of under a centimetre.
+- The carriers keep their scripted speeds and ride at a fixed height. Their compaction resistance is under 2 kN.

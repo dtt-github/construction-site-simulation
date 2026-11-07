@@ -23,6 +23,8 @@ import time
 
 import numpy as np
 
+import dumper as dumper_mod
+
 import excavator_server as ex
 
 secs = float(sys.argv[1]) if len(sys.argv) > 1 else 600.0
@@ -129,5 +131,9 @@ out = {
     "pass_log": pass_log,
     "dozer": {**{k: round(v, 2) for k, v in sim.dozer.counters.items()}, "mean_push_kN": sim.dozer.push_force},
     "spread": sim.dozer.spread_report(sim._surface),
+    "tracks": {"dozer_sinkage_cm": round(sim.dozer.sinkage * 100, 2), "dozer_pull_kN": round(sim.dozer.f_traction / 1000, 1),
+               "dozer_slip": round(sim.dozer.counters["slip_m"] / max(sim.dozer.counters["slip_m"] + sim.dozer.counters["push_m"], 1e-9), 3),
+               "carrier_sinkage_cm": [round(sim.carrier_track.sinkage(m) * 100, 2) for m in (dumper_mod.MASS_KG, dumper_mod.MASS_KG + 11000)],
+               **sim.track_counters},
 }
 print(json.dumps(out))

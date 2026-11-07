@@ -35,6 +35,8 @@ import math
 
 import numpy as np
 
+import tracks
+
 ARM_PIVOT = np.array([0.5858, 0.0, 0.38606])  # lift_joint in base_link
 BLADE_ON_ARM = np.array([1.5881, 0.0, -0.10373])  # blade frame (angle_joint) in the arm frame
 EDGE = np.array([0.41, 0.0, -0.30])  # cutting edge in the blade frame
@@ -47,18 +49,18 @@ FACE = [(0.41, -0.30), (0.20, 0.0), (0.18, 0.45), (0.30, 0.79)]
 PLATE = 0.08  # collider plate thickness
 TRACK_X = (-1.2, 1.35)  # track contact length in base_link (rear, front)
 TRACK_Y = 0.8  # half gauge
+SHOE_B, TRACK_L = 0.61, 2.235  # shoe width and track on the ground (m), D37PX-24 (tracks.py)
 
 # machine data: Komatsu D37PXi-24 operating weight 9.38 t (LECTURA Specs; 9.5 t used here), net power 66.1 kW
 # (ISO 9249, as the D37PX-24 with the same SAA4D95LE-7 engine); blade 3.2 m wide (PAT); hydrostatic drive
 MASS_KG = 9500.0
-TRACTION = 0.6  # usable drawbar pull / weight on loose fill
 P_DRAWBAR = 0.7 * 66e3  # W at the drawbar
-F_TRACTION = TRACTION * MASS_KG * 9.81  # N (about 56 kN)
+# drawbar pull and slip come from the soil (tracks.Track): about 57 kN at full slip on loam, 69 on dry sand, 41 on clay
 SPEED_PUSH, SPEED_REVERSE, SPEED_TRAVEL, SPEED_MIN = 1.0, 1.6, 1.4, 0.2  # m/s
 ACCEL = 0.5  # m/s2
 SPIN_RATE = math.radians(30.0)
 LIFT_RATE = 0.3  # rad/s at the lift joint (about 0.5 m/s at the edge)
-LOAD_HIGH, LOAD_LOW = 0.85, 0.6  # load control: lift above LOAD_HIGH * F_TRACTION, return to grade below LOAD_LOW
+LOAD_HIGH, LOAD_LOW = 0.85, 0.6  # load control: lift above LOAD_HIGH * the pull at full slip, return to grade below LOAD_LOW
 FORCE_TAU = 0.15  # s: the blade force is low-passed (one MPM step's impulses are noisy) for control and reports
 EMPTY_N, EMPTY_S = 3000.0, 0.7  # a push ends when the blade carries less than EMPTY_N for EMPTY_S
 LIFT = 0.3  # m per layer
@@ -118,11 +120,14 @@ STAGES = ["parked", "to lane", "lower", "push", "raise", "back", "to park"]
 
 
 class Dozer:
-    def __init__(self, park, area, ground_z):
+    def __init__(self, park, area, ground_z, soil="dry-sand"):
         """park: (x, y, yaw) of base_link where the dozer waits; area: (x_start, y_start, x_end, end ys) of
         the cutting edge: every push starts at (x_start, y_start), at the dump heap, and runs to x_end, the
-        lanes fanning out to the end ys."""
+        lanes fanning out to the end ys; soil: the preset it spreads (dug, so at its remoulded strength)."""
         self.park, self.ground_z = park, ground_z
+        self.track = tracks.Track(SHOE_B, TRACK_L, soil, loose=True)
+        self.f_traction = self.track.max_pull(MASS_KG)  # N: drawbar pull at full slip
+        self.sinkage = self.track.sinkage(MASS_KG)
         self.x_start, self.y_start, self.x_end, ends = area
         # lanes: heading and the cutting edge's travel to x_end
         self.lanes = [(math.atan2(y - self.y_start, self.x_end - self.x_start), math.hypot(y - self.y_start, self.x_end - self.x_start)) for y in ends]
@@ -146,7 +151,7 @@ class Dozer:
         self.empty_t = 0.0
         self.prev = None
         self.v, self.w = np.zeros(3), np.zeros(3)
-        self.counters = {"passes": 0, "push_m": 0.0, "work_MJ": 0.0, "load_lifts": 0, "lifts_raised": 0, "parked_s": 0.0, "working_s": 0.0, "peak_kN": 0.0, "slip_s": 0.0, "futile_passes": 0}
+        self.counters = {"passes": 0, "push_m": 0.0, "work_MJ": 0.0, "load_lifts": 0, "lifts_raised": 0, "parked_s": 0.0, "working_s": 0.0, "peak_kN": 0.0, "slip_s": 0.0, "slip_m": 0.0, "futile_passes": 0}
         self.push_force = []  # mean blade force per push (kN)
         self._push_sum = [0.0, 0.0]
 
@@ -388,23 +393,26 @@ class Dozer:
     def _push(self, tx, ty, dt):
         """Grade and load control while pushing toward tx; True when the pass is over."""
         F = self.force
-        if F > LOAD_HIGH * F_TRACTION and not self.load_lift:
+        if F > LOAD_HIGH * self.f_traction and not self.load_lift:
             self.load_lift = True
             self.counters["load_lifts"] += 1
-        elif F < LOAD_LOW * F_TRACTION:
+        elif F < LOAD_LOW * self.f_traction:
             self.load_lift = False
         target = LIFT_LO if self.load_lift else self.lift_for_edge(self.grade)
         if self.load_lift:  # lift only as far as needed: a small step per frame while overloaded
             target = max(self.lift - LIFT_RATE * dt, LIFT_LO)
         self._lift_to(target, dt)
-        v_max = float(np.clip(P_DRAWBAR / max(F, 1.0), SPEED_MIN, SPEED_PUSH))
-        if F > F_TRACTION:  # more than the tracks can pull: they slip, the dozer stands while the blade lifts
+        v_track = float(np.clip(P_DRAWBAR / max(F, 1.0), SPEED_MIN, SPEED_PUSH))  # the tracks' speed
+        slip = self.track.slip(MASS_KG, F)
+        v_max = v_track * (1.0 - slip)  # the machine's: the soil under the tracks shears by the rest
+        if slip >= 1.0:  # more than the tracks can pull: they spin, the dozer stands while the blade lifts
             v_max = 0.0
             self.speed = 0.0
             self.counters["slip_s"] += dt
-        x0 = self.x
+        x0, y0 = self.x, self.y
         done = self._drive(tx, ty, +1, v_max, dt) if v_max > 0.0 else False
-        moved = abs(self.x - x0)
+        moved = math.hypot(self.x - x0, self.y - y0)
+        self.counters["slip_m"] += moved * slip / max(1.0 - slip, 1e-6) if slip < 1.0 else v_track * dt
         self.counters["push_m"] += moved
         self.counters["work_MJ"] += F * moved / 1e6
         self.counters["peak_kN"] = max(self.counters["peak_kN"], F / 1000)

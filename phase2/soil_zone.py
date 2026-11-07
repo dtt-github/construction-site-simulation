@@ -541,6 +541,45 @@ class SoilZones:
         self.count_np = self.count.numpy().astype(np.int64)
         self._refit()
 
+    def columns_at(self, xy, names):
+        """Column index under each point xy (n, 2) in the named regions (-1 outside them)."""
+        col = np.full(len(xy), -1, dtype=np.int64)
+        for k, (x0, y0, nx, ny, off) in enumerate(self.spec):
+            if self.names[k] not in names:
+                continue
+            ix = np.floor((xy[:, 0] - x0) / CELL).astype(np.int64)
+            iy = np.floor((xy[:, 1] - y0) / CELL).astype(np.int64)
+            inside = (col < 0) & (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny)
+            col[inside] = off + iy[inside] * nx + ix[inside]
+        return col
+
+    def press(self, xy, sink, names):
+        """Tracks standing on the points xy (n, 2) of the named regions press their loose dormant soil down
+        to `sink` (m) below its loose height, by packing it denser (at most to its bank density); soil
+        pressed that far already stays as it is. Returns the columns pressed further."""
+        col = np.unique(self.columns_at(xy, names))
+        col = col[col >= 0]
+        col = col[self.col_loose[col] & (self.count_np[col] > 0)]
+        if not len(col):
+            return 0
+        n = self.count_np[col]
+        loose = LAYER_PER_PARTICLE * (1.0 + self.swell)
+        target = np.maximum((n * loose - sink) / n, LAYER_PER_PARTICLE)
+        deeper = target < self.col_layer_np[col] - 1e-9
+        if not deeper.any():
+            return 0
+        self.col_layer_np[col[deeper]] = target[deeper]
+        self.col_layer.assign(self.col_layer_np.astype(np.float32))
+        self._refit()
+        return int(deeper.sum())
+
+    def unpress_empty(self):
+        """Columns emptied of dormant soil take the loose layer again, for the next soil that settles there."""
+        empty = self.col_loose & (self.count_np == 0) & (self.col_layer_np < LAYER_PER_PARTICLE * (1.0 + self.swell) - 1e-9)
+        if empty.any():
+            self.col_layer_np[empty] = LAYER_PER_PARTICLE * (1.0 + self.swell)
+            self.col_layer.assign(self.col_layer_np.astype(np.float32))
+
     def set_counts(self, counts):
         """Replace the dormant particle counts of every column."""
         self.count_np = counts.astype(np.int64)

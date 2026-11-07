@@ -60,6 +60,7 @@ from soil_server import (
 )
 import hydraulics as hyd
 import soils
+import tracks
 import dozer as dozer_mod
 import dumper as dumper_mod
 from dozer import Dozer
@@ -701,8 +702,10 @@ class ExcavatorSim:
             c.body, c.vq, c.vqd = v, int(jq[joint_of[v]]), int(jqd[joint_of[v]])
         # the dozer spreading the loads at the spoil area; its blade's free joint follows the vessel's
         self.use_dozer = haul and dozer
+        self.carrier_track = tracks.Track(dumper_mod.SHOE_B, dumper_mod.TRACK_L, soil, loose=True)
+        self.track_counters = {"dozer_pressed": 0, "carrier_pressed": 0}
         edge_ahead = Dozer._edge_ahead()
-        self.dozer = Dozer((DOZER_X_START - edge_ahead, DOZER_PARK_Y, math.pi / 2), (DOZER_X_START, BED_CENTER[1], DOZER_X_END, DOZER_LANE_ENDS), GROUND_Z)
+        self.dozer = Dozer((DOZER_X_START - edge_ahead, DOZER_PARK_Y, math.pi / 2), (DOZER_X_START, BED_CENTER[1], DOZER_X_END, DOZER_LANE_ENDS), GROUND_Z, soil)
         self.blade_q, self.blade_qd = int(jq[joint_of[self.blade]]), int(jqd[joint_of[self.blade]])
 
         cfg = SolverImplicitMPM.Config()
@@ -1558,6 +1561,22 @@ class ExcavatorSim:
         self.state_0.joint_q.assign(q)
         self.state_0.joint_qd.assign(qd)
 
+    def _press_tracks(self):
+        """Ruts: the dozer's and carriers' tracks press the loose soil they stand on down by their sinkage
+        (tracks.py); the dozer, following the surface, then sits in its ruts."""
+        z = self.zones
+        if self.use_dozer:
+            dz = self.dozer
+            xy = tracks.footprint(dz.x, dz.y, dz.yaw, 0.5 * sum(dozer_mod.TRACK_X), dozer_mod.TRACK_Y, dozer_mod.SHOE_B, dozer_mod.TRACK_L)
+            self.track_counters["dozer_pressed"] += z.press(xy, dz.sinkage, ("spoil", "road"))
+        for d in self.fleet:
+            if d.hidden:
+                continue
+            sink = self.carrier_track.sinkage(dumper_mod.MASS_KG + d.payload_kg)
+            xy = tracks.footprint(d.base[0], d.base[1], d.yaw, dumper_mod.TRACK_X0, dumper_mod.HALF_GAUGE, dumper_mod.SHOE_B, dumper_mod.TRACK_L)
+            self.track_counters["carrier_pressed"] += z.press(xy, sink, ("spoil", "road"))
+        z.unpress_empty()
+
     def _spoil_surface(self, hm, max_speed):
         """Spoil-area heightmap: the dormant columns and the particles slower than max_speed (-0.95 where
         there is no soil)."""
@@ -1677,6 +1696,8 @@ class ExcavatorSim:
 
         if self.zone_frame % ZONE_EVERY == 0:
             self.zones.update([self.bucket_box(), self.dozer.blade_box()] if self.use_dozer else self.bucket_box())
+            if self.haul:
+                self._press_tracks()
         self.zone_frame += 1
         if self.zone_frame % self.mpm_every == 0:
             # the rigid frames in between reuse the last sand impulses as a constant force

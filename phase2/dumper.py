@@ -45,6 +45,10 @@ TIP_MAX = math.radians(60.0)  # dumping angle used (the vessel allows 65 deg)
 # performance: IC120 spec sheets give 10.9 km/h top speed; on a site haul road loaded carriers run slower
 SPEED_LOADED, SPEED_EMPTY, SPEED_REVERSE = 2.2, 2.8, 1.2  # m/s
 ACCEL = 0.6  # m/s2
+# tracks (tracks.py): IC120 operating weight 14.1 t; 600 mm shoes (assumed), 3.55 m on the ground each,
+# centred 0.2 m ahead of base_link, 1.0 m either side
+MASS_KG = 14100.0
+SHOE_B, TRACK_L, TRACK_X0, HALF_GAUGE = 0.6, 3.55, 0.2, 1.0
 SPIN_RATE = math.radians(25.0)  # rad/s, counter-rotating tracks
 TIP_RATE, LOWER_RATE = math.radians(7.5), math.radians(12.0)  # rad/s (about 8 s up to 60 deg, 5 s down)
 DUMP_HOLD = 3.0  # s at full tip, for the soil to leave
