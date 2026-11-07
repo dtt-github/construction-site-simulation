@@ -1619,3 +1619,29 @@ A fixed inset of 0.6 m (the pin stops that much short) fixed loam and clay. It s
 - `test_env.py` passes.
 
 Logs: `logs/haul_bench_aim_long1_<soil>_1carrier.json`; with the fixed inset, `logs/haul_bench_inset_long1_<soil>_1carrier.json`.
+
+## Dry sand's spill: a soil-model limit, not the autopilot
+
+After the aim fix, dry sand still left 10–12 t on the ground beside the carrier in 12 minutes. A tally of single grains, each tagged with the cycle stage it fell in and the side it landed on, shows where it comes from (300 s, 14 passes):
+
+| Stage | Falls beside the carrier | Where |
+|---|---|---|
+| Swing over | 2.2 t | mostly beyond the carrier's pit-side end, all through the swing |
+| Dump | 1.5–1.7 t | over both long walls |
+| Waiting for an empty carrier | 0.45–0.57 t | the side it waits on |
+| Swing back | 0.4–0.5 t | far side |
+
+(The ground-column tally used earlier counts soil that is woken and put back to sleep near the carrier, so its near-side figures for dry sand overstate spill.)
+
+**The bucket loses 12–19 % of its load on every swing**, with the bucket held fully curled (pitch −188°): 1.9–2.1 t at the end of the curl, 1.4–1.7 t at the dump. Two things in the soil model lie behind it:
+
+- **Sand over-packs in the bucket.** The shell holds 0.79 m³ struck (about 14 % more than a real 0.80 m³ heaped bucket would hold struck). At the end of the curl it holds 1.6–2.0 t of dry sand, 1.3–1.5 times the grain density of the bed. Real dry sand cannot be compressed like that.
+- **At 150 iterations the solve does not hold it there.** The packed sand creeps out over the lip while it is carried.
+
+**More iterations while carrying were tried** (400 during the swing over, the wait and the dump; 150 while digging, where the soil presets are calibrated). The swing loss halves (17.9 % → 9.8 %, at 15 % slower simulation). But the stiffer, over-packed load then jams the bucket: in dry sand it timed out 9 times on the swing over and the dump, the bucket 0.12–0.15 rad short of its target with the other joints on it. Clay dumped 18 % less per pass. Spill beside the carrier did not fall. Reverted. Fixing this needs the packing limit held in the bucket, which is a solver question (see "Why cutting forces change with the MPM step").
+
+**Kept:**
+- **Waiting fully curled.** In free-flowing soil, the bucket now waits for an empty carrier fully curled, as it swings, instead of 15° open. It makes no measurable difference here (73.3 t in 1500 s, as before), because the sand creeps out either way, but the open bucket was inconsistent with the rule the swing follows.
+- **Timeouts log each joint's error** (`err_rad` in the bench's `skipped` list). It found the bucket jam above, and one remaining case of the stall after the full carrier: at 474 s the house did not swing back (1.36 rad short) for 20 s.
+
+Logs: `logs/haul_bench_carry_long<n>_<soil>_1carrier.json` (the iterations tried), `logs/haul_bench_wait_long1_dry-sand_1carrier.json` (kept).

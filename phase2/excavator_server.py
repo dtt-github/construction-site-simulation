@@ -1229,7 +1229,7 @@ class ExcavatorSim:
         if waiting:
             # no carrier at the loading spot: swing part way and hold the full bucket up there (the pit's
             # soil goes back to sleep), until one is back
-            b = self.WAIT_POSE
+            b = self.WAIT_POSE if self.heap_check else (*self.WAIT_POSE[:4], self.CYCLE[4][4])  # as "swing to truck"
             self.stage_name = b[0]
             self.truck_wait += self.frame_dt
             self.was_waiting = True
@@ -1342,7 +1342,7 @@ class ExcavatorSim:
         self.stage_time += self.frame_dt
         timed_out = self.auto_wait > self.STAGE_TIMEOUT or self.stage_time > 3.0 * seg_all + self.STAGE_TIMEOUT
         if timed_out:
-            self.skipped.append({"t": round(self.sim_time, 2), "stage": b[0], "max_err_rad": round(float(np.max(np.abs(err))), 3)})
+            self.skipped.append({"t": round(self.sim_time, 2), "stage": b[0], "max_err_rad": round(float(np.max(np.abs(err))), 3), "err_rad": [round(float(e), 3) for e in err]})
             self.auto_wait = 0.0
         # close enough to the waypoint; after running 1.5 s past plan, an arm holding a heavy load at relief
         # (that cannot quite reach the pose) is let go on instead of timing out
