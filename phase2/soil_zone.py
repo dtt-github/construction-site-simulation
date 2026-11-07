@@ -518,6 +518,27 @@ class SoilZones:
         self._refit()
         return counts
 
+    def settle(self, mask):
+        """Put the active particles over the columns in mask to sleep at once, wherever they are moving."""
+        st, mm = self.state, self.mpm._mpm_model
+        self.sleep.assign(mask.astype(np.int32))
+        self.freed_n.zero_()
+        wp.launch(
+            absorb_kernel, dim=self.pool,
+            inputs=[st.particle_q, st.particle_qd, self.regions, self.sleep, self.LOST_Z, self.park, self.model.particle_flags, mm.particle_flags, mm.material_particle_flags, mm.material_particle_volume, self.count, self.freed, self.freed_n, self.lost],
+        )
+        nf = int(self.freed_n.numpy()[0])
+        if nf:
+            self.active_np[self.freed.numpy()[:nf]] = False
+        self.count_np = self.count.numpy().astype(np.int64)
+        self._refit()
+
+    def set_counts(self, counts):
+        """Replace the dormant particle counts of every column."""
+        self.count_np = counts.astype(np.int64)
+        self.count.assign(self.count_np.astype(np.int32))
+        self._refit()
+
     def remove(self, slots):
         """Take active particles (pool slots) out of the simulation."""
         slots = np.asarray(slots, dtype=np.int32)

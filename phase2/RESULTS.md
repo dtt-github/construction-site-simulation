@@ -1690,3 +1690,28 @@ Loads were 9.6–10.7 t (5–6 passes) and took 100–110 s to load. The match f
 - **The road is timed, not driven.** Grades, rolling resistance, bends and speed limits on the hidden part are not modelled, so the travel time is length / speed plus accelerating and braking.
 - **One loading spot, one dump point.** Real sites often load from both sides of the excavator, which shortens the swap.
 - **Loam only so far.**
+
+## A living site, 8: moving on along the bank
+
+With two or more carriers, the excavator dug out all the soil within its reach (about 77 t) in 17–23 minutes and stopped, so no study could run longer. It can now move on to fresh soil (`ExcavatorSim(relocate_m=4)`, `excavator_server.py --relocate-m 4`, `RELOCATE_M=4 bench_haul.py`; off by default).
+
+**How it works** (`_relocate`, a timed move rather than a driven one):
+- **When:** once no strip within reach holds a cut worth taking (`PIT_DONE_M3`), the excavator finishes its pass and moves 4 m along the bank, away from the carrier's side.
+- **What moves:** the pit's soil, not the machine. Its active particles are put to sleep, then every column is slid 4 m under the machine, keeping its surface height. Fresh bank soil comes in at the far (−y) end at the original fill level, and the dug ground beyond the near edge is left behind. The machine, loading spot, carriers, road and spoil area keep their places, as they would relative to an excavator walking along a bench.
+- **How long:** 4 m at the ZX200's low travel speed (3.5 km/h, 0.97 m/s) plus 30 s to raise the bucket, travel and set up again: 34 s. The 30 s is an assumption, since the handbooks give no figure (`RELOCATE_SETUP_S`). The excavator holds still meanwhile; the carriers and dozer carry on.
+- **In the browser** the pit's surface jumps by 4 m at the start of the move; the machine does not drive.
+
+**Benchmark** (loam, three carriers, 150 m road, 2400 s, log `logs/haul_bench_relocate_3carriers_loam.json`):
+
+| | Without moving (1500 s) | Moving on 4 m (2400 s) |
+|---|---|---|
+| Loaded | 77 t, then the face is dug out | 190 t, still digging |
+| Moves | – | 2 (at 957 s and 1761 s, 34 s each) |
+| Time between loads leaving | 130 s | 131 s on average; 149–173 s across a move |
+| Loading rate | 268 t/h | 285 t/h over 2400 s |
+| Loads | 9.6–10.7 t | 9.3–11.1 t |
+| Stages skipped | 0 | 0 |
+
+- **Production continues at the excavator's pace.** A move costs about 40 s on the load that spans it, roughly 1 % of output for every 40 loads.
+- **No soil is lost in the move:** particles fell through the ground at the same rate as without it (about 1.2 per second).
+- **The spread area limits longer runs.** The spoil holds 172 t after 2400 s. Its heaps keep particles awake, and the particle pool ran short 1033 times (39 in 1500 s without moving). Full-shift runs need a larger pool or a spread area that moves on too.

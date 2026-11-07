@@ -29,8 +29,9 @@ secs = float(sys.argv[1]) if len(sys.argv) > 1 else 600.0
 soil = os.environ.get("SOIL", ex.soils.DEFAULT_SOIL)
 n_carriers = int(os.environ.get("CARRIERS", "1"))
 haul_m = float(os.environ.get("HAUL_M", "0"))  # the off-screen two-lane road, each way (dumper.py)
+relocate_m = float(os.environ.get("RELOCATE_M", "0"))  # move on along the bank when the face is dug out
 max_passes = int(os.environ.get("PASSES", "0")) or None
-sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m)
+sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m, relocate_m=relocate_m)
 sim.auto = True
 fleet = sim.fleet
 loads, start_load, passes_at = [], {}, {}
@@ -91,6 +92,8 @@ out = {
     "soil": soil,
     "carriers": n_carriers,
     "haul_m": haul_m,
+    "relocate_m": relocate_m,
+    "relocations": sim.relocations,
     "sim_s": round(secs, 1),
     "stopped_after_passes": max_passes,
     "realtime_factor": round(secs / wall, 3),

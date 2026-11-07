@@ -537,12 +537,13 @@ class ExcavatorSim:
         ("swing back", 0, 6.0, 2.6 + DIG_Z, -95),  # lowers while swinging, once clear of the truck
     ]
 
-    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, haul_m=0.0, command_response=False):
+    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, haul_m=0.0, relocate_m=0.0, command_response=False):
         wp.init()
-        self.kwargs = {"voxel": voxel, "ppc": ppc, "soil": soil, "iterations": iterations, "fps": fps, "pool": pool, "mpm_every": mpm_every, "carriers": carriers, "haul_m": haul_m, "command_response": command_response}
+        self.kwargs = {"voxel": voxel, "ppc": ppc, "soil": soil, "iterations": iterations, "fps": fps, "pool": pool, "mpm_every": mpm_every, "carriers": carriers, "haul_m": haul_m, "relocate_m": relocate_m, "command_response": command_response}
         # levers reach the spools through the dead time and lag of PWRI's ZX200 under velocity commands
         # (hydraulics.COMMAND_DEAD; off: the spools follow the levers at once, as before)
         self.command_response = command_response
+        self.relocate_m = relocate_m  # > 0: when the face within reach is dug out, move this far along the bank
         self.soil = soil
         material = soils.SOILS[soil]
         density, friction = material["density"], material["friction"]
@@ -819,6 +820,7 @@ class ExcavatorSim:
         self.swing_inertia = self.SWING_INERTIA_GUESS
         self._z_cache = {}
         self._faces, self.face_log, self.pit_done = {}, [], False
+        self.relocate_pending, self.relocate_left, self.relocations = False, 0.0, []
         self.face_rest, self.pass_fill, self.pass_carried = {}, 0.0, 0.0  # strips set aside after a poor pass (until pass n); this pass's best fill and what it carried
         self.stage_time = 0.0
         self.auto_wait = 0.0
@@ -979,7 +981,10 @@ class ExcavatorSim:
                 if score > best_score:
                     best_score, best = score, {"psi": psi, "shift": shift, "avail_m3": round(avail, 2), "deepen": max(0.0, BED_TOP - band_top), "lowest": lowest}
         if best is None or best["avail_m3"] < self.PIT_DONE_M3:
-            self.pit_done = True
+            if self.relocate_m > 0.0:
+                self.relocate_pending = True  # move on along the bank once this pass is over (_relocate)
+            else:
+                self.pit_done = True
             return self._faces.get(max(self._faces, default=None), None) if self._faces else {"psi": 0.0, "shift": 0.0, "avail_m3": 0.0, "deepen": 0.0, "lowest": BED_TOP}
         self.face_log.append({"pass": p, **{k: (round(v, 2) if isinstance(v, float) else v) for k, v in best.items()}})
         return best
@@ -1219,8 +1224,43 @@ class ExcavatorSim:
             self.dispatch()
             self.truck_mark = 0.0
 
+    # moving to a new face: the ZX200 travels at 3.5 km/h in low range (0.97 m/s); raising the bucket, travelling,
+    # and setting up again add RELOCATE_SETUP_S (an assumption: handbooks give no figure)
+    RELOCATE_SPEED, RELOCATE_SETUP_S = 0.97, 30.0
+
+    def _relocate(self):
+        """The face within reach is dug out: move relocate_m along the bank (toward -y, away from the
+        carrier's side), with everything but the pit. The pit's soil is put to sleep and slid +y under the
+        machine by that much; fresh bank soil comes in from the -y side, and what passes the pit's +y edge
+        is left behind. The machine stands still for the time the move takes."""
+        z = self.zones
+        pit = self._pit_cols
+        z.settle(pit)
+        x0, y0, nx, ny, off = z.region_grid("ground")
+        dj = int(round(self.relocate_m / CELL))
+        k = np.flatnonzero(pit)
+        i, j = (k - off) % nx, (k - off) // nx
+        src = off + (j - dj) * nx + i
+        has_src = (j - dj >= 0)
+        has_src[has_src] &= pit[src[has_src]]
+        top = z.col_floor + z.count_np * z.col_layer_np
+        counts = z.count_np.copy()
+        new = np.floor(np.clip(top[src[has_src]] - z.col_floor[k[has_src]], 0.0, None) / z.col_layer_np[k[has_src]] / PER_LAYER) * PER_LAYER
+        counts[k[has_src]] = new.astype(np.int64)
+        counts[k[~has_src]] = self.bed_counts[k[~has_src]]  # fresh bank, as the pit was filled
+        z.set_counts(counts)
+        self.relocate_left = self.relocate_m / self.RELOCATE_SPEED + self.RELOCATE_SETUP_S
+        self.relocations.append({"t": round(self.sim_time, 1), "pass": self.passes, "move_s": round(self.relocate_left, 1)})
+        self.relocate_pending = False
+        self._faces, self.face_rest = {}, {}
+
     def _auto_control(self):
         """Track the cycle: move a target along the current segment only while the arm keeps up."""
+        if self.relocate_left > 0.0:
+            self.relocate_left -= self.frame_dt
+            self.stage_name = "relocate"
+            self.levers[:] = 0.0
+            return
         n = len(self.CYCLE)
         a = self.CYCLE[self.auto_stage]
         b = self.CYCLE[(self.auto_stage + 1) % n]
@@ -1384,6 +1424,8 @@ class ExcavatorSim:
                 self.passes += 1
                 self.ease = 0.0
                 self.curl_out, self.curl_from = None, None
+                if self.relocate_pending:
+                    self._relocate()
                 if self.pit_done:  # nothing left within reach: stop, and send the carrier off with what it has
                     self.auto = False
                     self.stage_name = "pit dug out"
@@ -2034,9 +2076,10 @@ def main():
     ap.add_argument("--mpm-every", type=int, default=MPM_EVERY, help="frames per MPM step (1: sand at 60 Hz)")
     ap.add_argument("--soil", choices=list(soils.SOILS), default=soils.DEFAULT_SOIL, help="soil preset (soils.py)")
     ap.add_argument("--carriers", type=int, default=1, help="crawler carriers in the haul cycle (more than two need --haul-m)")
+    ap.add_argument("--relocate-m", type=float, default=0.0, help="when the face within reach is dug out, move on this far along the bank (0: stop)")
     ap.add_argument("--haul-m", type=float, default=0.0, help="off-screen two-lane haul road between the loading spot and the dump, m each way")
     args = ap.parse_args()
-    sim = ExcavatorSim(voxel=args.voxel, iterations=args.iterations, pool=args.pool, mpm_every=args.mpm_every, soil=args.soil, carriers=args.carriers, haul_m=args.haul_m)
+    sim = ExcavatorSim(voxel=args.voxel, iterations=args.iterations, pool=args.pool, mpm_every=args.mpm_every, soil=args.soil, carriers=args.carriers, haul_m=args.haul_m, relocate_m=args.relocate_m)
     if args.trench:
         sim.set_trench()
     res = None
