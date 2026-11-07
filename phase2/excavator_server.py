@@ -151,7 +151,7 @@ ARMATURE = 200.0
 RIGID_SUBSTEPS = 4
 USE_MUJOCO_CPU = False  # GPU MuJoCo, with the rigid substeps recorded as one CUDA graph
 # moving soil zone (soil_zone.py): only soil near the bucket is MPM particles, the rest is dormant columns
-POOL = 200_000  # particle capacity (dry sand flowing into a cut wakes about 110 k); the 2 m fill is about 1.5 million particles
+POOL = 300_000  # particle capacity (dry sand flowing into a cut wakes about 110 k, a 10 t load spread by the dozer about 90 k); the 2 m fill is about 1.5 million particles
 ZONE_EVERY = 4  # frames between wake/sleep updates (15 Hz)
 MPM_EVERY = 2  # frames per MPM step: sand at 30 Hz (the stream rate), the machine at 60 Hz
 MPM_ITERATIONS = {1: 60, 2: 150}  # the longer step needs more solver iterations to hold the same load

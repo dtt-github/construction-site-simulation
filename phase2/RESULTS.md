@@ -1715,3 +1715,24 @@ With two or more carriers, the excavator dug out all the soil within its reach (
 - **Production continues at the excavator's pace.** A move costs about 40 s on the load that spans it, roughly 1 % of output for every 40 loads.
 - **No soil is lost in the move:** particles fell through the ground at the same rate as without it (about 1.2 per second).
 - **The spread area limits longer runs.** The spoil holds 172 t after 2400 s. Its heaps keep particles awake, and the particle pool ran short 1033 times (39 in 1500 s without moving). Full-shift runs need a larger pool or a spread area that moves on too.
+
+## A living site, 9: a particle pool that keeps up with the spread area
+
+On 40-minute runs the soil zones ran out of active particles: 1033 times in the moving-on benchmark above. When that happens, soil the bucket or blade reaches cannot wake and stays rigid for a moment. Logging where the awake particles were, every 60 s (loam, three carriers, 150 m road, moving on 4 m):
+
+- **The spoil area holds most of them:** up to 171 k awake while the dozer spreads, 88–149 k of them at rest. The pit adds 20–110 k while the excavator digs.
+- **Part of it was jitter.** A column only slept once every particle on it was slower than 0.04 m/s, so a few grains jittering on a heap's surface kept the whole column awake. A column now sleeps once at most 3 % of its particles move faster than that and none faster than 0.25 m/s, so soil still falling or flowing onto it keeps it awake (`FAST_FRAC`, `V_CREEP` in `soil_zone.py`). This only cut the shortfalls to 1052 (with the old 200 k pool).
+- **Most of it is size.** A 10 t load is about 90 k particles, and the dozer keeps one or two loads moving while the pit is dug, so the site needs about 250 k at its peak. The pool is now 300 k (`POOL`, `--pool`).
+
+**Benchmark** (as above; log `logs/haul_bench_pool300_loam.json`):
+
+| | 200 k pool | 300 k pool |
+|---|---|---|
+| Pool ran short | 1033 times | 124 times (0.3 % of zone updates) |
+| Loaded in 2400 s | 190 t (285 t/h) | 189 t (283 t/h) |
+| Spoil settled | 172 t | 162 t |
+| Particles lost through the ground | 2875 | 2990 |
+| Real-time factor | 0.54 | 0.91 |
+
+- **Production is unchanged**, as it should be: the shortfalls were brief and mostly at the spoil area.
+- **Speed:** the real-time factor rose rather than fell, but the GPU is shared, so the two runs are not a fair speed comparison; a larger pool did not slow the run noticeably.

@@ -140,7 +140,9 @@ def column_stats_kernel(
     qd: wp.array[wp.vec3],
     flags: wp.array[wp.int32],
     regions: Regions,
+    v_sleep: float,
     col_n: wp.array[int],
+    col_fast: wp.array[int],
     col_vmax: wp.array[float],
     col_ztop: wp.array[float],
 ):
@@ -149,8 +151,11 @@ def column_stats_kernel(
         return
     c = column_of(q[i], regions)
     if c >= 0:
+        v = wp.length(qd[i])
         wp.atomic_add(col_n, c, 1)
-        wp.atomic_max(col_vmax, c, wp.length(qd[i]))
+        if v >= v_sleep:
+            wp.atomic_add(col_fast, c, 1)
+        wp.atomic_max(col_vmax, c, v)
         wp.atomic_max(col_ztop, c, q[i][2])
 
 
@@ -389,7 +394,9 @@ class SoilZones:
     WAKE_DEPTH = 0.05  # m below the bucket box (which has 0.1 m of plate margin): woken columns become particles down to here
     MIN_AWAKE = 8  # updates (0.5 s): a woken column stays awake at least this long, so it can flow
     SLEEP_DZ = 0.9
-    V_SLEEP = 0.04  # m/s: a column sleeps only if all its particles are slower than this
+    V_SLEEP = 0.04  # m/s: a column sleeps only if its particles are slower than this, but for
+    FAST_FRAC = 0.03  # this fraction of them (MPM jitter on a heap's surface would keep it awake for good)
+    V_CREEP = 0.25  # m/s: ... and none faster than this (soil falling or flowing onto it)
     LOST_Z = -0.5  # m: particles below this fell through the ground and are removed
     REPOSE_SLOPE = 0.75  # tan of the angle of repose (sand friction 0.75, 37 deg)
     AVALANCHE_DROP = 0.2  # m to a neighbour: faces this high slump (smaller steps are below MPM's 8 cm resolution)
@@ -438,6 +445,7 @@ class SoilZones:
         self.count = wp.zeros(self.n_cols, dtype=int)
         self.col_n = wp.zeros(self.n_cols, dtype=int)
         self.col_vmax = wp.zeros(self.n_cols, dtype=float)
+        self.col_fast = wp.zeros(self.n_cols, dtype=int)
         self.col_ztop = wp.zeros(self.n_cols, dtype=float)
         self.sleep = wp.zeros(self.n_cols, dtype=int)
         self.show = wp.zeros(self.n_cols, dtype=int)
@@ -621,9 +629,11 @@ class SoilZones:
             wp.launch(swell_dug_kernel, dim=self.pool, inputs=[st.particle_q, self.model.particle_flags, self.woke_at, self.loose, self.DUG_M, self.loose_volume, mm.material_particle_volume])
         self.col_n.zero_()
         self.col_vmax.zero_()
+        self.col_fast.zero_()
         self.col_ztop.fill_(-1.0e6)
-        wp.launch(column_stats_kernel, dim=self.pool, inputs=[st.particle_q, st.particle_qd, self.model.particle_flags, self.regions], outputs=[self.col_n, self.col_vmax, self.col_ztop])
+        wp.launch(column_stats_kernel, dim=self.pool, inputs=[st.particle_q, st.particle_qd, self.model.particle_flags, self.regions, self.V_SLEEP], outputs=[self.col_n, self.col_fast, self.col_vmax, self.col_ztop])
         n, vmax, ztop = self.col_n.numpy(), self.col_vmax.numpy(), self.col_ztop.numpy()
+        fast = self.col_fast.numpy()
         dormant_top = np.where(self.count_np > 0, self.col_floor + self.count_np * self.col_layer_np, -1.0e6)
         top = np.maximum(dormant_top, ztop)
 
@@ -632,7 +642,8 @@ class SoilZones:
         near_any = np.zeros(self.n_cols, dtype=bool)
         for b in boxes:
             near_any |= self._near(b, self.SLEEP_MARGIN, self.SLEEP_DZ, top)
-        sleep = (n > 0) & rested & (vmax < self.V_SLEEP) & ~near_any
+        still = (vmax < self.V_SLEEP) | ((fast <= self.FAST_FRAC * n) & (vmax < self.V_CREEP))
+        sleep = (n > 0) & rested & still & ~near_any
         slept = int(sleep.sum())
         self.sleep.assign(sleep.astype(np.int32))
         self.freed_n.zero_()
