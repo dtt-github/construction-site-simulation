@@ -537,9 +537,9 @@ class ExcavatorSim:
         ("swing back", 0, 6.0, 2.6 + DIG_Z, -95),  # lowers while swinging, once clear of the truck
     ]
 
-    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, command_response=False):
+    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, haul_m=0.0, command_response=False):
         wp.init()
-        self.kwargs = {"voxel": voxel, "ppc": ppc, "soil": soil, "iterations": iterations, "fps": fps, "pool": pool, "mpm_every": mpm_every, "carriers": carriers, "command_response": command_response}
+        self.kwargs = {"voxel": voxel, "ppc": ppc, "soil": soil, "iterations": iterations, "fps": fps, "pool": pool, "mpm_every": mpm_every, "carriers": carriers, "haul_m": haul_m, "command_response": command_response}
         # levers reach the spools through the dead time and lag of PWRI's ZX200 under velocity commands
         # (hydraulics.COMMAND_DEAD; off: the spools follow the levers at once, as before)
         self.command_response = command_response
@@ -692,7 +692,7 @@ class ExcavatorSim:
         self.truck_floor = z.col_floor[z.region_mask("truck")].copy()
         # the carriers' haul cycle; each vessel and the dozer blade has a free joint (found by its child body)
         self.haul = haul
-        self.fleet = Fleet(carriers, BED_CENTER, GROUND_Z, HAUL_DUMP_X, HAUL_TURN_X, TRUCK_CAPACITY_KG)
+        self.fleet = Fleet(carriers, BED_CENTER, GROUND_Z, HAUL_DUMP_X, HAUL_TURN_X, TRUCK_CAPACITY_KG, haul_m)
         child = self.model.joint_child.numpy()
         jq, jqd = self.model.joint_q_start.numpy(), self.model.joint_qd_start.numpy()
         joint_of = {int(bd): j for j, bd in enumerate(child)}
@@ -1053,7 +1053,7 @@ class ExcavatorSim:
 
     def _load_top(self):
         """Height of the heaped load in the truck, from its mass."""
-        return BED_FLOOR_Z + self.LOAD_PEAK * self.truck_kg / self.density / (BED_L * BED_W)
+        return BED_FLOOR_Z + self.LOAD_PEAK * self.spot_kg / self.density / (BED_L * BED_W)
 
     def _load_raise(self):
         """How much higher (m) to carry and dump the bucket than planned, for a load heaped above the sides."""
@@ -1211,9 +1211,11 @@ class ExcavatorSim:
         if not self.haul:
             return
         self.measure()
-        self.pass_kg = self.truck_kg - self.truck_mark  # what this pass put in
-        self.truck_mark = self.truck_kg
-        if self.truck_kg + max(self.pass_kg, 0.5 * self.full_kg) > TRUCK_CAPACITY_KG:
+        # the carrier at the spot only (truck_kg also counts the loads on their way: on a long road the next
+        # carrier was sent off after one pass, the one before still hauling its load)
+        self.pass_kg = self.spot_kg - self.truck_mark  # what this pass put in
+        self.truck_mark = self.spot_kg
+        if self.spot_kg + max(self.pass_kg, 0.5 * self.full_kg) > TRUCK_CAPACITY_KG:
             self.dispatch()
             self.truck_mark = 0.0
 
@@ -1856,7 +1858,7 @@ class ExcavatorSim:
 
     def _carrier_three(self, d):
         """Carrier d's base_link and vessel pin poses in three.js coordinates ((pos, quat), (pos, quat))."""
-        base = np.array([d.base[0], d.base[1], GROUND_Z])
+        base = np.array([d.base[0], d.base[1], d.z])
         bq = dumper_mod.yaw_quat(d.yaw)
         p, R, _, _ = d.vessel_pose()
         pin = p - R @ dumper_mod.FLOOR_FROM_PIN
@@ -2031,9 +2033,10 @@ def main():
     ap.add_argument("--pool", type=int, default=POOL, help="particle capacity of the soil zone")
     ap.add_argument("--mpm-every", type=int, default=MPM_EVERY, help="frames per MPM step (1: sand at 60 Hz)")
     ap.add_argument("--soil", choices=list(soils.SOILS), default=soils.DEFAULT_SOIL, help="soil preset (soils.py)")
-    ap.add_argument("--carriers", type=int, default=1, choices=(1, 2), help="crawler carriers in the haul cycle")
+    ap.add_argument("--carriers", type=int, default=1, help="crawler carriers in the haul cycle (more than two need --haul-m)")
+    ap.add_argument("--haul-m", type=float, default=0.0, help="off-screen two-lane haul road between the loading spot and the dump, m each way")
     args = ap.parse_args()
-    sim = ExcavatorSim(voxel=args.voxel, iterations=args.iterations, pool=args.pool, mpm_every=args.mpm_every, soil=args.soil, carriers=args.carriers)
+    sim = ExcavatorSim(voxel=args.voxel, iterations=args.iterations, pool=args.pool, mpm_every=args.mpm_every, soil=args.soil, carriers=args.carriers, haul_m=args.haul_m)
     if args.trench:
         sim.set_trench()
     res = None

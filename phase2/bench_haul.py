@@ -12,6 +12,7 @@ versions of the autopilot pass by pass, in a quarter of the time. Progress goes 
     ../phase0/.venv-newton/bin/python bench_haul.py 600                 # dry sand
     SOIL=loam ../phase0/.venv-newton/bin/python bench_haul.py 600
     SOIL=loam CARRIERS=2 ../phase0/.venv-newton/bin/python bench_haul.py 600   # two carriers sharing the road
+    SOIL=loam CARRIERS=3 HAUL_M=150 ../phase0/.venv-newton/bin/python bench_haul.py 1500   # 150 m more road each way
     SOIL=clay PASSES=25 ../phase0/.venv-newton/bin/python bench_haul.py 1500   # quick check: the first 25 passes
 """
 
@@ -27,8 +28,9 @@ import excavator_server as ex
 secs = float(sys.argv[1]) if len(sys.argv) > 1 else 600.0
 soil = os.environ.get("SOIL", ex.soils.DEFAULT_SOIL)
 n_carriers = int(os.environ.get("CARRIERS", "1"))
+haul_m = float(os.environ.get("HAUL_M", "0"))  # the off-screen two-lane road, each way (dumper.py)
 max_passes = int(os.environ.get("PASSES", "0")) or None
-sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers)
+sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m)
 sim.auto = True
 fleet = sim.fleet
 loads, start_load, passes_at = [], {}, {}
@@ -88,6 +90,7 @@ delivered_t = fleet.delivered_kg / 1000.0
 out = {
     "soil": soil,
     "carriers": n_carriers,
+    "haul_m": haul_m,
     "sim_s": round(secs, 1),
     "stopped_after_passes": max_passes,
     "realtime_factor": round(secs / wall, 3),

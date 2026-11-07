@@ -1645,3 +1645,48 @@ After the aim fix, dry sand still left 10–12 t on the ground beside the carrie
 - **Timeouts log each joint's error** (`err_rad` in the bench's `skipped` list). It found the bucket jam above, and one remaining case of the stall after the full carrier: at 474 s the house did not swing back (1.36 rad short) for 20 s.
 
 Logs: `logs/haul_bench_carry_long<n>_<soil>_1carrier.json` (the iterations tried), `logs/haul_bench_wait_long1_dry-sand_1carrier.json` (kept).
+
+## A living site, 7: longer haul roads and three or more carriers
+
+The haul road can now be made longer, and the fleet larger (`ExcavatorSim(carriers=n, haul_m=L)`, `excavator_server.py --carriers n --haul-m L`, `CARRIERS=n HAUL_M=L bench_haul.py`). The question it answers is the one a site engineer asks next: how many carriers does a longer haul need?
+
+**The road** (`dumper.py`):
+- **Two lanes, off-screen.** Between the loading spot and the dump area, the road gains L metres each way. The middle of it is off-screen, so the pit, the loading spot and the spoil area stay in view as before.
+- **Leaving the spot:** a loaded carrier drives out and leaves the view. Its time on the hidden road is L at its speed (2.2 m/s loaded, 2.8 m/s empty), plus accelerating and braking.
+- **At the dump:** it comes back into view facing the dump point, backs in and dumps, then drives clear and leaves again empty.
+- **Coming back:** it reappears at the waiting place and goes on to the spot as before. Off-screen, a carrier is parked out of sight below the ground, as the dozer's blade is when unused.
+- **Traffic:** one carrier at a time in each visible area (the spot side, the dump side, the waiting place). Carriers queue off-screen, first come, first served. On two lanes they never meet head-on.
+- **The short road is unchanged:** with L = 0 and at most two carriers, the route and the earlier benchmarks are as before.
+
+**Two fixes the longer road needed:**
+- **A carrier was sent off after one pass.** The autopilot judged whether the next pass would fit by the carriers' total load, which also counts the loads on their way to the dump. On the short road the previous carrier had usually tipped before the next one's first pass; on a long road it had not, and the second and third carriers left with about 1 t. The autopilot now uses the load in the carrier at the spot only (also for the heap height it clears).
+- **The dozer held the next carrier up.** It started spreading as soon as a carrier left the dump area, and the next loaded carrier, already close, waited up to 60 s. On the long road it now stops when a carrier is waiting to come to the dump, or due there within 20 s (`DOZER_CLEAR_S`), and backs out and parks as it does for a carrier on the short road. Carriers waited 0 s at the dump in every run below.
+
+**Benchmark: one to four carriers, 150 m and 300 m** (loam, 1500 s, logs `logs/haul_bench_road<L>_<n>carriers_loam.json`). With two or more carriers, the excavator dug out all the soil within its reach (about 77 t) before 1500 s. So the rate is taken from the time between loads leaving the spot over the first six intervals, not from the total:
+
+| Road (each way) | Carriers | Time between loads leaving | Loading rate | Carrier cycle (loading + away) | Match factor | Carrier-limited rate, n × load / cycle |
+|---|---|---|---|---|---|---|
+| 150 m | 1 | 281 s | 137 t/h | 280 s | 0.38 | 134 t/h |
+| | 2 | 136 s | 256 t/h | 280 s | 0.75 | 268 t/h |
+| | 3 | 130 s | 268 t/h | | 1.13 | excavator-limited |
+| | 4 | 130 s | 268 t/h | | 1.50 | excavator-limited |
+| 300 m | 1 | 402 s | 91 t/h | 405 s | 0.26 | 89 t/h |
+| | 2 | 204 s | 170 t/h | 405 s | 0.52 | 178 t/h |
+| | 3 | 132 s | 268 t/h | | 0.78 | 267 t/h |
+| | 4 | 129 s | 274 t/h | | 1.04 | excavator-limited |
+
+Loads were 9.6–10.7 t (5–6 passes) and took 100–110 s to load. The match factor is carriers × loading time / carrier cycle time (Peurifoy & Schexnayder; Caterpillar Performance Handbook).
+
+- **The simulated rates follow the textbook model:**
+  - Below a match factor of 1, output is carriers × load / cycle time, within 2–5 %.
+  - Above it, the excavator sets the rate: about 270 t/h. That is one load every 130 s, made of 105 s of loading and about 25 s to swap carriers at the spot.
+- **The best fleet:**
+  - 150 m: two carriers reach 95 % of the excavator's rate; a third adds 5 %.
+  - 300 m: three carriers are needed.
+  - Beyond the best fleet, the extra carriers only wait: with four carriers on 150 m they waited 3278 s in a 1500 s run, 2.2 carrier-hours per hour.
+- **The pit is the limit in these runs.** About 77 t is within the excavator's reach without moving it, and with two or more carriers it is dug out in 1000–1400 s. Longer studies need the excavator to move to a new face.
+
+**Limits:**
+- **The road is timed, not driven.** Grades, rolling resistance, bends and speed limits on the hidden part are not modelled, so the travel time is length / speed plus accelerating and braking.
+- **One loading spot, one dump point.** Real sites often load from both sides of the excavator, which shortens the swap.
+- **Loam only so far.**

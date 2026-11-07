@@ -15,6 +15,13 @@ Route (zone frame, cab toward +x at the loading spot; the vessel tips about a pi
                   -> spin turn to face +x -> reverse into the loading spot
 Spin turns are made away from the excavator (its tracks are 2.5 m from the parked carrier's corner).
 
+Longer hauls (haul_m > 0, or more than two carriers): the middle of the road is off-screen, two lanes, haul_m
+long each way. A loaded carrier drives out, leaves the view ("haul out", timed at its speed with accelerating
+and braking), and comes back into view on the dump side facing the dump point, once that is clear ("wait at
+dump", still off-screen); it backs in, dumps, drives clear and leaves again ("haul back"). It comes back into
+view at the waiting place (QUEUE) once that is free ("queue on road": carriers queue on the road, off-screen),
+and goes on to the spot as before. Off-screen, a carrier is parked out of sight below the ground.
+
 The haul road is one lane, so the server gates three moves with the other carriers' positions (Fleet):
 a loaded carrier leaves the spot only while every other carrier waits at QUEUE (two never meet head-on
 on the lane); a waiting carrier comes down to the spot once it is empty and the carrier that left it is
@@ -49,9 +56,14 @@ SHAKE_DEG, SHAKE_PERIOD, CARRY_BACK, DUMP_MAX = 4.0, 0.8, 0.03, 15.0
 CREEP_SPEED, CREEP_MAX = 0.4, 2.5  # m/s, m
 RETURN_X = 18.5  # base_link x where an empty carrier turns back toward the spot, or leaves the road to wait
 QUEUE = (14.5, 11.0, -math.pi / 2)  # waiting place north of the road: base_link x, y, heading (cab to the road)
+# longer hauls: base_link x where a loaded carrier leaves the view, and where it comes back into it facing the dump
+# point (its cab clears a carrier spinning onto the spot from QUEUE, and a loaded one driving out to HIDE_X)
+HIDE_X, EMERGE_X = 14.5, 21.5
+DOZER_CLEAR_S = 20.0  # s before a loaded carrier is due at the dump side that the dozer stops work there
+HIDE_DEPTH = 20.0  # m below the ground where an off-screen carrier is parked (as the dozer's blade when unused)
 
 STAGES = ("loading", "drive out", "turn to dump", "reverse to dump", "tip", "dump", "lower", "return", "turn to load", "reverse in",
-          "wait at dump", "to queue", "wait to load", "from queue")
+          "wait at dump", "to queue", "wait to load", "from queue", "haul out", "haul back", "queue on road")
 AT_SPOT = ("loading", "reverse in", "from queue")  # using the loading spot or on the way into it
 LEAVING = ("drive out", "turn to dump", "wait at dump")  # loaded, on the lane between the spot and the dump point
 AT_DUMP = ("reverse to dump", "tip", "dump", "lower", "return")
@@ -77,11 +89,13 @@ def rot(yaw, tip):
 
 
 class Dumper:
-    def __init__(self, load_center, ground_z, dump_x, turn_x, capacity_kg, start="spot", index=0):
+    def __init__(self, load_center, ground_z, dump_x, turn_x, capacity_kg, start="spot", index=0, haul_m=None):
         """load_center: vessel centre (x, y) at the loading spot; dump_x: base_link x when dumping (the
         rear, and the soil, further +x); turn_x: where the loaded carrier spins round; start: "spot" (at the
-        loading spot) or "queue" (waiting to load)."""
+        loading spot), "queue" (waiting to load) or "road" (off-screen, queueing for the waiting place);
+        haul_m: the off-screen road's length each way (None: the short road, no off-screen part)."""
         self.ground_z, self.capacity_kg = ground_z, capacity_kg
+        self.haul_m = haul_m
         self.load_base = np.array([load_center[0] - VESSEL_X, load_center[1]])
         self.dump_x, self.turn_x = dump_x, turn_x
         self.start, self.index = start, index
@@ -96,6 +110,9 @@ class Dumper:
         self.dump_clear = True  # no dozer or other carrier at the dump point
         self.may_leave_queue = True  # the spot is free and the lane to it clear
         self.spot_busy = False  # another carrier is using or entering the loading spot
+        self.queue_free = True  # no other carrier at the waiting place (longer hauls)
+        self.hidden, self.hide_left = False, 0.0  # off-screen, and the time left on the off-screen road
+        self.arrived = 0.0  # when it began to wait off-screen
         self.dozer_wait, self.depart_wait, self.queue_wait = 0.0, 0.0, 0.0  # s held at each gate
         self.payload_kg = 0.0
         self.residual_kg, self.load_kg = 0.0, 0.0  # soil still in the vessel while dumping; the load taken
@@ -106,7 +123,13 @@ class Dumper:
         self.counts = None  # the carried load (server): particle counts per vessel cell, while away
         self.creep_from = None  # where the carrier stood when it began to dump
         self.carry_counted = 0
-        if self.start == "queue":
+        if self.start == "road":
+            self.base = np.array(QUEUE[:2], dtype=float)
+            self.yaw = QUEUE[2]
+            self.hidden = True
+            self.stage = "queue on road"
+            self.plan = [("emerge", *QUEUE, "queue_free", "queue on road"), *self._from_queue()]
+        elif self.start == "queue":
             self.base = np.array(QUEUE[:2], dtype=float)
             self.yaw = QUEUE[2]
             self.stage = "wait to load"
@@ -125,13 +148,18 @@ class Dumper:
         """Vessel body origin (middle of the floor), rotation, linear and angular velocity (zone frame)."""
         R = rot(self.yaw, self.tip)
         Rz = rot(self.yaw, 0.0)
-        pin = np.array([*self.base, self.ground_z]) + Rz @ PIN
+        pin = np.array([*self.base, self.z]) + Rz @ PIN
         p = pin + R @ FLOOR_FROM_PIN
         w = np.array([0.0, 0.0, self.yaw_rate]) + Rz @ np.array([0.0, -self.tip_rate, 0.0])
         heading = np.array([math.cos(self.yaw), math.sin(self.yaw), 0.0])
-        v_pin = self.speed * heading + np.cross([0.0, 0.0, self.yaw_rate], pin - np.array([*self.base, self.ground_z]))
+        v_pin = self.speed * heading + np.cross([0.0, 0.0, self.yaw_rate], pin - np.array([*self.base, self.z]))
         v = v_pin + np.cross(w, p - pin)
         return p, R, v, w
+
+    @property
+    def z(self):
+        """base_link height: on the ground, or out of sight below it while off-screen."""
+        return self.ground_z - (HIDE_DEPTH if self.hidden else 0.0)
 
     def vessel_quat(self):
         return quat_mul(yaw_quat(self.yaw), np.array([0.0, math.sin(-self.tip / 2), 0.0, math.cos(-self.tip / 2)]))
@@ -141,6 +169,13 @@ class Dumper:
     # ("face", x, y, stage) spin to head for (x, y); ("spin", yaw, stage); ("gate", flag, stage) hold until
     # the flag is set; ("tip",), ("dump",), ("lower",); ("choose",) pick the way back once at RETURN_X
     def _trip(self):
+        if self.haul_m is not None:
+            y = self.base[1]
+            return [("drive", HIDE_X, y, +1, SPEED_LOADED, "drive out"), ("hide", self.haul_m, SPEED_LOADED, "haul out"),
+                    ("emerge", EMERGE_X, y, math.pi, "dump_clear", "wait at dump"),
+                    ("drive", self.dump_x, y, -1, SPEED_REVERSE, "reverse to dump"), ("tip",), ("dump",), ("lower",),
+                    ("drive", EMERGE_X, y, +1, SPEED_EMPTY, "return"), ("hide", self.haul_m, SPEED_EMPTY, "haul back"),
+                    ("emerge", *QUEUE, "queue_free", "queue on road"), *self._from_queue()]
         return [("drive", self.turn_x, self.base[1], +1, SPEED_LOADED, "drive out"), ("spin", math.pi, "turn to dump"),
                 ("gate", "dump_clear", "wait at dump"), ("drive", self.dump_x, self.base[1], -1, SPEED_REVERSE, "reverse to dump"),
                 ("tip",), ("dump",), ("lower",), ("drive", RETURN_X, self.load_base[1], +1, SPEED_EMPTY, "return"), ("choose",)]
@@ -223,6 +258,29 @@ class Dumper:
                     self.dozer_wait += dt
                 else:
                     self.queue_wait += dt
+        elif kind == "hide":
+            _, dist, v, stage = move
+            if self.stage != stage:
+                # the road at speed v, accelerating from rest and braking to it at ACCEL
+                self.hide_left = dist / v + v / ACCEL if dist > 0.0 else 0.0
+                self.hidden, self.speed = True, 0.0
+            self._next(stage)
+            self.hide_left -= dt
+            done = self.hide_left <= 0.0
+        elif kind == "emerge":
+            _, x, y, yaw, flag, stage = move
+            if getattr(self, flag):
+                self.base[:] = (x, y)
+                self.yaw, self.hidden = yaw, False
+                done = True
+            else:
+                if self.stage != stage:
+                    self.arrived = self.time  # in line from here (Fleet.gates: first come, first served)
+                self._next(stage)
+                if flag == "dump_clear":
+                    self.dozer_wait += dt
+                else:
+                    self.queue_wait += dt
         elif kind == "tip":
             self._next("tip")
             self.tip_rate = TIP_RATE
@@ -283,9 +341,12 @@ class Dumper:
 class Fleet:
     """The carriers and the traffic rules between them (see the module docstring)."""
 
-    def __init__(self, n, load_center, ground_z, dump_x, turn_x, capacity_kg):
-        assert 1 <= n <= 2, "one waiting place: one or two carriers"
-        self.carriers = [Dumper(load_center, ground_z, dump_x, turn_x, capacity_kg, start="spot" if i == 0 else "queue", index=i) for i in range(n)]
+    def __init__(self, n, load_center, ground_z, dump_x, turn_x, capacity_kg, haul_m=0.0):
+        """haul_m: the off-screen road's length each way; more than two carriers need it (they queue on it)."""
+        self.long = haul_m > 0.0 or n > 2
+        h = haul_m if self.long else None
+        self.carriers = [Dumper(load_center, ground_z, dump_x, turn_x, capacity_kg, start=("spot", "queue")[i] if i < 2 else "road", index=i, haul_m=h)
+                         for i in range(n)]
 
     def __iter__(self):
         return iter(self.carriers)
@@ -303,6 +364,17 @@ class Fleet:
         return next((c for c in self.carriers if c.parked), None)
 
     def gates(self, dozer_parked):
+        if self.long:
+            # one carrier at a time on each side of the view: the spot side (driving out, or from the waiting
+            # place into the spot), the dump side, and the waiting place
+            for c in self.carriers:
+                others = [o for o in self.carriers if o is not c]
+                c.may_depart = not any(o.stage in ("from queue", "reverse in") for o in others)
+                c.dump_clear = dozer_parked and not any(o.stage in AT_DUMP or o.stage == "wait at dump" and (o.arrived, o.index) < (c.arrived, c.index) for o in others)
+                c.may_leave_queue = not any(o.stage in AT_SPOT or o.stage == "drive out" for o in others)
+                c.queue_free = not any(o.stage in ("wait to load", "from queue") or o.stage == "queue on road" and (o.arrived, o.index) < (c.arrived, c.index)
+                                       for o in others)  # first come, first served
+            return
         for c in self.carriers:
             others = [o for o in self.carriers if o is not c]
             c.may_depart = all(o.stage == "wait to load" for o in others)
@@ -315,6 +387,11 @@ class Fleet:
     def dump_area_free(self):
         """The dozer may work at the dump point: every carrier is at the loading spot or waiting to load,
         or still close to the spot on its way out."""
+        if self.long:
+            # nor one waiting off-screen to come to it, or due there within DOZER_CLEAR_S: the dozer backs
+            # out and parks in time (spreading as soon as a carrier had left held the next one up to 60 s)
+            return not any(c.stage in AT_DUMP or c.stage == "wait at dump" or c.stage == "haul out" and c.hide_left < DOZER_CLEAR_S
+                           for c in self.carriers)
         return all(c.stage in ("loading", "reverse in", "wait to load", "from queue") or (c.stage == "drive out" and c.base[0] < c.turn_x - 6.0)
                    or c.stage in ("to queue",) and c.base[1] > 8.0 for c in self.carriers)
 
