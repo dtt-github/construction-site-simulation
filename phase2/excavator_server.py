@@ -193,22 +193,26 @@ GROUND_REGION = ("ground", -ZONE_HALF[0] - 2.0, -ZONE_HALF[1] - 2.0, 229, 181, g
 # of the machine, flat site ground from x = 13 to 34 m
 HAUL_TURN_X, HAUL_DUMP_X = 20.0, 23.0
 CARRIER_STAGES = dumper_mod.STAGES
-# dozer (dozer.py): spreads the dumped loads east of the dump point in lanes along +x (cutting edge from
-# DOZER_X_START to DOZER_X_END), and parks north of the dump point, out of the carrier's way
+# the fill area east of the dump point is two cells, south and north of the dump line (y 5.2): the dozer
+# spreads one while the roller rolls the other, and they change over when a lift is spread and the other
+# cell rolled
+# dozer (dozer.py): spreads the dumped loads in lanes fanning out along +x into its cell (cutting edge from
+# DOZER_X_START to DOZER_X_END), and parks north-west of the dump point, out of the carrier's way
 DOZER_X_START, DOZER_X_END = 25.2, 33.4  # cutting edge x where the pushes start (the dump heap) and end
-DOZER_LANE_ENDS = (1.3, 3.9, 6.5, 9.1)  # y where the fanned lanes reach DOZER_X_END (from the dump line, y 5.2)
+DOZER_CELLS = ((3.7, 1.1, -1.5), (6.7, 9.3, 11.9))  # y where each cell's fanned lanes reach DOZER_X_END
 DOZER_PARK_Y = 11.4
-# roller (roller.py): rolls the spread area in lanes along +x clear of the dump heap, and parks south of it
-ROLLER_X = (26.5, 33.0)  # drum x along every lane
-ROLLER_Y = (1.2, 9.2)  # y covered by the lanes
-ROLLER_PARK = (28.0, -1.2, 0.0)
+# roller (roller.py): rolls its cell in lanes along +x, clear of the dump heap and of the dozer's pushes
+# near it, and parks east of the area
+ROLLER_X = (28.0, 35.0)  # drum x along every lane
+ROLLER_CELLS = ((-3.2, 5.2), (5.2, 13.6))  # y covered by each cell's lanes: the cells meet on the dump line
+ROLLER_PARK = (37.5, 5.2, math.pi)
 DOZER_SEES_SPEED = 1.0  # m/s: the dozer plans on all soil slower than this (dumped clay creeps for minutes)
 # the haul road between the loading spot and the spoil area: soil falling off a carrier settles there
 ROAD_REGION = ("road", 13.3, -2.5, 134, 190, lambda x, y: np.full(np.shape(x), GROUND_Z))
 # the spoil area reaches 4.6 m past the dozer's lanes, for the soil carried ahead of the blade at the end,
 # and 2 m beside them, for the soil spilled off the blade's ends (soil outside a soil region never settles)
-SPOIL_REGION = ("spoil", 24.0, -2.5, 175, 190, lambda x, y: np.full(np.shape(x), GROUND_Z))
-SPOIL_HM = (24.0, -2.5, 140, 152)  # display heightmap of the spoil area: x0, y0, nx, ny (0.1 m cells)
+SPOIL_REGION = ("spoil", 24.0, -5.5, 175, 220, lambda x, y: np.full(np.shape(x), GROUND_Z))
+SPOIL_HM = (24.0, -5.5, 140, 210)  # display heightmap of the spoil area: x0, y0, nx, ny (0.1 m cells)
 
 
 def box_inertia(m, hx, hy, hz):
@@ -710,11 +714,11 @@ class ExcavatorSim:
         self.carrier_track = tracks.Track(dumper_mod.SHOE_B, dumper_mod.TRACK_L, soil, loose=True)
         self.track_counters = {"dozer_pressed": 0, "carrier_pressed": 0}
         edge_ahead = Dozer._edge_ahead()
-        self.dozer = Dozer((DOZER_X_START - edge_ahead, DOZER_PARK_Y, math.pi / 2), (DOZER_X_START, BED_CENTER[1], DOZER_X_END, DOZER_LANE_ENDS), GROUND_Z, soil)
+        self.dozer = Dozer((DOZER_X_START - edge_ahead, DOZER_PARK_Y, math.pi / 2), (DOZER_X_START, BED_CENTER[1], DOZER_X_END, DOZER_CELLS), GROUND_Z, soil)
         self.blade_q, self.blade_qd = int(jq[joint_of[self.blade]]), int(jqd[joint_of[self.blade]])
         # the roller compacting the spread fill once the dozer has spread it
         self.use_roller = self.use_dozer and roller
-        self.roller = roller_mod.Roller(ROLLER_PARK, ROLLER_X, ROLLER_Y, GROUND_Z)
+        self.roller = roller_mod.Roller(ROLLER_PARK, ROLLER_X, ROLLER_CELLS, GROUND_Z)
         self.roller_counters = {"rolled": 0}
 
         cfg = SolverImplicitMPM.Config()
@@ -819,7 +823,6 @@ class ExcavatorSim:
         self.blade_force = np.zeros(3)
         self.zones.set_region_floor("truck", self.truck_floor)
         self.dispatch_pending, self.truck_wait = False, 0.0
-        self.roller_may = False
         self.pass_kg, self.truck_mark = 0.0, 0.0
         self.dump_inset, self.vessel_before = self.DUMP_INSET[0], None
         self.was_waiting = False
@@ -1562,14 +1565,17 @@ class ExcavatorSim:
         if self.zone_frame % 3 == 0:
             self._spoil_surface(self.doze_hm, DOZER_SEES_SPEED)
             self.doze_hm_np = self.doze_hm.numpy()
-        may_work = self.fleet.dump_area_free() and (self.roller.parked or not self.use_roller)
+        may_work = self.fleet.dump_area_free()
         self.blade_force = self.sand_forces.numpy()[self.blade][:3].astype(float)
+        if self.use_roller and self.zone_frame % 30 == 0:  # the other cell is rolled (most of its soil: spill off the
+            # blade's ends and the dump heap reach it all the time)
+            dz.may_switch = self.zones.rolled_share(self.roller.cell_points(), ("spoil",), roller_mod.ROLL_PASSES) >= roller_mod.DONE_SHARE
         dz.update(self.frame_dt, self._surface, self.blade_force, may_work)
         if self.use_roller:
-            if self.zone_frame % 30 == 0:  # the dozer's lane scores are a few ms: twice a second
-                self.roller_may = dz.parked and not dz.wants_work(self._surface)
+            r = self.roller
+            r.set_cell(1 - dz.cell)  # the cell the dozer is not spreading
             rolled = lambda xy, n: self.zones.rolled_share(xy, ("spoil",), n)
-            self.roller.update(self.frame_dt, self._surface, self.roller_may, rolled, dz.grade)
+            r.update(self.frame_dt, self._surface, True, rolled, dz.grades[r.cell])
         p, R = dz.blade_pose()
         q, qd = self.state_0.joint_q.numpy(), self.state_0.joint_qd.numpy()
         q[self.blade_q:self.blade_q + 7] = [*p, *dz.blade_quat()]

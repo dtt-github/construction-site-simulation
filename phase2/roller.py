@@ -10,10 +10,9 @@ is rolled with the same drum here; on site it would get the padfoot version (BW 
 
 Rolling, as fill is rolled on site: the roller works the spread area in straight lanes along +x, one drum
 width apart less an overlap, forward and back over each lane (a pass each way) until ROLL_PASSES passes have
-gone over nearly all the soil in the lane since soil was last added there. It rolls only while the dozer is
-parked with nothing to spread, and parks south of the area, out of the dozer's and the carriers' way,
-whenever the dozer has work. A lane whose soil still stands well above the design surface (a heap the dozer
-has not spread) is left for later.
+gone over nearly all the soil in the lane since soil was last added there. The fill area is two cells; the
+roller rolls the one the dozer is not spreading, and parks east of the area when it is done. A lane whose
+soil still stands well above the design surface (a heap the dozer has not spread) is left for later.
 
 Machine (BOMAG data sheet via dealer listings): operating weight 10.6 t, drum 2.13 m wide and 1.50 m in
 diameter, top speed 10.9 km/h. Rolling speed ROLL_SPEED (4 km/h): 3-6 km/h is the usual range for soil.
@@ -45,20 +44,23 @@ STAGES = ["parked", "to lane", "roll", "to park"]
 
 
 class Roller:
-    def __init__(self, park, x_range, y_range, ground_z):
-        """park: (x, y, yaw) where it waits; x_range: (x0, x1) of the drum along every lane; y_range: (y0, y1)
-        covered by the lanes."""
+    def __init__(self, park, x_range, cells, ground_z):
+        """park: (x, y, yaw) where it waits; x_range: (x0, x1) of the drum along every lane; cells: (y0, y1)
+        covered by each cell's lanes (it rolls one cell at a time)."""
         self.park, self.ground_z = park, ground_z
         self.x0, self.x1 = x_range
         step = DRUM_W - OVERLAP
-        n = max(1, math.ceil((y_range[1] - y_range[0] - DRUM_W) / step) + 1)
-        self.lanes = [y_range[0] + DRUM_W / 2 + k * step for k in range(n)]
+        self.cell_lanes = []
+        for y0, y1 in cells:
+            n = max(1, math.ceil((y1 - y0 - DRUM_W) / step) + 1)  # lanes at most a step apart, spread evenly
+            self.cell_lanes.append(list(np.linspace(y0 + DRUM_W / 2, y1 - DRUM_W / 2, n)))
         self.reset()
 
     def reset(self):
         self.x, self.y, self.yaw = self.park
         self.z, self.pitch, self.roll = self.ground_z + DRUM_R, 0.0, 0.0
         self.speed = 0.0
+        self.cell, self.lanes = 0, self.cell_lanes[0]
         self.stage = "parked"
         self.plan = []  # ("spin", yaw) | ("drive", x, y, dir, speed, stage)
         self.lane = None
@@ -67,6 +69,12 @@ class Roller:
     @property
     def parked(self):
         return self.stage == "parked"
+
+    def set_cell(self, cell):
+        """Roll this cell from now on (leaving the lane in hand)."""
+        if cell != self.cell:
+            self.cell, self.lanes, self.lane = cell, self.cell_lanes[cell], None
+            self.plan = [] if self._at_park() else self._to_park()
 
     def drum_pos(self):
         return np.array([self.x, self.y]) + DRUM_X * np.array([math.cos(self.yaw), math.sin(self.yaw)])
@@ -79,6 +87,10 @@ class Roller:
         c, s = math.cos(self.yaw), math.sin(self.yaw)
         x, y = self.drum_pos()
         return np.stack([x + c * gu.ravel() - s * gv.ravel(), y + s * gu.ravel() + c * gv.ravel()], 1)
+
+    def cell_points(self):
+        """Points (n, 2) under all the lanes of the cell it rolls."""
+        return np.concatenate([self._lane_points(k) for k in range(len(self.lanes))])
 
     def _lane_points(self, k):
         x = np.arange(self.x0, self.x1, 0.1) + 0.05
