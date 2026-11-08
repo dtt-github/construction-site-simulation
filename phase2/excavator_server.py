@@ -1562,19 +1562,19 @@ class ExcavatorSim:
         self.state_0.joint_qd.assign(qd)
 
     def _press_tracks(self):
-        """Ruts: the dozer's and carriers' tracks press the loose soil they stand on down by their sinkage
-        (tracks.py); the dozer, following the surface, then sits in its ruts."""
+        """Ruts and compaction: each pass of the dozer's and carriers' tracks presses the loose soil under them
+        denser by their sinkage (tracks.py, SoilZone.press); the dozer, following the surface, sits in its ruts."""
         z = self.zones
         if self.use_dozer:
             dz = self.dozer
             xy = tracks.footprint(dz.x, dz.y, dz.yaw, 0.5 * sum(dozer_mod.TRACK_X), dozer_mod.TRACK_Y, dozer_mod.SHOE_B, dozer_mod.TRACK_L)
-            self.track_counters["dozer_pressed"] += z.press(xy, dz.sinkage, ("spoil", "road"))
+            self.track_counters["dozer_pressed"] += z.press(xy, dz.sinkage, ("spoil", "road"), "dozer", self.sim_time)
         for d in self.fleet:
             if d.hidden:
                 continue
             sink = self.carrier_track.sinkage(dumper_mod.MASS_KG + d.payload_kg)
             xy = tracks.footprint(d.base[0], d.base[1], d.yaw, dumper_mod.TRACK_X0, dumper_mod.HALF_GAUGE, dumper_mod.SHOE_B, dumper_mod.TRACK_L)
-            self.track_counters["carrier_pressed"] += z.press(xy, sink, ("spoil", "road"))
+            self.track_counters["carrier_pressed"] += z.press(xy, sink, ("spoil", "road"), d, self.sim_time)
         z.unpress_empty()
 
     def _spoil_surface(self, hm, max_speed):

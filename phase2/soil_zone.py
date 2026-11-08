@@ -31,6 +31,11 @@ its MPM volume grows by (1 + swell), so with the solver's packing limit (critica
 spreads out at lower density, mass unchanged. Loose particles keep that volume when they sleep in a loose
 region and wake again; one sleeping in the pit is counted back as soil in place.
 
+Compaction: each track pass presses the loose columns under it denser, at most to bank density (press).
+A loose column's layer is the mean volume of its particles, so it holds any mix of loose and compacted
+soil: particles woken from it take that volume (compacted ones are marked 2), and particles that sleep on
+it bring theirs. Compacted soil that the blade or bucket moves DUG_M is dug again, and loose.
+
 Dormant columns are as rigid as the pit walls. That is the approximation: soil outside the zone does not
 fail, so the zone has to cover the bucket's failure wedge (WAKE_MARGIN).
 """
@@ -90,9 +95,10 @@ def swell_dug_kernel(
     loose_volume: float,
     volume: wp.array[float],
 ):
-    """Particles in place that have moved dug_m from where they woke are dug: loose, at the larger volume."""
+    """Particles in place or compacted that have moved dug_m from where they woke are dug: loose, at the
+    larger volume."""
     i = wp.tid()
-    if (flags[i] & ACTIVE) == 0 or loose[i] != 0:
+    if (flags[i] & ACTIVE) == 0 or loose[i] == 1:
         return
     if wp.length(q[i] - woke_at[i]) > dug_m:
         loose[i] = 1
@@ -104,18 +110,19 @@ def mark_spawned_kernel(
     slots: wp.array[int],
     q: wp.array[wp.vec3],
     is_loose: wp.array[int],
-    loose_volume: float,
+    vols: wp.array[float],
     woke_at: wp.array[wp.vec3],
     loose: wp.array[int],
     volume: wp.array[float],
 ):
-    """Newly woken or injected particles: remember where they started, and whether they are loose."""
+    """Newly woken or injected particles: remember where they started, and whether they are in place (0),
+    loose (1) or compacted (2); loose and compacted ones take their column's volume per particle."""
     k = wp.tid()
     i = slots[k]
     woke_at[i] = q[i]
     loose[i] = is_loose[k]
     if is_loose[k] != 0:
-        volume[i] = loose_volume
+        volume[i] = vols[k]
 
 
 @wp.func
@@ -195,11 +202,13 @@ def absorb_kernel(
     mpm_material_flags: wp.array[wp.int32],
     mpm_material_volume: wp.array[float],
     count: wp.array[int],
+    col_vol: wp.array[float],
     freed: wp.array[int],
     freed_n: wp.array[int],
     lost: wp.array[int],
 ):
-    """Sleep: particles in sleeping columns are added to the column count and parked. Particles that
+    """Sleep: particles in sleeping columns are added to the column count (and their volume to col_vol)
+    and parked. Particles that
     fell through the ground (below min_z, or well under every region above them) are removed and counted
     as lost."""
     i = wp.tid()
@@ -214,6 +223,7 @@ def absorb_kernel(
     if c < 0 or sleep[c] == 0:
         return
     wp.atomic_add(count, c, 1)
+    wp.atomic_add(col_vol, c, mpm_material_volume[i])
     deactivate(i, flags, mpm_flags, mpm_material_flags, mpm_material_volume, q, qd, park, freed, freed_n)
 
 
@@ -432,6 +442,7 @@ class SoilZones:
         self.col_layer_np = np.where(self.col_loose, LAYER_PER_PARTICLE * (1.0 + swell), LAYER_PER_PARTICLE)
         self.col_layer = wp.array(self.col_layer_np.astype(np.float32), dtype=float)
         self.loose_volume = particle_volume * (1.0 + swell)
+        self.loose_layer = LAYER_PER_PARTICLE * (1.0 + swell)
         self.floor_z = wp.array(self.col_floor.astype(np.float32), dtype=float)
         self.col_xy = wp.array(np.stack([self.col_x, self.col_y], axis=1).astype(np.float32), dtype=wp.vec2)
 
@@ -443,6 +454,9 @@ class SoilZones:
         self.regions.floor = self.floor_z
 
         self.count = wp.zeros(self.n_cols, dtype=int)
+        self.col_vol = wp.zeros(self.n_cols, dtype=float)  # MPM volume of the particles slept this update
+        self.col_passes = np.zeros(self.n_cols, dtype=np.int64)  # track passes over each column
+        self.last_pressed = {}  # per machine: when each column was last under its tracks (s)
         self.col_n = wp.zeros(self.n_cols, dtype=int)
         self.col_vmax = wp.zeros(self.n_cols, dtype=float)
         self.col_fast = wp.zeros(self.n_cols, dtype=int)
@@ -451,7 +465,7 @@ class SoilZones:
         self.show = wp.zeros(self.n_cols, dtype=int)
         self.freed = wp.zeros(pool, dtype=int)
         self.woke_at = wp.zeros(pool, dtype=wp.vec3)  # where each particle woke (or was injected)
-        self.loose = wp.zeros(pool, dtype=int)  # 1: dug, at the loose volume
+        self.loose = wp.zeros(pool, dtype=int)  # 0: in place; 1: dug, at the loose volume; 2: compacted
         self.freed_n = wp.zeros(1, dtype=int)
         self.lost = wp.zeros(1, dtype=int)
 
@@ -528,18 +542,31 @@ class SoilZones:
 
     def settle(self, mask):
         """Put the active particles over the columns in mask to sleep at once, wherever they are moving."""
-        st, mm = self.state, self.mpm._mpm_model
         self.sleep.assign(mask.astype(np.int32))
+        self._absorb()
+        self._refit()
+
+    def _absorb(self):
+        """Sleep the particles over the columns flagged in self.sleep (and drop the lost ones); a loose
+        column's layer becomes the mean volume of its particles, old and newly slept."""
+        st, mm = self.state, self.mpm._mpm_model
+        self.col_vol.zero_()
         self.freed_n.zero_()
         wp.launch(
             absorb_kernel, dim=self.pool,
-            inputs=[st.particle_q, st.particle_qd, self.regions, self.sleep, self.LOST_Z, self.park, self.model.particle_flags, mm.particle_flags, mm.material_particle_flags, mm.material_particle_volume, self.count, self.freed, self.freed_n, self.lost],
+            inputs=[st.particle_q, st.particle_qd, self.regions, self.sleep, self.LOST_Z, self.park, self.model.particle_flags, mm.particle_flags, mm.material_particle_flags, mm.material_particle_volume, self.count, self.col_vol, self.freed, self.freed_n, self.lost],
         )
         nf = int(self.freed_n.numpy()[0])
         if nf:
             self.active_np[self.freed.numpy()[:nf]] = False
+        before = self.count_np
         self.count_np = self.count.numpy().astype(np.int64)
-        self._refit()
+        got = np.flatnonzero(self.col_loose & (self.count_np > before))
+        if len(got):
+            vol = self.col_vol.numpy()[got] / self.particle_volume * LAYER_PER_PARTICLE
+            layer = (before[got] * self.col_layer_np[got] + vol) / self.count_np[got]
+            self.col_layer_np[got] = np.clip(layer, LAYER_PER_PARTICLE, self.loose_layer)
+            self.col_layer.assign(self.col_layer_np.astype(np.float32))
 
     def columns_at(self, xy, names):
         """Column index under each point xy (n, 2) in the named regions (-1 outside them)."""
@@ -553,31 +580,44 @@ class SoilZones:
             col[inside] = off + iy[inside] * nx + ix[inside]
         return col
 
-    def press(self, xy, sink, names):
-        """Tracks standing on the points xy (n, 2) of the named regions press their loose dormant soil down
-        to `sink` (m) below its loose height, by packing it denser (at most to its bank density); soil
-        pressed that far already stays as it is. Returns the columns pressed further."""
+    PASS_GAP_S = 2.0  # s: a column that comes back under a machine's tracks after this long is a new pass
+
+    def press(self, xy, sink, names, machine, t):
+        """Tracks of `machine` standing on the points xy (n, 2) of the named regions at time t (s). Each new
+        pass over a loose column presses it down by `sink` (m, the tracks' sinkage) times the share of its
+        loose-to-bank margin it still has, packing it towards its bank density. Returns the columns pressed."""
+        last = self.last_pressed.setdefault(machine, np.full(self.n_cols, -np.inf))
         col = np.unique(self.columns_at(xy, names))
         col = col[col >= 0]
-        col = col[self.col_loose[col] & (self.count_np[col] > 0)]
-        if not len(col):
+        new = col[t - last[col] > self.PASS_GAP_S]
+        last[col] = t
+        new = new[self.col_loose[new] & (self.count_np[new] > 0)]
+        if not len(new):
             return 0
-        n = self.count_np[col]
-        loose = LAYER_PER_PARTICLE * (1.0 + self.swell)
-        target = np.maximum((n * loose - sink) / n, LAYER_PER_PARTICLE)
-        deeper = target < self.col_layer_np[col] - 1e-9
-        if not deeper.any():
-            return 0
-        self.col_layer_np[col[deeper]] = target[deeper]
+        self.col_passes[new] += 1
+        n, layer = self.count_np[new], self.col_layer_np[new]
+        margin = (layer - LAYER_PER_PARTICLE) / (self.loose_layer - LAYER_PER_PARTICLE)
+        self.col_layer_np[new] = np.maximum(layer - sink * margin / n, LAYER_PER_PARTICLE)
         self.col_layer.assign(self.col_layer_np.astype(np.float32))
         self._refit()
-        return int(deeper.sum())
+        return len(new)
+
+    def compaction(self, name):
+        """Dormant soil of a loose region: its mean density as a fraction of bank density (loose soil:
+        1 / (1 + swell)), and the share of its soil-bearing columns passed over at least 1, 3 and 6 times."""
+        m = self.region_mask(name) & (self.count_np > 0)
+        if not m.any():
+            return {}
+        n = self.count_np[m]
+        p = self.col_passes[m]
+        return {"of_bank": round(float(n.sum() * LAYER_PER_PARTICLE / (n * self.col_layer_np[m]).sum()), 4), "loose_of_bank": round(1.0 / (1.0 + self.swell), 4),
+                "passed_1": round(float((p >= 1).mean()), 3), "passed_3": round(float((p >= 3).mean()), 3), "passed_6": round(float((p >= 6).mean()), 3)}
 
     def unpress_empty(self):
         """Columns emptied of dormant soil take the loose layer again, for the next soil that settles there."""
-        empty = self.col_loose & (self.count_np == 0) & (self.col_layer_np < LAYER_PER_PARTICLE * (1.0 + self.swell) - 1e-9)
+        empty = self.col_loose & (self.count_np == 0) & (self.col_layer_np < self.loose_layer - 1e-9)
         if empty.any():
-            self.col_layer_np[empty] = LAYER_PER_PARTICLE * (1.0 + self.swell)
+            self.col_layer_np[empty] = self.loose_layer
             self.col_layer.assign(self.col_layer_np.astype(np.float32))
 
     def set_counts(self, counts):
@@ -614,14 +654,19 @@ class SoilZones:
             inputs=[slots_wp, wp.array(np.asarray(pos[:n], dtype=np.float32), dtype=wp.vec3), self.particle_volume, self.model.particle_flags, mm.particle_flags, mm.material_particle_flags, mm.material_particle_volume, st.particle_q, st.particle_qd, ext.particle_qd_grad, ext.particle_elastic_strain, ext.particle_Jp, ext.particle_stress, ext.particle_transform],
         )
         wp.launch(set_velocity_kernel, dim=n, inputs=[slots_wp, wp.array(np.asarray(vel[:n], dtype=np.float32), dtype=wp.vec3), st.particle_qd])
-        self._mark(slots_wp, np.full(n, int(loose), dtype=np.int32))
+        self._mark(slots_wp, np.full(n, int(loose), dtype=np.int32), np.full(n, self.loose_volume))
         if self.on_spawn is not None:
             self.on_spawn(slots_wp)
         return n, slots_wp
 
-    def _mark(self, slots_wp, is_loose):
+    def _column_state(self, cols):
+        """State (0 in place, 1 loose, 2 compacted) and MPM volume of the particles woken from columns."""
+        state = np.where(self.col_loose[cols], np.where(self.col_layer_np[cols] >= self.loose_layer - 1e-9, 1, 2), 0).astype(np.int32)
+        return state, self.particle_volume * self.col_layer_np[cols] / LAYER_PER_PARTICLE
+
+    def _mark(self, slots_wp, is_loose, vols):
         st, mm = self.state, self.mpm._mpm_model
-        wp.launch(mark_spawned_kernel, dim=len(is_loose), inputs=[slots_wp, st.particle_q, wp.array(is_loose, dtype=int), self.loose_volume, self.woke_at, self.loose, mm.material_particle_volume])
+        wp.launch(mark_spawned_kernel, dim=len(is_loose), inputs=[slots_wp, st.particle_q, wp.array(is_loose, dtype=int), wp.array(np.asarray(vols, dtype=np.float32), dtype=float), self.woke_at, self.loose, mm.material_particle_volume])
 
     def _refit(self):
         wp.launch(column_top_kernel, dim=self.n_cols, inputs=[self.count, self.floor_z, self.col_layer, self.mesh_points])
@@ -685,16 +730,8 @@ class SoilZones:
         sleep = (n > 0) & rested & still & ~near_any
         slept = int(sleep.sum())
         self.sleep.assign(sleep.astype(np.int32))
-        self.freed_n.zero_()
-        wp.launch(
-            absorb_kernel, dim=self.pool,
-            inputs=[st.particle_q, st.particle_qd, self.regions, self.sleep, self.LOST_Z, self.park, self.model.particle_flags, mm.particle_flags, mm.material_particle_flags, mm.material_particle_volume, self.count, self.freed, self.freed_n, self.lost],
-        )
-        nf = int(self.freed_n.numpy()[0])
-        if nf:
-            self.active_np[self.freed.numpy()[:nf]] = False
+        self._absorb()
         if slept:
-            self.count_np = self.count.numpy().astype(np.int64)
             self.counters["slept"] += slept
         self.counters["lost"] = int(self.lost.numpy()[0])
 
@@ -739,7 +776,9 @@ class SoilZones:
                 spawn_kernel, dim=len(slots),
                 inputs=[slots_wp, wp.array(pos.astype(np.float32), dtype=wp.vec3), self.particle_volume, self.model.particle_flags, mm.particle_flags, mm.material_particle_flags, mm.material_particle_volume, st.particle_q, st.particle_qd, ext.particle_qd_grad, ext.particle_elastic_strain, ext.particle_Jp, ext.particle_stress, ext.particle_transform],
             )
-            self._mark(slots_wp, np.repeat(self.col_loose[wake], (self.count_np[wake] - keep[wake]).astype(np.int64)).astype(np.int32))
+            k = (self.count_np[wake] - keep[wake]).astype(np.int64)
+            state, vol = self._column_state(wake)
+            self._mark(slots_wp, np.repeat(state, k), np.repeat(vol, k))
             if self.on_spawn is not None:
                 self.on_spawn(slots_wp)
             self.count_np[wake] = keep[wake]

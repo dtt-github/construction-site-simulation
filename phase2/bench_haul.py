@@ -135,5 +135,6 @@ out = {
                "dozer_slip": round(sim.dozer.counters["slip_m"] / max(sim.dozer.counters["slip_m"] + sim.dozer.counters["push_m"], 1e-9), 3),
                "carrier_sinkage_cm": [round(sim.carrier_track.sinkage(m) * 100, 2) for m in (dumper_mod.MASS_KG, dumper_mod.MASS_KG + 11000)],
                **sim.track_counters},
+    "compaction": {r: sim.zones.compaction(r) for r in ("spoil", "road")},
 }
 print(json.dumps(out))

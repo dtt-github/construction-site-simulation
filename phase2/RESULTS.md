@@ -1784,3 +1784,42 @@ The dozer used to pull a flat 56 kN (0.6 × its weight) in every soil, and the c
 - When a pressed column's particles wake, they return to loose volume, so the compaction is lost (left to item #7, compaction).
 - Soil that settles onto a pressed column takes on its packed layer, an error of under a centimetre.
 - The carriers keep their scripted speeds and ride at a fixed height. Their compaction resistance is under 2 kN.
+
+## A living site, 11: compaction of the spread layers
+
+With the ruts of section 10, a column was pressed once to the tracks' sinkage and stayed there however often the machines passed over it. The compaction was also lost when soil woke: its particles came back at loose volume. Both are now fixed (`SoilZone.press`, `_absorb`, `_column_state` in `soil_zone.py`):
+
+- **Repeated passes compact further.** A column that comes back under a machine's tracks after more than 2 s counts as a new pass. Each pass presses the column down by the tracks' Bekker sinkage times the share of its loose-to-bank margin it still has. Density therefore rises almost linearly over the first passes and levels off towards bank density, which it never exceeds.
+- **Why this rule (an assumption, not a fit):**
+  - Peters et al. (2026, *J. Terramechanics* 123, 101125) found that vertical displacement grows with the cumulative wheel load over up to 8 passes. That is close to linear in the number of passes, measured on silty loam under farm tyres.
+  - Field guidance for earthwork says most of the densification comes in the first few passes.
+  - No published table of density against pass number for a crawler on loose fill was found.
+- **Compaction is kept through wake and sleep.**
+  - A loose column's layer is the mean volume of its particles. Particles woken from it take that volume, so the MPM soil stays as dense as it was. Compacted particles are marked 2.
+  - Particles that sleep on a column bring their own volume, so new loose soil spread over a compacted lift no longer inherits its density.
+  - Compacted soil that the blade or bucket moves 0.3 m (`DUG_M`) is dug again and becomes loose.
+- **Reported:** `SoilZone.compaction(region)` gives the dormant soil's mean density as a fraction of bank density (loose soil: 1 / (1 + swell)) and the share of columns passed over at least 1, 3 and 6 times.
+
+**Benchmark** (one carrier, 1500 s; logs `logs/haul_bench_compact_long1_<soil>_1carrier.json`, against section 10's `tracks` logs):
+
+| | Dry sand | Loam | Clay |
+|---|---|---|---|
+| Loose density, as a share of bank | 0.893 | 0.800 | 0.741 |
+| Spoil at the end | 0.914 | 0.808 | 0.746 |
+| Haul road at the end | 0.964 | 0.951 | 0.875 |
+| Spoil columns passed ≥ 1 / 3 / 6 times | 37 / 25 / 20 % | 32 / 27 / 19 % | 34 / 29 / 24 % |
+| Loaded (section 10) | 73.3 t (76.5) | 78.8 t (76.8) | 74.7 t (75.8) |
+| Spread rms from grade (section 10) | 0.29 m (0.33) | 0.39 m (0.40) | 0.59 m (0.41) |
+
+- **The haul road compacts most.** It holds a thin layer of spilled soil and the carriers pass over it dozens of times, so it reaches 88–96 % of bank density, as haul roads do.
+- **The spoil compacts little, except in sand.**
+  - Dry sand recovers 19 % of its loose-to-bank margin. Loam and clay recover only 2–4 %, because their Bekker sinkage is 0.2–0.4 cm a pass, spread over lifts up to a metre thick.
+  - This follows from the limit noted in section 10: the Bekker values are for natural ground, and loose fill sinks more under a track. Real spreading in loam and clay would leave denser fill than this.
+  - The model cannot yet say how much denser. That needs pressure–sinkage values measured on loose fill, or a compaction field test (item #8).
+- **Production and spreading are unchanged within run-to-run spread.** Clay's higher rms has another cause: its 7th load (72.6 t delivered against 64.0 t) was dumped near the end of the run and not yet spread.
+
+**Limits:**
+
+- One layer value per column, so the density is averaged over the column's whole depth. A real track compacts the top 0.3 m or so most.
+- The per-pass rule is assumed.
+- There is no roller yet, which is how fill is actually brought to 95 % of Proctor.
