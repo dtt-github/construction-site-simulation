@@ -9,7 +9,7 @@ Two recordings:
     cycle   one dig-swing-load pass (the original demo)
     site    a whole haul cycle with two carriers: the first is loaded pass by pass and hauls the load to
             the spoil area while the second takes its place at the excavator; the first dumps, the dozer
-            spreads the load, until the dozer parks again (about 5 minutes, played as a time-lapse)
+            spreads the load and the roller rolls it, until both are parked again (played as a time-lapse)
 
 File, version 2: "RPLY", u32 version, u32 hello length, hello JSON (with "replay": {"speed", "what"}),
 u32 frame count, then per frame u32 head, grains and tail lengths and the three pieces of the frame as the
@@ -57,20 +57,21 @@ def main():
     fps = args.fps or (6.0 if site else 15.0)
     speed = args.speed or (4.0 if site else 1.0)
     n_grains = args.grains or (700 if site else 3000)
-    max_s = args.max_s or (420.0 if site else 90.0)
+    max_s = args.max_s or (600.0 if site else 90.0)
 
     sim = ex.ExcavatorSim(soil=args.soil, dozer=site, haul=site, carriers=(args.carriers or 2) if site else 1)
     sim.auto = True
     every = max(1, round(1 / (fps * sim.frame_dt)))
-    frames, n, spread = [], 0, False
+    frames, n, spread, rolled = [], 0, False, False
     prev = (None, None)
     while sim.sim_time < max_s:
         sim.step()
         n += 1
         if site:
             spread |= sim.dozer.stage == "push"
-            if spread and sim.dozer.parked:
-                break  # the first load is spread and the dozer is back at its park
+            rolled |= spread and sim.roller.stage == "roll"
+            if rolled and sim.dozer.parked and sim.roller.parked:
+                break  # the first load is spread, rolled, and the dozer and the roller are back at their parks
         elif sim.passes >= args.passes:
             break
         if n % every:

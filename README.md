@@ -9,7 +9,7 @@ Initiated and maintained by **[DigitalTwin Technology GmbH](https://www.digitalt
 
 ![Open-licensed machines in the site: Komatsu D37PXi dozer, IHI IC120 carrier, Hitachi ZX200 excavator](assets/screenshots/showcase_machines.png)
 
-**[Try the site in your browser](https://dtt-github.github.io/construction-site-simulation/)**, no GPU needed: the terrain, the SimReady props and the open machines run client-side (three.js + Jolt). The excavator and soil need the GPU server, so the demo plays a whole haul cycle recorded from it as a 4× time-lapse: the ZX200 loads an IC120 carrier pass by pass, which hauls the load to the spoil area while a second carrier takes its place; the load is tipped and the D37 dozer spreads it, all in MPM soil (`phase2/record_replay.py`). Click *View pit* to watch it. For live control, see [Quick start](#quick-start).
+**[Try the site in your browser](https://dtt-github.github.io/construction-site-simulation/)**, no GPU needed: the terrain, the SimReady props and the open machines run client-side (three.js + Jolt). The excavator and soil need the GPU server, so the demo plays a whole haul cycle recorded from it as a 4× time-lapse: the ZX200 loads an IC120 carrier pass by pass, which hauls the load to the spoil area while a second carrier takes its place; the load is tipped, the D37 dozer spreads it and a 10.6 t roller compacts it, all in MPM soil (`phase2/record_replay.py`). Click *View pit* to watch it. For live control, see [Quick start](#quick-start).
 
 **Goal:** a site you can trust numerically. Soil that digs like soil, machines whose hydraulics stall like real ones, and every model checked against measured data. Rigid-body site physics runs in the browser (three.js + Jolt). Soil and machine dynamics run on a GPU server (NVIDIA Newton: MPM sand, MuJoCo articulations) and stream into the same page.
 
@@ -101,7 +101,7 @@ Only licenses that allow redistribution, modification and commercial use are acc
 
 - Operator models beyond the scripted cycle (learned or recorded operator inputs), and checking heaped bucket loads against field data
 - Converged soil solves: loads still depend on the MPM iteration count
-- A living site: the haul cycle, the D37 dozer spreading the spoil, and two carriers sharing the road are done. The operator now chooses each cut where the soil is, so loading holds steady over a long shift in loam and clay. Long shifts hold steady in all three soils. Next: clearing spill at the loading spot, longer haul roads and more carriers, track–soil contact for the carriers and the dozer, compaction of the spread layers
+- A living site: the haul cycle, the D37 dozer spreading the spoil, two carriers sharing the road, track–soil contact, compaction of the spread layers and a roller are done. The operator now chooses each cut where the soil is, so loading holds steady over a long shift in loam and clay. Long shifts hold steady in all three soils. Next: a larger fill area where one lift is spread while another is rolled
 - Research APIs: the Gymnasium environment, the lidar, depth camera and IMU, and the ROS 2 bridge are done (the carrier and the dozer are in all three). Next: a `ros2_control` hardware interface, sensor noise models, and several environments per GPU
 - Measured ZX200 masses, swing torque and pressure logs for validation
 - Measured pressure logs, port relief and house inertia to validate the hydraulics

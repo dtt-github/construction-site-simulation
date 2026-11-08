@@ -759,7 +759,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       controlsEl.querySelectorAll("input").forEach((el) => (el.disabled = true));
       const secs = frames[frames.length - 1].t.toFixed(0);
       const what = info.what === "site"
-        ? `a whole haul cycle, ${secs} s played ${info.speed}× faster: the ZX200 loads an IC120 carrier pass by pass${(info.carriers ?? 1) > 1 ? ", which hauls the load to the spoil area while the second carrier takes its place" : " and the carrier hauls the load to the spoil area"}; it tips the load and the D37 dozer spreads it, all in Newton MPM soil`
+        ? `a whole haul cycle, ${secs} s played ${info.speed}× faster: the ZX200 loads an IC120 carrier pass by pass${(info.carriers ?? 1) > 1 ? ", which hauls the load to the spoil area while the second carrier takes its place" : " and the carrier hauls the load to the spoil area"}; it tips the load, the D37 dozer spreads it and the roller compacts it, all in Newton MPM soil`
         : `one auto dig–swing–load pass of the ZX200 with its hydraulic cylinders, in Newton MPM sand (${secs} s)`;
       statusEl.innerHTML = `<strong>Recorded replay</strong> (loops): ${what}, recorded from the GPU server. For live control, run the server (<a href="${QUICK_START}" target="_blank" rel="noopener">quick start</a>).`;
     } catch (err) {
