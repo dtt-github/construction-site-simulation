@@ -31,7 +31,8 @@ its MPM volume grows by (1 + swell), so with the solver's packing limit (critica
 spreads out at lower density, mass unchanged. Loose particles keep that volume when they sleep in a loose
 region and wake again; one sleeping in the pit is counted back as soil in place.
 
-Compaction: each track pass presses the loose columns under it denser, at most to bank density (press).
+Compaction: each track pass presses the loose columns under it denser, at most to bank density (press);
+each roller pass packs a column's top lift towards the compacted density, denser than bank (roll).
 A loose column's layer is the mean volume of its particles, so it holds any mix of loose and compacted
 soil: particles woken from it take that volume (compacted ones are marked 2), and particles that sleep on
 it bring theirs. Compacted soil that the blade or bucket moves DUG_M is dug again, and loose.
@@ -413,10 +414,11 @@ class SoilZones:
 
     DUG_M = 0.3  # m: a particle that has moved this far from where it woke has been dug (it bulks)
 
-    def __init__(self, regions, pool, particle_volume, swell=0.0, loose_regions=()):
+    def __init__(self, regions, pool, particle_volume, swell=0.0, loose_regions=(), compacted=1.0):
         """regions: list of (name, x0, y0, nx, ny, ground) with ground(x, y) -> ground height (numpy),
         raised regions first; pool: particle capacity; swell: bank to loose volume increase of dug soil;
-        loose_regions: the regions whose dormant soil is loose (dug)."""
+        loose_regions: the regions whose dormant soil is loose (dug); compacted: volume of rolled soil per
+        bank volume (soils.SOILS[...]["compacted"])."""
         self.swell = swell
         self.names = [r[0] for r in regions]
         self.ground = [r[5] for r in regions]
@@ -443,6 +445,7 @@ class SoilZones:
         self.col_layer = wp.array(self.col_layer_np.astype(np.float32), dtype=float)
         self.loose_volume = particle_volume * (1.0 + swell)
         self.loose_layer = LAYER_PER_PARTICLE * (1.0 + swell)
+        self.dense_layer = LAYER_PER_PARTICLE * compacted  # rolled fill
         self.floor_z = wp.array(self.col_floor.astype(np.float32), dtype=float)
         self.col_xy = wp.array(np.stack([self.col_x, self.col_y], axis=1).astype(np.float32), dtype=wp.vec2)
 
@@ -456,6 +459,7 @@ class SoilZones:
         self.count = wp.zeros(self.n_cols, dtype=int)
         self.col_vol = wp.zeros(self.n_cols, dtype=float)  # MPM volume of the particles slept this update
         self.col_passes = np.zeros(self.n_cols, dtype=np.int64)  # track passes over each column
+        self.col_rolled = np.zeros(self.n_cols, dtype=np.int64)  # roller passes since soil was last added
         self.last_pressed = {}  # per machine: when each column was last under its tracks (s)
         self.col_n = wp.zeros(self.n_cols, dtype=int)
         self.col_vmax = wp.zeros(self.n_cols, dtype=float)
@@ -565,8 +569,9 @@ class SoilZones:
         if len(got):
             vol = self.col_vol.numpy()[got] / self.particle_volume * LAYER_PER_PARTICLE
             layer = (before[got] * self.col_layer_np[got] + vol) / self.count_np[got]
-            self.col_layer_np[got] = np.clip(layer, LAYER_PER_PARTICLE, self.loose_layer)
+            self.col_layer_np[got] = np.clip(layer, self.dense_layer, self.loose_layer)
             self.col_layer.assign(self.col_layer_np.astype(np.float32))
+            self.col_rolled[got[self.count_np[got] - before[got] >= PER_LAYER]] = 0  # a new layer of soil: roll it again
 
     def columns_at(self, xy, names):
         """Column index under each point xy (n, 2) in the named regions (-1 outside them)."""
@@ -596,11 +601,41 @@ class SoilZones:
             return 0
         self.col_passes[new] += 1
         n, layer = self.count_np[new], self.col_layer_np[new]
-        margin = (layer - LAYER_PER_PARTICLE) / (self.loose_layer - LAYER_PER_PARTICLE)
-        self.col_layer_np[new] = np.maximum(layer - sink * margin / n, LAYER_PER_PARTICLE)
+        margin = np.clip((layer - LAYER_PER_PARTICLE) / (self.loose_layer - LAYER_PER_PARTICLE), 0.0, 1.0)
+        self.col_layer_np[new] = np.where(margin > 0, np.maximum(layer - sink * margin / n, LAYER_PER_PARTICLE), layer)
         self.col_layer.assign(self.col_layer_np.astype(np.float32))
         self._refit()
         return len(new)
+
+    def roll(self, xy, names, machine, t, depth, share):
+        """A roller drum on the points xy (n, 2) of the named regions at time t (s). Each new pass over a loose
+        column packs its top `depth` (m) of soil by `share` of what that soil still lacks of the compacted
+        density. Returns the columns rolled."""
+        last = self.last_pressed.setdefault(machine, np.full(self.n_cols, -np.inf))
+        col = np.unique(self.columns_at(xy, names))
+        col = col[col >= 0]
+        new = col[t - last[col] > self.PASS_GAP_S]
+        last[col] = t
+        new = new[self.col_loose[new] & (self.count_np[new] > 0)]
+        if not len(new):
+            return 0
+        self.col_passes[new] += 1
+        self.col_rolled[new] += 1
+        n, layer = self.count_np[new], self.col_layer_np[new]
+        top = np.minimum(n * layer, depth)  # the lift the drum reaches, at the column's mean layer
+        dh = top * share * np.clip(layer - self.dense_layer, 0.0, None) / layer
+        self.col_layer_np[new] = layer - dh / n
+        self.col_layer.assign(self.col_layer_np.astype(np.float32))
+        self._refit()
+        return len(new)
+
+    def rolled_share(self, xy, names, passes):
+        """Share of the soil-bearing loose columns under the points xy rolled at least `passes` times since
+        soil was last added (1.0 where there is none)."""
+        col = np.unique(self.columns_at(xy, names))
+        col = col[(col >= 0)]
+        col = col[self.col_loose[col] & (self.count_np[col] > 0)]
+        return float((self.col_rolled[col] >= passes).mean()) if len(col) else 1.0
 
     def compaction(self, name):
         """Dormant soil of a loose region: its mean density as a fraction of bank density (loose soil:
@@ -611,6 +646,7 @@ class SoilZones:
         n = self.count_np[m]
         p = self.col_passes[m]
         return {"of_bank": round(float(n.sum() * LAYER_PER_PARTICLE / (n * self.col_layer_np[m]).sum()), 4), "loose_of_bank": round(1.0 / (1.0 + self.swell), 4),
+                "compacted_of_bank": round(LAYER_PER_PARTICLE / self.dense_layer, 4), "rolled_6": round(float((self.col_rolled[m] >= 6).mean()), 3),
                 "passed_1": round(float((p >= 1).mean()), 3), "passed_3": round(float((p >= 3).mean()), 3), "passed_6": round(float((p >= 6).mean()), 3)}
 
     def unpress_empty(self):
@@ -618,6 +654,7 @@ class SoilZones:
         empty = self.col_loose & (self.count_np == 0) & (self.col_layer_np < self.loose_layer - 1e-9)
         if empty.any():
             self.col_layer_np[empty] = self.loose_layer
+            self.col_rolled[empty] = 0
             self.col_layer.assign(self.col_layer_np.astype(np.float32))
 
     def set_counts(self, counts):

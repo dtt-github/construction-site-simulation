@@ -33,7 +33,8 @@ n_carriers = int(os.environ.get("CARRIERS", "1"))
 haul_m = float(os.environ.get("HAUL_M", "0"))  # the off-screen two-lane road, each way (dumper.py)
 relocate_m = float(os.environ.get("RELOCATE_M", "0"))  # move on along the bank when the face is dug out
 max_passes = int(os.environ.get("PASSES", "0")) or None
-sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m, relocate_m=relocate_m)
+roller = os.environ.get("ROLLER", "1") != "0"
+sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m, relocate_m=relocate_m, roller=roller)
 sim.auto = True
 fleet = sim.fleet
 loads, start_load, passes_at = [], {}, {}
@@ -136,5 +137,6 @@ out = {
                "carrier_sinkage_cm": [round(sim.carrier_track.sinkage(m) * 100, 2) for m in (dumper_mod.MASS_KG, dumper_mod.MASS_KG + 11000)],
                **sim.track_counters},
     "compaction": {r: sim.zones.compaction(r) for r in ("spoil", "road")},
+    "roller": {**{k: round(v, 2) for k, v in sim.roller.counters.items()}, **sim.roller_counters} if sim.use_roller else None,
 }
 print(json.dumps(out))

@@ -1823,3 +1823,37 @@ With the ruts of section 10, a column was pressed once to the tracks' sinkage an
 - One layer value per column, so the density is averaged over the column's whole depth. A real track compacts the top 0.3 m or so most.
 - The per-pass rule is assumed.
 - There is no roller yet, which is how fill is actually brought to 95 % of Proctor.
+
+## A living site, 12: a roller
+
+Section 11 left the spread fill nearly as loose as it was dumped in loam and clay, because the dozer's and carriers' tracks sink only a few millimetres into it. On site, fill is brought to its specified density by a roller, so the site now has one (`roller.py`, `SoilZone.roll`):
+
+- **Machine:** a 10.6 t single-drum vibratory roller, BOMAG BW 211 D-5 class. Its drum is 2.13 m wide and 1.50 m in diameter, and it rolls at 4 km/h (3–6 km/h is usual on soil). It is scripted like the dozer: it follows the ground surface and does not touch the MPM particles.
+- **What a pass does:** each pass of the drum packs the top 0.3 m of a column by 39 % of what it still lacks of the soil's compacted density. Six passes thus give 95 % of the gain (1 − 0.61⁶). Field guides put the passes a vibratory roller needs on a 0.2–0.3 m lift at 4 to 8 (West Virginia DOT, *Soil & Aggregate Compaction* manual, 2024).
+- **Compacted density** (volume per bank volume, US Army FM 5-434, Table 1-1): sand 0.95, loam 0.90, clay 0.90. Rolled fill can end up denser than the bank it was dug from, as it does on site.
+- **When it rolls:** the roller works only while the dozer is parked with nothing to spread, and clears out to its parking spot south of the area when the dozer has work. It rolls the area in straight lanes, one drum width apart less 0.15 m of overlap, forward and back. It stays on a lane until 90 % of the lane's soil has had six passes since soil was last added there. A lane where soil still stands more than 0.4 m above the design surface (a heap not yet spread) is left for later.
+- **Loose-fill sinkage values:** no published Bekker pressure–sinkage values for loose, freshly spread fill were found, so the tracks keep the natural-ground values of section 10. The roller is what brings the fill to density, as on site.
+
+**Benchmark** (one carrier, 1500 s; logs `logs/haul_bench_roller_long1_<soil>_1carrier.json`, against section 11's `compact` logs):
+
+| | Dry sand | Loam | Clay |
+|---|---|---|---|
+| Spoil density, as a share of bank (section 11) | 0.981 (0.914) | 0.862 (0.808) | 0.757 (0.746) |
+| Compacted density (the roller's limit) | 1.053 | 1.111 | 1.111 |
+| Spoil columns rolled ≥ 6 times | 31 % | 18 % | 0 % |
+| Roller working / passes / lanes finished | 740 s / 61 / 4 | 443 s / 26 / 1 | 146 s / 5 / 0 |
+| Loaded (section 11) | 72.1 t (73.3) | 80.0 t (78.8) | 75.3 t (74.7) |
+| Spread rms from grade (section 11) | 0.31 m (0.29) | 0.43 m (0.39) | 0.43 m (0.59) |
+
+- **The roller compacts what it gets to.** In dry sand the spoil goes from 0.914 to 0.981 of bank, and loam from 0.808 to 0.862.
+- **It gets to little of the area.** The spread area is 61 m², too small for the roller and the dozer to work side by side. The roller gets about a minute between loads, and every load the dozer spreads on a rolled lane makes that lane loose again. A real site would roll a finished lift while the next is spread elsewhere.
+- **Clay is barely rolled.** The roller worked 146 s in 25 minutes. The dozer needs more passes in clay (section 10), so it is rarely parked, and heaps over 0.4 m stood in the lanes when it was.
+- **Production and spreading are unchanged within run-to-run spread.** The roller waits for the dozer, so it never holds up a carrier.
+- **Clay's haul road came out looser (0.780 against 0.875).** The roller never drives on the road, and the track code is unchanged. The road holds only spilled soil, and in this run more of it was spilled late and passed over fewer times (passed ≥ 3 times: 61 % against 73 %).
+
+**Limits:**
+
+- The per-pass share is set from the field guides' pass counts, not fitted to a measured density curve. Vibration, moisture and lift thickness are not modelled.
+- The roller spins on the spot, which an articulated roller cannot do, and clay is rolled with the smooth drum. On site, clay would get the padfoot version (BW 211 PD-5).
+- One layer value per column, so a pass is averaged over the column's whole depth below its top 0.3 m.
+- The spread area is too small for a real rolling pattern. A larger fill area with separate spreading and rolling lifts would show the roller's real effect.

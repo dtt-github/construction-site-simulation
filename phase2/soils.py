@@ -26,16 +26,18 @@ G = 9.81
 YIELD_PRESSURE = 1.0e8  # Pa: compressive cap, far above any pressure in the pit; sets the tensile scale
 
 SOILS = {
-    "dry-sand": {"color": "#c9a774", "grain": "#b08a55", "label": "Dry sand", "density": 1600.0, "friction": 0.75, "cohesion": 0.0, "tensile": 0.0, "fill_factor": 1.0, "swell": 0.12},
-    "moist-sand": {"color": "#9c7f58", "grain": "#87693f", "label": "Moist sand", "density": 1750.0, "friction": 0.75, "cohesion": 2.0e3, "tensile": 0.5e3, "mpm_cohesion": 0.9e3, "mpm_tensile": 0.2e3, "remoulded": 0.7, "fill_factor": 1.0, "swell": 0.15},
-    "loam": {"color": "#7b5b3e", "grain": "#684a30", "label": "Loam", "density": 1850.0, "friction": 0.55, "cohesion": 12.0e3, "tensile": 2.0e3, "remoulded": 0.2, "fill_factor": 1.05, "swell": 0.25},
-    "clay": {"color": "#8f6a52", "grain": "#7a5640", "label": "Clay", "density": 1950.0, "friction": 0.05, "cohesion": 45.0e3, "tensile": 8.0e3, "remoulded": 0.3, "fill_factor": 1.0, "swell": 0.35},
+    "dry-sand": {"color": "#c9a774", "grain": "#b08a55", "label": "Dry sand", "density": 1600.0, "friction": 0.75, "cohesion": 0.0, "tensile": 0.0, "fill_factor": 1.0, "swell": 0.12, "compacted": 0.95},
+    "moist-sand": {"color": "#9c7f58", "grain": "#87693f", "label": "Moist sand", "density": 1750.0, "friction": 0.75, "cohesion": 2.0e3, "tensile": 0.5e3, "mpm_cohesion": 0.9e3, "mpm_tensile": 0.2e3, "remoulded": 0.7, "fill_factor": 1.0, "swell": 0.15, "compacted": 0.95},
+    "loam": {"color": "#7b5b3e", "grain": "#684a30", "label": "Loam", "density": 1850.0, "friction": 0.55, "cohesion": 12.0e3, "tensile": 2.0e3, "remoulded": 0.2, "fill_factor": 1.05, "swell": 0.25, "compacted": 0.90},
+    "clay": {"color": "#8f6a52", "grain": "#7a5640", "label": "Clay", "density": 1950.0, "friction": 0.05, "cohesion": 45.0e3, "tensile": 8.0e3, "remoulded": 0.3, "fill_factor": 1.0, "swell": 0.35, "compacted": 0.90},
 }
 DEFAULT_SOIL = "dry-sand"
 # what a bucket carries: "fill_factor" of the heaped (SAE) rating as loose soil (excavator bucket fill factors
 # of the Caterpillar Performance Handbook: sand and gravel 95-110 %, moist loam and sandy clay 100-110 %,
 # hard tough clay 80-90 %; Komatsu's handbook rates clay higher, 110-120 %: clay takes 1.0, between the
-# two), and "swell" from bank to loose volume (typical: sand 10-15 %, loam 20-30 %, clay 30-40 %)
+# two), "swell" from bank to loose volume (typical: sand 10-15 %, loam 20-30 %, clay 30-40 %), and
+# "compacted": the volume of rolled fill per bank volume (US Army FM 5-434, Earthmoving Operations, Table 1-1:
+# sand 0.95, loam 0.90, clay 0.90)
 # plastic volume opening (Jp - 1) over which a cohesive soil loosened by digging falls to its remoulded
 # strength ("remoulded": fraction kept; 1 / sensitivity, typically 1/2-1/4 for clays): it breaks up rather
 # than drawing out into strands (MPM's perfectly plastic tension cap would let it stretch without limit).

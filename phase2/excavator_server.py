@@ -62,6 +62,7 @@ import hydraulics as hyd
 import soils
 import tracks
 import dozer as dozer_mod
+import roller as roller_mod
 import dumper as dumper_mod
 from dozer import Dozer
 from dumper import Fleet
@@ -197,6 +198,10 @@ CARRIER_STAGES = dumper_mod.STAGES
 DOZER_X_START, DOZER_X_END = 25.2, 33.4  # cutting edge x where the pushes start (the dump heap) and end
 DOZER_LANE_ENDS = (1.3, 3.9, 6.5, 9.1)  # y where the fanned lanes reach DOZER_X_END (from the dump line, y 5.2)
 DOZER_PARK_Y = 11.4
+# roller (roller.py): rolls the spread area in lanes along +x clear of the dump heap, and parks south of it
+ROLLER_X = (26.5, 33.0)  # drum x along every lane
+ROLLER_Y = (1.2, 9.2)  # y covered by the lanes
+ROLLER_PARK = (28.0, -1.2, 0.0)
 DOZER_SEES_SPEED = 1.0  # m/s: the dozer plans on all soil slower than this (dumped clay creeps for minutes)
 # the haul road between the loading spot and the spoil area: soil falling off a carrier settles there
 ROAD_REGION = ("road", 13.3, -2.5, 134, 190, lambda x, y: np.full(np.shape(x), GROUND_Z))
@@ -538,7 +543,7 @@ class ExcavatorSim:
         ("swing back", 0, 6.0, 2.6 + DIG_Z, -95),  # lowers while swinging, once clear of the truck
     ]
 
-    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, haul_m=0.0, relocate_m=0.0, command_response=False):
+    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, haul_m=0.0, relocate_m=0.0, command_response=False, roller=True):
         wp.init()
         self.kwargs = {"voxel": voxel, "ppc": ppc, "soil": soil, "iterations": iterations, "fps": fps, "pool": pool, "mpm_every": mpm_every, "carriers": carriers, "haul_m": haul_m, "relocate_m": relocate_m, "command_response": command_response}
         # levers reach the spools through the dead time and lag of PWRI's ZX200 under velocity commands
@@ -680,7 +685,7 @@ class ExcavatorSim:
         self.n_particles = self.sand_model.particle_count
         self.swell = material["swell"]  # bank to loose volume of dug soil
         self.zones = SoilZones([TRUCK_REGION, GROUND_REGION, ROAD_REGION, SPOIL_REGION], self.n_particles, SPACING**3,
-                               swell=self.swell, loose_regions=("truck", "road", "spoil"))
+                               swell=self.swell, loose_regions=("truck", "road", "spoil"), compacted=material.get("compacted", 1.0))
         z = self.zones
         # dormant faces lower than a cohesive soil's critical height stand; only higher ones are woken to fail
         z.AVALANCHE_DROP = max(SoilZones.AVALANCHE_DROP, 0.8 * soils.critical_height(soil)[0])
@@ -707,6 +712,10 @@ class ExcavatorSim:
         edge_ahead = Dozer._edge_ahead()
         self.dozer = Dozer((DOZER_X_START - edge_ahead, DOZER_PARK_Y, math.pi / 2), (DOZER_X_START, BED_CENTER[1], DOZER_X_END, DOZER_LANE_ENDS), GROUND_Z, soil)
         self.blade_q, self.blade_qd = int(jq[joint_of[self.blade]]), int(jqd[joint_of[self.blade]])
+        # the roller compacting the spread fill once the dozer has spread it
+        self.use_roller = self.use_dozer and roller
+        self.roller = roller_mod.Roller(ROLLER_PARK, ROLLER_X, ROLLER_Y, GROUND_Z)
+        self.roller_counters = {"rolled": 0}
 
         cfg = SolverImplicitMPM.Config()
         cfg.voxel_size = voxel
@@ -806,9 +815,11 @@ class ExcavatorSim:
         self.auto = False
         self.fleet.reset()
         self.dozer.reset()
+        self.roller.reset()
         self.blade_force = np.zeros(3)
         self.zones.set_region_floor("truck", self.truck_floor)
         self.dispatch_pending, self.truck_wait = False, 0.0
+        self.roller_may = False
         self.pass_kg, self.truck_mark = 0.0, 0.0
         self.dump_inset, self.vessel_before = self.DUMP_INSET[0], None
         self.was_waiting = False
@@ -1551,9 +1562,14 @@ class ExcavatorSim:
         if self.zone_frame % 3 == 0:
             self._spoil_surface(self.doze_hm, DOZER_SEES_SPEED)
             self.doze_hm_np = self.doze_hm.numpy()
-        may_work = self.fleet.dump_area_free()
+        may_work = self.fleet.dump_area_free() and (self.roller.parked or not self.use_roller)
         self.blade_force = self.sand_forces.numpy()[self.blade][:3].astype(float)
         dz.update(self.frame_dt, self._surface, self.blade_force, may_work)
+        if self.use_roller:
+            if self.zone_frame % 30 == 0:  # the dozer's lane scores are a few ms: twice a second
+                self.roller_may = dz.parked and not dz.wants_work(self._surface)
+            rolled = lambda xy, n: self.zones.rolled_share(xy, ("spoil",), n)
+            self.roller.update(self.frame_dt, self._surface, self.roller_may, rolled, dz.grade)
         p, R = dz.blade_pose()
         q, qd = self.state_0.joint_q.numpy(), self.state_0.joint_qd.numpy()
         q[self.blade_q:self.blade_q + 7] = [*p, *dz.blade_quat()]
@@ -1575,6 +1591,8 @@ class ExcavatorSim:
             sink = self.carrier_track.sinkage(dumper_mod.MASS_KG + d.payload_kg)
             xy = tracks.footprint(d.base[0], d.base[1], d.yaw, dumper_mod.TRACK_X0, dumper_mod.HALF_GAUGE, dumper_mod.SHOE_B, dumper_mod.TRACK_L)
             self.track_counters["carrier_pressed"] += z.press(xy, sink, ("spoil", "road"), d, self.sim_time)
+        if self.use_roller and self.roller.stage == "roll":
+            self.roller_counters["rolled"] += z.roll(self.roller.drum_footprint(), ("spoil",), "roller", self.sim_time, roller_mod.LIFT_M, roller_mod.PASS_SHARE)
         z.unpress_empty()
 
     def _spoil_surface(self, hm, max_speed):
@@ -1843,6 +1861,9 @@ class ExcavatorSim:
             },
             "truck_capacity_kg": TRUCK_CAPACITY_KG,
         }
+        if self.use_roller:  # the roller moves (frame trailer "ROL1"): drawn from its dimensions (base frame, z up)
+            out["roller"] = {"drum_x": roller_mod.DRUM_X, "drum_r": roller_mod.DRUM_R, "drum_w": roller_mod.DRUM_W,
+                             "axle_x": roller_mod.AXLE_X, "wheel_r": roller_mod.WHEEL_R, "stages": roller_mod.STAGES}
         if self.use_dozer:  # the dozer moves (frame trailer "DOZ1"): its glTF, or these boxes, in URDF base_link frames
             out["dozer"] = {
                 "file": "assets/machinery/opera_d37pxi.glb",
@@ -1909,6 +1930,9 @@ class ExcavatorSim:
         if self.use_dozer:  # trailer "DOZ1": the dozer's base_link pose, lift angle, blade force (kN), stage
             dz = self.dozer
             tail += struct.pack("<4s7fffI", b"DOZ1", *self.to_three(dz.base_pos()), *self.quat_to_three(dz.base_quat()), dz.lift, dz.force / 1000, dozer_mod.STAGES.index(dz.stage))
+        if self.use_roller:  # trailer "ROL1": the roller's base pose (drum axle height) and stage
+            r = self.roller
+            tail += struct.pack("<4s7fI", b"ROL1", *self.to_three(r.base_pos()), *self.quat_to_three(r.base_quat()), roller_mod.STAGES.index(r.stage))
         return (head, grains, tail) if parts else head + grains + tail
 
     def _load_owner(self):

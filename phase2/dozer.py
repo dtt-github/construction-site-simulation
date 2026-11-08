@@ -256,6 +256,16 @@ class Dozer:
         """Cutting edge ahead of base_link with the blade down (m)."""
         return float((ARM_PIVOT + rot_y(LIFT_HI) @ (BLADE_ON_ARM + EDGE))[0])
 
+    def wants_work(self, surface):
+        """Whether the dozer, parked, would go out to spread (a lane with soil to push, or a new load)."""
+        soil, room = self._lane_scores(surface)
+        h = surface(self._area_points())
+        if float(np.clip(h - self.grade - TOL, 0.0, None).sum() * 0.01) > self.area_soil + NEW_LOAD_M3:
+            return True
+        score = np.minimum(soil, room)
+        score[list(self.blocked)] = 0.0
+        return bool(score.max() >= DONE_M3)
+
     def _next_job(self, surface, may_work):
         """Pick the next moves once the current ones are done."""
         at_lane = self.lane is not None
