@@ -137,6 +137,9 @@ out = {
                "carrier_sinkage_cm": [round(sim.carrier_track.sinkage(m) * 100, 2) for m in (dumper_mod.MASS_KG, dumper_mod.MASS_KG + 11000)],
                **sim.track_counters},
     "compaction": {r: sim.zones.compaction(r) for r in ("spoil", "road")},
+    # per fill cell (under the roller's lanes), and whether the dozer is spreading it at the end
+    "cell_compaction": [{**sim.zones.compaction("spoil", sim.roller.cell_points(k)), "spreading": k == sim.dozer.cell}
+                        for k in range(len(sim.roller.cell_lanes))] if sim.use_roller else None,
     "roller": {**{k: round(v, 2) for k, v in sim.roller.counters.items()}, **sim.roller_counters} if sim.use_roller else None,
 }
 print(json.dumps(out))

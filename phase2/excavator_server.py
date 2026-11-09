@@ -820,6 +820,7 @@ class ExcavatorSim:
         self.fleet.reset()
         self.dozer.reset()
         self.roller.reset()
+        self.roller_idle_dozer = False  # the dozer is parked with nothing to spread
         self.blade_force = np.zeros(3)
         self.zones.set_region_floor("truck", self.truck_floor)
         self.dispatch_pending, self.truck_wait = False, 0.0
@@ -1573,9 +1574,15 @@ class ExcavatorSim:
         dz.update(self.frame_dt, self._surface, self.blade_force, may_work)
         if self.use_roller:
             r = self.roller
-            r.set_cell(1 - dz.cell)  # the cell the dozer is not spreading
             rolled = lambda xy, n: self.zones.rolled_share(xy, ("spoil",), n)
-            r.update(self.frame_dt, self._surface, True, rolled, dz.grades[r.cell])
+            if self.zone_frame % 30 == 0:  # the cell the dozer is not spreading; once that is rolled, the dozer's
+                # while it is parked with nothing to spread
+                other = 1 - dz.cell
+                self.roller_idle_dozer = dz.parked and not dz.wants_work(self._surface)
+                busy = r.has_work(other, rolled, self._surface, dz.grades[other])
+                r.set_cell(dz.cell if self.roller_idle_dozer and not busy else other)
+            may_roll = r.cell != dz.cell or (dz.parked and self.roller_idle_dozer)
+            r.update(self.frame_dt, self._surface, may_roll, rolled, dz.grades[r.cell])
         p, R = dz.blade_pose()
         q, qd = self.state_0.joint_q.numpy(), self.state_0.joint_qd.numpy()
         q[self.blade_q:self.blade_q + 7] = [*p, *dz.blade_quat()]

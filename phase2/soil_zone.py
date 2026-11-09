@@ -637,10 +637,16 @@ class SoilZones:
         col = col[self.col_loose[col] & (self.count_np[col] > 0)]
         return float((self.col_rolled[col] >= passes).mean()) if len(col) else 1.0
 
-    def compaction(self, name):
-        """Dormant soil of a loose region: its mean density as a fraction of bank density (loose soil:
-        1 / (1 + swell)), and the share of its soil-bearing columns passed over at least 1, 3 and 6 times."""
+    def compaction(self, name, xy=None):
+        """Dormant soil of a loose region (or of its columns under the points xy): its mean density as a fraction
+        of bank density (loose soil: 1 / (1 + swell)), and the share of its soil-bearing columns passed over at
+        least 1, 3 and 6 times."""
         m = self.region_mask(name) & (self.count_np > 0)
+        if xy is not None:
+            under = np.zeros_like(m)
+            col = self.columns_at(xy, (name,))
+            under[col[col >= 0]] = True
+            m &= under
         if not m.any():
             return {}
         n = self.count_np[m]

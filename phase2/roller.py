@@ -11,7 +11,8 @@ is rolled with the same drum here; on site it would get the padfoot version (BW 
 Rolling, as fill is rolled on site: the roller works the spread area in straight lanes along +x, one drum
 width apart less an overlap, forward and back over each lane (a pass each way) until ROLL_PASSES passes have
 gone over nearly all the soil in the lane since soil was last added there. The fill area is two cells; the
-roller rolls the one the dozer is not spreading, and parks east of the area when it is done. A lane whose
+roller rolls the one the dozer is not spreading, and once that is done, the dozer's cell while the dozer is
+parked with nothing to spread (clearing out when it has). It parks east of the area when it has no lane. A lane whose
 soil still stands well above the design surface (a heap the dozer has not spread) is left for later.
 
 Machine (BOMAG data sheet via dealer listings): operating weight 10.6 t, drum 2.13 m wide and 1.50 m in
@@ -71,10 +72,16 @@ class Roller:
         return self.stage == "parked"
 
     def set_cell(self, cell):
-        """Roll this cell from now on (leaving the lane in hand)."""
+        """Roll this cell from now on (leaving the lane in hand for the next one)."""
         if cell != self.cell:
-            self.cell, self.lanes, self.lane = cell, self.cell_lanes[cell], None
-            self.plan = [] if self._at_park() else self._to_park()
+            self.cell, self.lanes, self.lane, self.plan = cell, self.cell_lanes[cell], None, []
+
+    def has_work(self, cell, rolled_share, surface, grade):
+        """Whether a cell has a lane to roll (one not yet rolled enough that no heap stands in)."""
+        lanes, self.lanes = self.lanes, self.cell_lanes[cell]
+        short = self._shortfall(rolled_share, surface, grade)
+        self.lanes = lanes
+        return max(short) > 1.0 - DONE_SHARE
 
     def drum_pos(self):
         return np.array([self.x, self.y]) + DRUM_X * np.array([math.cos(self.yaw), math.sin(self.yaw)])
@@ -88,13 +95,14 @@ class Roller:
         x, y = self.drum_pos()
         return np.stack([x + c * gu.ravel() - s * gv.ravel(), y + s * gu.ravel() + c * gv.ravel()], 1)
 
-    def cell_points(self):
-        """Points (n, 2) under all the lanes of the cell it rolls."""
-        return np.concatenate([self._lane_points(k) for k in range(len(self.lanes))])
+    def cell_points(self, cell=None):
+        """Points (n, 2) under all the lanes of a cell (the one it rolls by default)."""
+        lanes = self.lanes if cell is None else self.cell_lanes[cell]
+        return np.concatenate([self._lane_points(k, lanes) for k in range(len(lanes))])
 
-    def _lane_points(self, k):
+    def _lane_points(self, k, lanes=None):
         x = np.arange(self.x0, self.x1, 0.1) + 0.05
-        y = np.arange(-DRUM_W / 2, DRUM_W / 2, 0.1) + 0.05 + self.lanes[k]
+        y = np.arange(-DRUM_W / 2, DRUM_W / 2, 0.1) + 0.05 + (self.lanes if lanes is None else lanes)[k]
         gx, gy = np.meshgrid(x, y)
         return np.stack([gx.ravel(), gy.ravel()], 1)
 
@@ -111,15 +119,20 @@ class Roller:
         px, py, pyaw = self.park
         return math.hypot(self.x - px, self.y - py) < 0.1 and abs(math.sin(self.yaw - pyaw)) < 0.01
 
-    def _next_job(self, may_work, rolled_share, surface, grade):
-        if not may_work:
-            self.lane = None
-            return [] if self._at_park() else self._to_park()
+    def _shortfall(self, rolled_share, surface, grade):
+        """Per lane of the cell: the share of its soil not yet rolled ROLL_PASSES times (0 where a heap stands)."""
         short = []
         for k in range(len(self.lanes)):
             pts = self._lane_points(k)
             rough = np.percentile(surface(pts), 90) - grade > ROUGH_M
             short.append(0.0 if rough else 1.0 - rolled_share(pts, ROLL_PASSES))
+        return short
+
+    def _next_job(self, may_work, rolled_share, surface, grade):
+        if not may_work:
+            self.lane = None
+            return [] if self._at_park() else self._to_park()
+        short = self._shortfall(rolled_share, surface, grade)
         if self.lane is not None and short[self.lane] > 1.0 - DONE_SHARE:
             best = self.lane  # finish the lane in hand
         else:

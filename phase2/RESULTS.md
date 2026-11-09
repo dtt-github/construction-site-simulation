@@ -1862,35 +1862,38 @@ Section 11 left the spread fill nearly as loose as it was dumped in loam and cla
 
 Section 12's roller got to little of the fill because the spread area (61 m²) was too small for it and the dozer to work side by side. The fill area is now 103 m² in two cells, south and north of the dump line (y 5.2), and the two machines work one cell each, as fill is placed on site:
 
-- **Dozer:** it spreads one cell at a time, its lanes fanning out from the dump heap into that cell. When the cell's lift is full, it moves to the other cell, whose next lift starts there, and the cell it leaves is rolled. If the roller has not finished the other cell by then (less than 90 % of its soil rolled six times), that lift goes on unrolled soil and is counted (`lifts_on_unrolled`).
-- **Roller:** it rolls the cell the dozer is not spreading, in lanes from x 28 to 35, and parks east of the area. It no longer waits for the dozer to park. The two cells' lanes meet on the dump line. A first version left a 3 m strip between them for the carrier, but the dozer's pushes left 30–40 % of the soil in that strip, where the roller never went.
+- **Dozer:** it spreads one cell at a time, its lanes fanning out from the dump heap into that cell. When the cell's lift is full, it moves to the other cell, whose next lift starts there. If the roller has not finished the other cell by then (less than 90 % of its soil rolled six times), that lift goes on unrolled soil and is counted (`lifts_on_unrolled`).
+- **Roller:** it rolls the cell the dozer is not spreading, in lanes from x 28 to 35. Once that cell is done, it rolls the dozer's cell while the dozer is parked with nothing to spread, and clears out when the dozer has work. It parks east of the area.
+- **Cell edges:** the two cells' lanes meet on the dump line. A first version left a 3 m strip between them for the carrier, but the dozer's pushes left 30–40 % of the soil in that strip, where the roller never went.
 - **Swap rule:** a first version moved the dozer only once the other cell was rolled. The dozer's spill along the shared edge kept making the nearest lane loose again, so in dry sand and loam the dozer never moved and stacked three lifts on one cell.
+- **Per-cell density:** the benchmark now also reports each cell's density (`cell_compaction`). The cell being spread holds a fresh lift at any moment, so the whole-area figure mixes finished and unfinished fill.
 
 **Benchmark** (one carrier, 1500 s; logs `logs/haul_bench_cells_long1_<soil>_1carrier.json`, against section 12's `roller` logs):
 
 | | Dry sand | Loam | Clay |
 |---|---|---|---|
-| Spoil density, as a share of bank (section 12) | 0.958 (0.981) | 0.838 (0.862) | 0.770 (0.757) |
-| Spoil columns passed over ≥ 1 time (section 12) | 79 % (78 %) | 69 % (55 %) | 56 % (45 %) |
-| Spoil columns rolled ≥ 6 times since soil last settled (section 12) | 31 % (31 %) | 1 % (18 %) | 5 % (0 %) |
-| Roller working (section 12) | 1208 s (740 s) | 1201 s (443 s) | 1203 s (146 s) |
-| Dozer cell swaps / lifts on unrolled soil | 3 / 2 | 3 / 2 | 3 / 1 |
+| Spoil density, as a share of bank (section 12) | 0.942 (0.981) | 0.853 (0.862) | 0.782 (0.757) |
+| Density: cell left to the roller / cell being spread at the end | 0.957 / 0.957 | 0.854 / 0.874 | 0.793 / 0.851 |
+| Spoil columns rolled ≥ 6 times since soil last settled (section 12) | 12 % (31 %) | 21 % (18 %) | 24 % (0 %) |
+| Spoil columns passed over ≥ 1 time (section 12) | 75 % (78 %) | 68 % (55 %) | 63 % (45 %) |
+| Roller working (section 12) | 1257 s (740 s) | 932 s (443 s) | 900 s (146 s) |
+| Dozer cell swaps / lifts on unrolled soil | 3 / 2 | 3 / 2 | 3 / 0 |
 | Design surface per cell above ground | 0.6 / 0.6 m | 0.6 / 0.6 m | 0.6 / 0.6 m |
-| Spread rms from grade (section 12) | 0.45 m (0.31) | 0.31 m (0.43) | 0.50 m (0.43) |
-| Soil above grade not yet spread (section 12) | 13.8 m³ (5.2) | 8.0 m³ (4.3) | 17.3 m³ (4.4) |
-| Loaded (section 12) | 71.3 t (72.1) | 79.2 t (80.0) | 78.8 t (75.3) |
-| Carrier wait at the dump (section 12) | 6.2 s (0.0) | 6.3 s (0.6) | 7.8 s (7.3) |
-| Real-time factor (section 12) | 0.34 (0.37) | 0.35 (0.38) | 0.34 (0.37) |
+| Spread rms from grade (section 12) | 0.45 m (0.31) | 0.36 m (0.43) | 0.67 m (0.43) |
+| Soil above grade not yet spread (section 12) | 14.2 m³ (5.2) | 8.7 m³ (4.3) | 23.2 m³ (4.4) |
+| Loaded (section 12) | 71.7 t (72.1) | 81.3 t (80.0) | 77.4 t (75.3) |
+| Carrier wait at the dump (section 12) | 6.8 s (0.0) | 0.0 s (0.6) | 9.0 s (7.3) |
+| Real-time factor (section 12) | 0.33 (0.37) | 0.34 (0.38) | 0.33 (0.37) |
 
-- **The roller now works the whole run.** It works about 1200 s of the 1500 s in every soil, against 146–740 s before, and reaches more of the fill (passed over at least once: up to 69 % against 55 % in loam).
-- **The fill is not denser for it.** Spoil density is within 0.03 of section 12 in every soil: lower in sand and loam, higher in clay. Much of the extra rolling goes on the lanes next to the dump line. The dozer's pushes in the other cell keep spilling soil onto them, so they are rolled again and again.
-- **The rolled-six-times share is a snapshot of the latest lift.** A column's count restarts whenever any soil settles on it, so it falls each time the dozer moves to a cell. Density counts the lifts below as well, which makes it the measure to compare.
-- **Lifts are now even.** Both cells reach 0.6 m, where section 12's single area stood at 0.6–0.9 m. In five of the nine moves across the three soils, the roller had not finished the cell the dozer moved to.
-- **Spreading looks worse.** More soil stands above grade (8–17 m³ against about 4–5 m³). Part of it is the heap on the dump line, which both cells' lanes start from and whose soil counts against whichever cell's grade lies under it. The wider area also means longer pushes.
-- **Production is unchanged within run-to-run spread.** The carrier waited 6–8 s longer at the dump over the whole run. The larger heightmap of the area costs about 8 % in real-time factor.
+- **Clay gains the most.** In section 12 the roller barely worked in clay (146 s), because the dozer was rarely parked. With its own cell it works 900 s, 24 % of the clay is rolled six times against none, and the density rises from 0.757 to 0.782 of bank.
+- **Sand and loam do not gain.** Loam is within run-to-run spread (0.853 against 0.862). Sand is lower (0.942 against 0.981). The same soil now covers 103 m² instead of 61 m², and the cell being spread at the end holds a fresh lift. In section 12 the roller went over each load as soon as it was spread.
+- **The roller rarely finishes a cell.** It reaches only 56–63 % of the soil in the cell left to it at least once. Lanes where the heap or an unspread push stands more than 0.4 m above the design surface wait, and the lane nearest the dump line gets the dozer's spill from the other cell. In four of the nine moves, the dozer moved to a cell the roller had not finished.
+- **Lifts are now even.** Both cells reach 0.6 m, where section 12's single area stood at 0.6–0.9 m.
+- **Spreading looks worse.** More soil stands above grade (9–23 m³ against about 4–5 m³). Part of it is the heap on the dump line, which both cells' lanes start from and whose soil counts against whichever cell's grade lies under it. The pushes are also longer.
+- **Production is unchanged within run-to-run spread.** The larger heightmap of the area costs about 10 % in real-time factor.
 
 **Limits:**
 
 - The cells' shared edge has no buffer, so spreading one cell spills onto the other's nearest lane. On site the rolled cell would be fenced off or the pushes stopped short of it.
 - The roller never reaches the heap (x < 28), which holds 15–25 % of the spoil.
-- The dozer moves when its lift is full, not when the roller is done. A site would balance the two by giving the roller a longer lane or the dozer a second cell.
+- The dozer moves when its lift is full, not when the roller is done. A site would match the two by the cell size or a second roller.
