@@ -199,12 +199,15 @@ CARRIER_STAGES = dumper_mod.STAGES
 # dozer (dozer.py): spreads the dumped loads in lanes fanning out along +x into its cell (cutting edge from
 # DOZER_X_START to DOZER_X_END), and parks north-west of the dump point, out of the carrier's way
 DOZER_X_START, DOZER_X_END = 25.2, 33.4  # cutting edge x where the pushes start (the dump heap) and end
-DOZER_CELLS = ((3.7, 1.1, -1.5), (6.7, 9.3, 11.9))  # y where each cell's fanned lanes reach DOZER_X_END
+# the inner lanes of each cell end 2.3 m from the dump line, so the blade's side spill stays out of the other cell
+DOZER_CELLS = ((2.9, 0.7, -1.5), (7.5, 9.7, 11.9))  # y where each cell's fanned lanes reach DOZER_X_END
 DOZER_PARK_Y = 11.4
 # roller (roller.py): rolls its cell in lanes along +x, clear of the dump heap and of the dozer's pushes
 # near it, and parks east of the area
 ROLLER_X = (28.0, 35.0)  # drum x along every lane
-ROLLER_CELLS = ((-3.2, 5.2), (5.2, 13.6))  # y covered by each cell's lanes: the cells meet on the dump line
+# the cells leave a 1.2 m buffer on the dump line that neither rolls: the spill from the dozer's cell lands
+# there, not on the edge lane the roller has just finished in the other cell
+ROLLER_CELLS = ((-3.2, 4.6), (5.8, 13.6))  # y covered by each cell's lanes
 ROLLER_PARK = (37.5, 5.2, math.pi)
 DOZER_SEES_SPEED = 1.0  # m/s: the dozer plans on all soil slower than this (dumped clay creeps for minutes)
 # the haul road between the loading spot and the spoil area: soil falling off a carrier settles there

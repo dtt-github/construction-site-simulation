@@ -1897,3 +1897,36 @@ Section 12's roller got to little of the fill because the spread area (61 m²) w
 - The cells' shared edge has no buffer, so spreading one cell spills onto the other's nearest lane. On site the rolled cell would be fenced off or the pushes stopped short of it.
 - The roller never reaches the heap (x < 28), which holds 15–25 % of the spoil.
 - The dozer moves when its lift is full, not when the roller is done. A site would match the two by the cell size or a second roller.
+
+## A living site, 14: a buffer between the two cells
+
+Section 13's cells met on the dump line, so the dozer's side spill from one cell kept loosening the edge lane of the cell the roller had just rolled. The two cells now keep apart:
+
+- **Dozer:** the inner lane of each cell ends 2.3 m from the dump line at the far end (y 2.9 and 7.5 instead of 3.7 and 6.7), so the blade's spill stays on its own side.
+- **Roller:** its cells stop 0.6 m short of the dump line on each side (y −3.2 to 4.6 and 5.8 to 13.6). The 1.2 m strip between them takes the spill and is not rolled.
+
+**Choosing the layout** (loam, 750 s, one run at a time): with only the dozer's lanes pulled back, the roller's edge lanes still overlapped the spill and the cell being rolled fell to 54 % rolled six times. With both changes it reached 97 %, against 73 % with the cells meeting on the line.
+
+**Benchmark** (one carrier, 1500 s; logs `logs/haul_bench_buffer_<soil>_1carrier.json`, against section 13):
+
+| | Dry sand | Loam | Clay |
+|---|---|---|---|
+| Spoil density, as a share of bank (section 13) | 0.989 (0.942) | 0.874 (0.853) | 0.770 (0.782) |
+| Density: cell left to the roller / cell being spread at the end | 1.026 / 1.040 | 0.942 / 0.868 | 0.743 / 0.869 |
+| Cell left to the roller: rolled ≥ 6 times (section 13) | 94 % (33 %) | 63 % (37 %) | 3 % (40 %) |
+| Spoil columns rolled ≥ 6 times (section 13) | 60 % (12 %) | 22 % (21 %) | 7 % (24 %) |
+| Roller working (section 13) | 1021 s (1257) | 976 s (932) | 1078 s (900) |
+| Dozer cell swaps / lifts on unrolled soil (section 13) | 3 / 1 (3 / 2) | 3 / 1 (3 / 2) | 3 / 1 (3 / 0) |
+| Spread rms from grade (section 13) | 0.31 m (0.45) | 0.34 m (0.36) | 0.65 m (0.67) |
+| Soil above grade not yet spread (section 13) | 5.7 m³ (14.2) | 8.2 m³ (8.7) | 23.2 m³ (23.2) |
+| Loaded (section 13) | 72.4 t (71.7) | 79.2 t (81.3) | 77.8 t (77.4) |
+
+- **Sand and loam gain.** The cell left to the roller is rolled six times over 94 % (sand) and 63 % (loam) of its soil, against 33–37 %. Sand's density rises from 0.942 to 0.989 of bank, above section 12's single area (0.981). Fewer lifts go on unrolled soil.
+- **Clay's end-of-run figure is a phase artefact.** The dozer's last move took it onto the cell the roller had rolled (90 % passed over), so the cell left to the roller at the end holds the lift just spread. A snapshot at one moment cannot separate this; a per-lift record would.
+- **Production is unchanged.** The real-time factor fell from 0.33 to 0.27 in all three soils. The layout does not change the soil solve, so this is likely the machine after its restart; it was not checked. Peak SoC temperature was 68–69 °C with one run at a time.
+
+**Limits:**
+
+- The 1.2 m buffer strip holds about 8 % of the spoil and is never rolled. On site it would be rolled last, once both cells are at grade.
+- The roller still never reaches the heap (x < 28).
+- Density is reported at the end of the run only, so the cell figures depend on where the dozer is in its cycle.
