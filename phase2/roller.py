@@ -12,7 +12,7 @@ Rolling, as fill is rolled on site: the roller works the spread area in straight
 width apart less an overlap, forward and back over each lane (a pass each way) until ROLL_PASSES passes have
 gone over nearly all the soil in the lane since soil was last added there. The fill area is two cells; the
 roller rolls the one the dozer is not spreading, and once that is done, the dozer's cell while the dozer is
-parked with nothing to spread (clearing out when it has). It parks east of the area when it has no lane. A lane whose
+parked with nothing to spread (clearing out when it has), and then the buffer strip between the cells. It parks east of the area when it has no lane. A lane whose
 soil still stands well above the design surface (a heap the dozer has not spread) is left for later.
 
 Machine (BOMAG data sheet via dealer listings): operating weight 10.6 t, drum 2.13 m wide and 1.50 m in

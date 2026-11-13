@@ -1930,3 +1930,33 @@ Section 13's cells met on the dump line, so the dozer's side spill from one cell
 - The 1.2 m buffer strip holds about 8 % of the spoil and is never rolled. On site it would be rolled last, once both cells are at grade.
 - The roller still never reaches the heap (x < 28).
 - Density is reported at the end of the run only, so the cell figures depend on where the dozer is in its cycle.
+
+## A living site, 15: density per lift, and rolling the buffer strip
+
+Section 14's cell figures were read at the end of the run, so they depended on where the dozer was. Two changes:
+
+- **Density per lift:** each time the dozer starts a lift on a cell, the benchmark records that cell's soil as it is about to be covered (`covered_lifts`). A soil column holds one mean density, so the record is for the whole cell's fill under the new lift, not the top lift alone.
+- **Buffer strip:** once both cells are rolled and the dozer is parked with nothing to spread, the roller rolls one drum-wide lane down the strip on the dump line. It waits for the dozer to park because the pushes cross the strip near the heap. The heap itself (x < 28) is still not rolled: the carrier tips there.
+
+**Benchmark** (one carrier, 1500 s; logs `logs/haul_bench_lifts_<soil>_1carrier.json`, against section 14):
+
+| | Dry sand | Loam | Clay |
+|---|---|---|---|
+| Lifts covered: density, as a share of bank / rolled ≥ 6 times | | | |
+| — 1st (north cell) | 1.025 / 49 % | 1.061 / 86 % | 1.004 / 87 % |
+| — 2nd (south cell) | 0.911 / 18 % | 0.807 / 4 % | 0.742 / 0 % |
+| — 3rd (north cell) | 1.034 / 93 % | 1.060 / 97 % | 1.059 / 93 % |
+| Buffer strip rolled ≥ 6 times at the end | 48 % | 19 % | 0 % |
+| Roller working (section 14) | 1213 s (1021) | 1188 s (976) | 1176 s (1078) |
+| Spoil density at the end (section 14) | 0.985 (0.989) | 0.879 (0.874) | 0.763 (0.770) |
+| Spread rms from grade (section 14) | 0.24 m (0.31) | 0.35 m (0.34) | 0.58 m (0.65) |
+| Loaded (section 14) | 72.0 t (72.4) | 78.8 t (79.2) | 79.9 t (77.8) |
+
+- **Two lifts of three are covered rolled, in all three soils, clay included.** Rolled lifts reach 1.00–1.06 of bank. Section 14's low clay figure was where the dozer stood at the end, as suspected.
+- **The second lift is covered unrolled every time.** The dozer finishes its first lift in the second cell within 150–250 s of moving there, before the roller has rolled the first cell, so the dozer comes back onto loose soil (0.74–0.91 of bank). This is the one `lifts_on_unrolled` in each run. After that, the two machines keep pace.
+- **Rolling the strip changes little.** The roller works 100–200 s more, but the strip is only rolled when the dozer is idle, which is rare, and the end densities are within run-to-run spread of section 14.
+
+**Limits:**
+
+- Three lifts per run are too few to say how often lifts are covered unrolled over a shift. A longer run, or a dozer told to wait for the roller, would show it.
+- The record is per cell, not per lift depth: the soil model keeps one density per column.

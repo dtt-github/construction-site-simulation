@@ -140,6 +140,8 @@ out = {
     # per fill cell (under the roller's lanes), and whether the dozer is spreading it at the end
     "cell_compaction": [{**sim.zones.compaction("spoil", sim.roller.cell_points(k)), "spreading": k == sim.dozer.cell}
                         for k in range(len(sim.roller.cell_lanes))] if sim.use_roller else None,
+    # each cell's soil as the dozer started a new lift on it, so it does not depend on where the dozer is at the end
+    "covered_lifts": sim.covered_lifts if sim.use_roller else None,
     "roller": {**{k: round(v, 2) for k, v in sim.roller.counters.items()}, **sim.roller_counters} if sim.use_roller else None,
 }
 print(json.dumps(out))

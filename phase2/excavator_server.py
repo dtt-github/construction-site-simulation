@@ -208,6 +208,10 @@ ROLLER_X = (28.0, 35.0)  # drum x along every lane
 # the cells leave a 1.2 m buffer on the dump line that neither rolls: the spill from the dozer's cell lands
 # there, not on the edge lane the roller has just finished in the other cell
 ROLLER_CELLS = ((-3.2, 4.6), (5.8, 13.6))  # y covered by each cell's lanes
+# the buffer strip, one drum wide on the dump line: rolled while the dozer is parked with nothing to spread
+# and both cells are rolled (the dozer's pushes cross it near the heap)
+ROLLER_STRIP = (5.2 - roller_mod.DRUM_W / 2, 5.2 + roller_mod.DRUM_W / 2)
+ROLLER_STRIP_CELL = len(ROLLER_CELLS)
 ROLLER_PARK = (37.5, 5.2, math.pi)
 DOZER_SEES_SPEED = 1.0  # m/s: the dozer plans on all soil slower than this (dumped clay creeps for minutes)
 # the haul road between the loading spot and the spoil area: soil falling off a carrier settles there
@@ -721,7 +725,7 @@ class ExcavatorSim:
         self.blade_q, self.blade_qd = int(jq[joint_of[self.blade]]), int(jqd[joint_of[self.blade]])
         # the roller compacting the spread fill once the dozer has spread it
         self.use_roller = self.use_dozer and roller
-        self.roller = roller_mod.Roller(ROLLER_PARK, ROLLER_X, ROLLER_CELLS, GROUND_Z)
+        self.roller = roller_mod.Roller(ROLLER_PARK, ROLLER_X, ROLLER_CELLS + (ROLLER_STRIP,), GROUND_Z)
         self.roller_counters = {"rolled": 0}
 
         cfg = SolverImplicitMPM.Config()
@@ -824,6 +828,7 @@ class ExcavatorSim:
         self.dozer.reset()
         self.roller.reset()
         self.roller_idle_dozer = False  # the dozer is parked with nothing to spread
+        self.covered_lifts = []  # each time the dozer starts a lift on a cell: that cell's soil then
         self.blade_force = np.zeros(3)
         self.zones.set_region_floor("truck", self.truck_floor)
         self.dispatch_pending, self.truck_wait = False, 0.0
@@ -1573,19 +1578,26 @@ class ExcavatorSim:
         self.blade_force = self.sand_forces.numpy()[self.blade][:3].astype(float)
         if self.use_roller and self.zone_frame % 30 == 0:  # the other cell is rolled (most of its soil: spill off the
             # blade's ends and the dump heap reach it all the time)
-            dz.may_switch = self.zones.rolled_share(self.roller.cell_points(), ("spoil",), roller_mod.ROLL_PASSES) >= roller_mod.DONE_SHARE
+            dz.may_switch = self.zones.rolled_share(self.roller.cell_points(1 - dz.cell), ("spoil",), roller_mod.ROLL_PASSES) >= roller_mod.DONE_SHARE
+        switches = dz.counters["switches"]
         dz.update(self.frame_dt, self._surface, self.blade_force, may_work)
+        if self.use_roller and dz.counters["switches"] > switches:  # the dozer starts a lift on this cell: the soil it
+            # covers, as it stands now (the cell's last lift and those under it)
+            self.covered_lifts.append({"t": round(self.sim_time, 1), "cell": dz.cell, **self.zones.compaction("spoil", self.roller.cell_points(dz.cell))})
         if self.use_roller:
             r = self.roller
             rolled = lambda xy, n: self.zones.rolled_share(xy, ("spoil",), n)
+            grade = lambda cell: dz.grades[cell] if cell < len(dz.grades) else max(dz.grades)  # the strip: the higher cell's
             if self.zone_frame % 30 == 0:  # the cell the dozer is not spreading; once that is rolled, the dozer's
-                # while it is parked with nothing to spread
+                # while it is parked with nothing to spread, and then the buffer strip between the cells
                 other = 1 - dz.cell
                 self.roller_idle_dozer = dz.parked and not dz.wants_work(self._surface)
-                busy = r.has_work(other, rolled, self._surface, dz.grades[other])
-                r.set_cell(dz.cell if self.roller_idle_dozer and not busy else other)
-            may_roll = r.cell != dz.cell or (dz.parked and self.roller_idle_dozer)
-            r.update(self.frame_dt, self._surface, may_roll, rolled, dz.grades[r.cell])
+                if r.has_work(other, rolled, self._surface, grade(other)) or not self.roller_idle_dozer:
+                    r.set_cell(other)
+                else:
+                    r.set_cell(dz.cell if r.has_work(dz.cell, rolled, self._surface, grade(dz.cell)) else ROLLER_STRIP_CELL)
+            may_roll = r.cell == 1 - dz.cell or (dz.parked and self.roller_idle_dozer)
+            r.update(self.frame_dt, self._surface, may_roll, rolled, grade(r.cell))
         p, R = dz.blade_pose()
         q, qd = self.state_0.joint_q.numpy(), self.state_0.joint_qd.numpy()
         q[self.blade_q:self.blade_q + 7] = [*p, *dz.blade_quat()]
