@@ -17,8 +17,10 @@ soil still stands well above the design surface (a heap the dozer has not spread
 
 Machine (BOMAG data sheet via dealer listings): operating weight 10.6 t, drum 2.13 m wide and 1.50 m in
 diameter, top speed 10.9 km/h. Rolling speed ROLL_SPEED (4 km/h): 3-6 km/h is the usual range for soil.
-The roller turns on the spot here, which an articulated roller cannot do; it reaches each lane by a short
-diagonal drive instead of the three-point turns a real one would make.
+It keeps clear of the other machines by its route (traffic.py checks the gap): it reaches and leaves each lane
+from the east end, along the area's edge away from the dump heap, never across the fill, and while the dozer
+works it leaves the lanes its pushes pass beside (keep_off). The roller turns on the spot here, which an
+articulated roller cannot do; a real one would make a three-point turn at the lane end.
 """
 
 import math
@@ -65,23 +67,31 @@ class Roller:
         self.stage = "parked"
         self.plan = []  # ("spin", yaw) | ("drive", x, y, dir, speed, stage)
         self.lane = None
+        self.keep_off = set()  # lanes of the cell it may not roll now (next to the dozer's pushes)
         self.counters = {"lanes_rolled": 0, "roll_m": 0.0, "parked_s": 0.0, "working_s": 0.0, "passes": 0}
 
     @property
     def parked(self):
         return self.stage == "parked"
 
-    def set_cell(self, cell):
-        """Roll this cell from now on (leaving the lane in hand for the next one)."""
+    def set_cell(self, cell, keep_off=()):
+        """Roll this cell from now on (leaving the lane in hand for the next one), except the lanes keep_off."""
+        self.keep_off = set(keep_off)
         if cell != self.cell:
-            self.cell, self.lanes, self.lane, self.plan = cell, self.cell_lanes[cell], None, []
+            self.cell, self.lanes, self.lane = cell, self.cell_lanes[cell], None
+            self.plan = self._out_of_lane()
 
-    def has_work(self, cell, rolled_share, surface, grade):
-        """Whether a cell has a lane to roll (one not yet rolled enough that no heap stands in)."""
+    def has_work(self, cell, rolled_share, surface, grade, keep_off=()):
+        """Whether a cell has a lane to roll (one not yet rolled enough that no heap stands in, nor keep_off)."""
         lanes, self.lanes = self.lanes, self.cell_lanes[cell]
-        short = self._shortfall(rolled_share, surface, grade)
+        short = self._shortfall(rolled_share, surface, grade, keep_off)
         self.lanes = lanes
         return max(short) > 1.0 - DONE_SHARE
+
+    def lane_poses(self, y, step=0.25):
+        """Base poses (x, y, yaw) rolling a lane at y, and turning onto it at its east end."""
+        xs = np.arange(self.x0 + DRUM_X, self.x1 + DRUM_X + step, step)
+        return [(x, y, math.pi) for x in xs] + [(self.x1 + DRUM_X, y, a) for a in np.linspace(0.0, math.pi, 9)]
 
     def drum_pos(self):
         return np.array([self.x, self.y]) + DRUM_X * np.array([math.cos(self.yaw), math.sin(self.yaw)])
@@ -108,24 +118,29 @@ class Roller:
 
     # ------------------------------------------------------------------ planning
     def _start(self, k):
-        """Base position with the drum at the lane's west end, heading +x."""
-        return self.x0 - DRUM_X, self.lanes[k]
+        """Base position with the drum at the lane's east end, heading -x (into the lane, away from the heap)."""
+        return self.x1 + DRUM_X, self.lanes[k]
+
+    def _out_of_lane(self):
+        """Back out of the lane along it to its east end (it never drives across the fill area)."""
+        ex = self.x1 + DRUM_X
+        return [("drive", ex, self.y, -1, TRAVEL_SPEED, "to park")] if self.x < ex - 0.01 and math.cos(self.yaw) < -0.99 else []
 
     def _to_park(self):
         px, py, pyaw = self.park
-        return [("spin", math.atan2(py - self.y, px - self.x)), ("drive", px, py, +1, TRAVEL_SPEED, "to park"), ("spin", pyaw)]
+        return self._out_of_lane() + [("spin", math.atan2(py - self.y, px - self.x)), ("drive", px, py, +1, TRAVEL_SPEED, "to park"), ("spin", pyaw)]
 
     def _at_park(self):
         px, py, pyaw = self.park
         return math.hypot(self.x - px, self.y - py) < 0.1 and abs(math.sin(self.yaw - pyaw)) < 0.01
 
-    def _shortfall(self, rolled_share, surface, grade):
+    def _shortfall(self, rolled_share, surface, grade, keep_off=None):
         """Per lane of the cell: the share of its soil not yet rolled ROLL_PASSES times (0 where a heap stands)."""
         short = []
         for k in range(len(self.lanes)):
             pts = self._lane_points(k)
             rough = np.percentile(surface(pts), 90) - grade > ROUGH_M
-            short.append(0.0 if rough else 1.0 - rolled_share(pts, ROLL_PASSES))
+            short.append(0.0 if rough or k in (self.keep_off if keep_off is None else keep_off) else 1.0 - rolled_share(pts, ROLL_PASSES))
         return short
 
     def _next_job(self, may_work, rolled_share, surface, grade):
@@ -147,8 +162,8 @@ class Roller:
         sx, sy = self._start(best)
         moves = []
         if best != self.lane:
-            moves += [("spin", math.atan2(sy - self.y, sx - self.x)), ("drive", sx, sy, +1, TRAVEL_SPEED, "to lane"), ("spin", 0.0)]
-        moves += [("drive", self.x1 - DRUM_X, sy, +1, ROLL_SPEED, "roll"), ("drive", sx, sy, -1, ROLL_SPEED, "roll")]
+            moves += self._out_of_lane() + [("spin", math.atan2(sy - self.y, sx - self.x)), ("drive", sx, sy, +1, TRAVEL_SPEED, "to lane"), ("spin", math.pi)]
+        moves += [("drive", self.x0 + DRUM_X, sy, +1, ROLL_SPEED, "roll"), ("drive", sx, sy, -1, ROLL_SPEED, "roll")]
         self.lane = best
         return moves
 
@@ -196,6 +211,8 @@ class Roller:
         self.counters["parked_s" if self.parked else "working_s"] += dt
         if not may_work and self.lane is not None:
             self.plan, self.lane = self._to_park(), None  # the dozer has work: clear out
+        elif self.lane in self.keep_off:
+            self.plan, self.lane = self._out_of_lane(), None  # the dozer works beside this lane: leave it
         if not self.plan:
             self.plan = self._next_job(may_work, rolled_share, surface, grade)
             if not self.plan and self._at_park():

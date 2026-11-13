@@ -1960,3 +1960,45 @@ Section 14's cell figures were read at the end of the run, so they depended on w
 
 - Three lifts per run are too few to say how often lifts are covered unrolled over a shift. A longer run, or a dozer told to wait for the roller, would show it.
 - The record is per cell, not per lift depth: the soil model keeps one density per column.
+
+## A living site, 16: machines keep clear of each other, and the dozer waits for the roller
+
+The carriers, the dozer and the roller are scripted, so nothing in the physics kept them apart. In the recorded demo the roller drove through the dozer and the carrier. Two changes:
+
+- **Clearance** (`traffic.py`): each mobile machine has a plan-view outline from its model (carrier 5.8 × 2.6 m, dozer 4.35 × 3.21 m with the blade, roller 4.5 × 2.34 m). The benchmark counts every frame in which two outlines overlap. A machine whose next step would bring it within 0.3 m of another stops and gives way, as site traffic rules require (HSE HSG144). Give-way is the safety net. The routes keep the machines apart:
+  - The loaded carrier waits for the dump point at x = 17 m, before it turns. Its spin at x = 20 m swept the dozer's way between the heap and its park.
+  - The roller enters and leaves every lane from the east end and rolls westward, so it never drives across the fill and stays 0.7 m clear of a tipping carrier.
+  - While the dozer works, the roller leaves the one lane in each cell that its pushes pass beside. The lanes are found from the outlines at start-up (`traffic.near`). It rolls them while the dozer is parked.
+- **Dozer hold:** when its cell is spread and the other cell is not yet rolled, the dozer keeps working its own cell for up to 300 s (`HOLD_MAX_S`) before it moves on.
+
+**Clearance benchmark** (loam, one carrier; logs `logs/haul_bench_traffic_<case>_loam_1carrier.json`):
+
+| | Old routes, no give-way (750 s) | Old routes, give-way (750 s) | New routes (750 s) | New routes (1800 s) |
+|---|---|---|---|---|
+| Frames with overlapping outlines: carrier–roller / dozer–roller / carrier–dozer | 805 / 2499 / 562 | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 |
+| Give-way stops (s waiting), carrier / dozer / roller | — | 5 (476) / 2 (573) / 14 (576) | 0 / 0 / 0 | 0 / 0 / 0 |
+| Waits over 60 s (stuck) | — | 5 | 0 | 0 |
+| Loaded | 48.9 t | 21.3 t | 48.0 t | 79.1 t (158 t/h) |
+| Carrier waiting at the dump | 6 s | 0 s | 18 s | 38 s |
+
+- **Without give-way, overlapping outlines occurred about 65 s in 750 s.** Most were the roller driving diagonally to its lanes across the dozer's cell.
+- **Give-way alone deadlocks.** The machines' paths cross, so they wait on each other and loading falls by more than half.
+- **With the new routes no machine comes within the 0.3 m clearance, and nobody has to give way.** The same holds with two carriers sharing the road, as in the demo (dry sand, 750 s, 50.4 t loaded; `logs/haul_bench_traffic_routes_dry-sand_2carrier.json`). Loading is 2 % below the old routes (within run-to-run spread). The carrier waits about 12 s more per run at the dump point, because it stops before its turn.
+
+**Dozer hold** (1500 s; logs `logs/haul_bench_hold_<soil>_1carrier.json`; lifts covered, density as a share of bank / share rolled ≥ 6 times):
+
+| | Dry sand | Loam | Clay |
+|---|---|---|---|
+| Holds (s held) | 1 (305 s) | 2 (440 s) | 0 |
+| 1st lift (north cell) | 1.027 / 99 % | 1.036 / 98 % | 1.033 / 90 % |
+| 2nd lift (south cell) | 0.910 / 14 % | 0.812 / 5 % | 1.039 / 92 % |
+| 3rd lift (north cell) | — | 0.981 / 74 % | 0.901 / 77 % |
+| Loaded (section 15) | 72.2 t (72.0) | 81.2 t (78.8) | 73.5 t (79.9) |
+
+- **In clay every lift was covered rolled, with no hold needed.**
+- **In sand and loam the hold timed out and the south cell was still covered nearly unrolled.** The roller had 300–440 s on that cell and rolled under 15 % of it six times. The 1800 s loam run shows the same thing (2nd lift: 5 % rolled at 1031 s, 94 % by the end). Why the roller is so slow on the waiting cell is not yet known: either it is not on that cell during the hold, or new soil keeps resetting the count.
+
+**Limits:**
+
+- The outlines are rectangles around each machine. They are generous at the rounded corners and do not include the excavator, which stays at its spot. The carriers on the off-screen road are not checked.
+- The roller turns on the spot at each lane end; a real articulated roller makes a three-point turn there, which needs about 3 m more room east of the area.

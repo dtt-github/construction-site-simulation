@@ -25,8 +25,9 @@ and goes on to the spot as before. Off-screen, a carrier is parked out of sight 
 The haul road is one lane, so the server gates three moves with the other carriers' positions (Fleet):
 a loaded carrier leaves the spot only while every other carrier waits at QUEUE (two never meet head-on
 on the lane); a waiting carrier comes down to the spot once it is empty and the carrier that left it is
-past its turn point; a carrier backs into the dump point only while no other carrier or the dozer is
-there. The places were checked against each spin turn's swept circle (4.15 m radius about base_link).
+past its turn point; a carrier turns and backs into the dump point only while no other carrier or the dozer
+is there (it waits short of the turn, at WAIT_X). The places were checked against each spin turn's swept
+circle (4.15 m radius about base_link), and traffic.py keeps every machine's outline clear of the others.
 
 Geometry from the model (ic120_ros2, urdf/ic120.xacro and the vessel mesh): vessel pin 3.015 m behind
 base_link and 0.946 m above the ground, tip range 0..65 deg; the vessel's floor centre 1.575 m ahead of the
@@ -58,6 +59,9 @@ SHAKE_DEG, SHAKE_PERIOD, CARRY_BACK, DUMP_MAX = 4.0, 0.8, 0.03, 15.0
 # the dumped pile builds up under the tipped vessel's tail and holds the rest of the load in: as drivers do,
 # the carrier creeps forward while soil is still in the vessel, so the load spreads out behind it
 CREEP_SPEED, CREEP_MAX = 0.4, 2.5  # m/s, m
+# base_link x where a loaded carrier waits for the dump point to clear: its cab 0.3 m short of the circle the dozer
+# sweeps spinning at the start of its pushes (traffic.py outlines), and so of the dozer's way north to its park
+WAIT_X = 17.0
 RETURN_X = 18.5  # base_link x where an empty carrier turns back toward the spot, or leaves the road to wait
 QUEUE = (14.5, 11.0, -math.pi / 2)  # waiting place north of the road: base_link x, y, heading (cab to the road)
 # longer hauls: base_link x where a loaded carrier leaves the view, and where it comes back into it facing the dump
@@ -180,8 +184,10 @@ class Dumper:
                     ("drive", self.dump_x, y, -1, SPEED_REVERSE, "reverse to dump"), ("tip",), ("dump",), ("lower",),
                     ("drive", EMERGE_X, y, +1, SPEED_EMPTY, "return"), ("hide", self.haul_m, SPEED_EMPTY, "haul back"),
                     ("emerge", *QUEUE, "queue_free", "queue on road"), *self._from_queue()]
-        return [("drive", self.turn_x, self.base[1], +1, SPEED_LOADED, "drive out"), ("spin", math.pi, "turn to dump"),
-                ("gate", "dump_clear", "wait at dump"), ("drive", self.dump_x, self.base[1], -1, SPEED_REVERSE, "reverse to dump"),
+        # it waits short of its turn: spinning round there sweeps the dozer's way between the heap and its park
+        return [("drive", WAIT_X, self.base[1], +1, SPEED_LOADED, "drive out"), ("gate", "dump_clear", "wait at dump"),
+                ("drive", self.turn_x, self.base[1], +1, SPEED_LOADED, "drive out"), ("spin", math.pi, "turn to dump"),
+                ("drive", self.dump_x, self.base[1], -1, SPEED_REVERSE, "reverse to dump"),
                 ("tip",), ("dump",), ("lower",), ("drive", RETURN_X, self.load_base[1], +1, SPEED_EMPTY, "return"), ("choose",)]
 
     def _into_spot(self, stage):

@@ -24,7 +24,8 @@ reach). When the area holds more soil above grade than room below it, the layer 
 surface rises by one lift (up to MAX_FILL). The fill area may be split into cells (two, either side of the
 dump line), spread one at a time: when a cell's layer is full, spreading moves to the other cell (whose next
 lift starts, if it was spread before), and this one is rolled. If the site says the other cell is not rolled
-yet, its next lift goes on unrolled soil (counted as lifts_on_unrolled). The carrier
+yet, the dozer holds: it keeps spreading its own cell (no new lift there) until the roller is done, or for at
+most HOLD_MAX_S, after which the next lift goes on unrolled soil (counted as lifts_on_unrolled). The carrier
 must not dump while the dozer works there: the server holds the carrier at its turn point until the dozer
 has parked, and recalls the dozer when the carrier leaves the loading spot.
 
@@ -72,6 +73,7 @@ DONE_M3 = 0.35  # a lane whose heap part holds less soil than this above grade +
 HEAP_PART = 0.6  # the first part of each lane, from the dump heap: the soil there is what is left to spread
 MAX_FILL = 1.5  # m: the design surface rises by layers up to this above the ground
 FUTILE_M3 = 0.15  # a pass that moves less than this out of its lane's heap part blocks the lane
+HOLD_MAX_S = 300.0  # longest the dozer waits for the roller before moving to an unrolled cell
 NEW_LOAD_M3 = 1.0  # the area's soil above grade growing by this much means a new load: blocked lanes reopen
 
 
@@ -147,6 +149,7 @@ class Dozer:
         self.grades = [self.ground_z + LIFT] * len(self.cell_lanes)  # design surface per cell
         self.full = [False] * len(self.cell_lanes)  # the cell's lift is spread
         self.may_switch = False  # set by the site: the other cell is rolled
+        self.hold_since = None  # when the dozer started waiting for the other cell to be rolled
         self.stage, self.stage_time, self.time = "parked", 0.0, 0.0
         self.plan = []  # moves still to make: ("spin", yaw) | ("drive", x, y, dir, speed, stage) | ("lift", "up"/"raise"/"grade") | ("push", x, y)
         self.lane = None
@@ -160,7 +163,7 @@ class Dozer:
         self.prev = None
         self.v, self.w = np.zeros(3), np.zeros(3)
         self.counters = {"passes": 0, "push_m": 0.0, "work_MJ": 0.0, "load_lifts": 0, "lifts_raised": 0, "parked_s": 0.0, "working_s": 0.0, "peak_kN": 0.0, "slip_s": 0.0, "slip_m": 0.0, "futile_passes": 0,
-                         "switches": 0, "lifts_on_unrolled": 0}
+                         "switches": 0, "lifts_on_unrolled": 0, "holds": 0, "held_s": 0.0}
         self.push_force = []  # mean blade force per push (kN)
         self._push_sum = [0.0, 0.0]
 
@@ -288,6 +291,11 @@ class Dozer:
         """Cutting edge ahead of base_link with the blade down (m)."""
         return float((ARM_PIVOT + rot_y(LIFT_HI) @ (BLADE_ON_ARM + EDGE))[0])
 
+    def push_poses(self, cell, step=0.25):
+        """Base poses (x, y, yaw) along every push of a cell, from the start to the far end of its lane."""
+        return [(*(self.start + s * np.array([math.cos(th), math.sin(th)])), th)
+                for th, L in self.cell_lanes[cell] for s in np.arange(0.0, L + step, step)]
+
     def wants_work(self, surface):
         """Whether the dozer, parked, would go out to spread (a lane with soil to push, or a new load)."""
         soil, room = self._lane_scores(surface)
@@ -319,13 +327,25 @@ class Dozer:
         if area_soil >= 2 * DONE_M3 and area_soil > area_room and len(self.cell_lanes) > 1 and (
                 not self.full[other] or self.grades[other] + LIFT <= self.ground_z + MAX_FILL + 1e-6):
             # more soil above grade than room below it: this cell's lift is spread, so spreading moves to the
-            # other cell and this one is rolled; if the other is not rolled yet, its next lift goes on unrolled soil
-            if self.full[other] and not self.may_switch:
-                self.counters["lifts_on_unrolled"] += 1
-            self.full[self.cell] = True
-            self.switch(other)
-            return []
-        if area_soil >= 2 * DONE_M3 and area_soil > area_room and self.grade + LIFT <= self.ground_z + MAX_FILL + 1e-6:
+            # other cell and this one is rolled; if the other is not rolled yet, the dozer waits for the roller
+            # (spreading its own cell) for at most HOLD_MAX_S, then its next lift goes on unrolled soil
+            held = self.full[other] and not self.may_switch
+            if held and self.hold_since is None:
+                self.hold_since = self.time
+                self.counters["holds"] += 1
+            if not held or self.time - self.hold_since >= HOLD_MAX_S:
+                if held:
+                    self.counters["lifts_on_unrolled"] += 1
+                if self.hold_since is not None:
+                    self.counters["held_s"] += self.time - self.hold_since
+                self.hold_since = None
+                self.full[self.cell] = True
+                self.switch(other)
+                return []
+        elif self.hold_since is not None and len(self.cell_lanes) > 1:
+            self.counters["held_s"] += self.time - self.hold_since  # the soil was spread below the lift while it waited
+            self.hold_since = None
+        if self.hold_since is None and area_soil >= 2 * DONE_M3 and area_soil > area_room and self.grade + LIFT <= self.ground_z + MAX_FILL + 1e-6:
             # more soil above grade than room below it: this layer is full, the next goes on top
             self.grade += LIFT
             self.counters["lifts_raised"] += 1

@@ -35,6 +35,7 @@ relocate_m = float(os.environ.get("RELOCATE_M", "0"))  # move on along the bank 
 max_passes = int(os.environ.get("PASSES", "0")) or None
 roller = os.environ.get("ROLLER", "1") != "0"
 sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m, relocate_m=relocate_m, roller=roller)
+sim.traffic.enabled = os.environ.get("TRAFFIC", "1") != "0"  # TRAFFIC=0: machines drive through each other (collisions still counted)
 sim.auto = True
 fleet = sim.fleet
 loads, start_load, passes_at = [], {}, {}
@@ -142,6 +143,8 @@ out = {
                         for k in range(len(sim.roller.cell_lanes))] if sim.use_roller else None,
     # each cell's soil as the dozer started a new lift on it, so it does not depend on where the dozer is at the end
     "covered_lifts": sim.covered_lifts if sim.use_roller else None,
+    # machines kept apart (traffic.py): waits per machine, and frames any two outlines overlapped
+    "traffic": {"collision_frames": sim.collisions, **sim.traffic.counters()},
     "roller": {**{k: round(v, 2) for k, v in sim.roller.counters.items()}, **sim.roller_counters} if sim.use_roller else None,
 }
 print(json.dumps(out))
