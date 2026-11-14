@@ -2002,3 +2002,31 @@ The carriers, the dozer and the roller are scripted, so nothing in the physics k
 
 - The outlines are rectangles around each machine. They are generous at the rounded corners and do not include the excavator, which stays at its spot. The carriers on the off-screen road are not checked.
 - The roller turns on the spot at each lane end; a real articulated roller makes a three-point turn there, which needs about 3 m more room east of the area.
+
+## A living site, 17: the roller finishes the waiting cell
+
+Section 16 left the south cell covered nearly unrolled in sand and loam. Two causes, found by logging the roller during the hold:
+
+- **A lane that never counts as done.** In loam the roller spent the whole hold on a lane holding one stray soil column (of 1,540) that never registered a pass. The lane's rolled share stayed below 90 %, so the roller never moved on, and the lanes with the real soil waited. The roller now counts passes, as operators do: after 12 passes (`MAX_PASSES`, twice the six needed) it leaves a lane that is still short, and rolls it again only if its unrolled share rises by more than 10 % (`NEW_SOIL_SHARE`), that is, new soil lands there.
+- **The last lane lies beside the dozer.** In sand the roller rolled every lane it could, then parked for about 130 s. The last lane was the one beside the waiting dozer's pushes, which the roller keeps off while the dozer works (section 16). The dozer only trims its cell while it waits, so it now makes way: once the roller's only lanes left on the other cell are those beside its pushes, it pulls back to its park until the cell is rolled.
+
+**Benchmark** (1500 s, one carrier; logs `logs/haul_bench_way_<soil>_1carrier.json`, with the pass rule alone in `haul_bench_left_*`; lifts covered, density as a share of bank / share rolled ≥ 6 times):
+
+| | Dry sand | Loam | Clay |
+|---|---|---|---|
+| Holds (s held), section 16 → now | 1 (305 s) → 1 (69 s) | 2 (440 s) → 2 (157 s) | 0 → 1 (52 s) |
+| Lifts covered unrolled, section 16 → now | 1 → 0 | 1 → 0 | 0 → 0 |
+| Lifts covered (time, density / rolled) | 538 s: 1.014 / 95 %<br>794 s: 1.030 / 95 %<br>1145 s: 1.033 / 97 % | 331 s: 0.999 / 51 %<br>604 s: 1.066 / 94 %<br>1020 s: 1.061 / 97 %<br>1385 s: 1.040 / 97 % | 399 s: 1.009 / 99 %<br>655 s: 1.050 / 93 %<br>1391 s: 1.007 / 98 % |
+| Spoil rolled ≥ 6 times at the end | 74 % → 75 % | 56 % → 77 % | 64 % → 53 % |
+| Loaded, section 16 → now | 72.2 → 71.5 t | 81.2 → 79.5 t | 73.5 → 72.3 t |
+| Overlapping outlines / give-way stops | 0 / 0 | 0 / 0 | 0 / 0 |
+
+- **Every lift laid after a hold now goes on rolled soil, 93–97 % rolled six times, at 1.03–1.07 of bank density.** The holds are 2–6 times shorter.
+- **The pass rule alone fixed loam but not sand.** In sand it raised the covered lift from 14 % to 59 % rolled, and the hold still timed out. Making way fixed sand.
+- **Loading is within 1–2 t of section 16** (run-to-run spread). The roller leaves about one lane per run after 12 passes.
+- **One lift is still covered half rolled:** loam at 331 s (51 %). That was the dozer's first move to the other cell, with no hold: the cell's other lanes still held unspread heaps, which the roller skips, so the site counted the cell as having no rolling left. In clay the spoil rolled six times at the end is lower (53 %) because the run stopped with a fresh lift half rolled.
+
+**Limits:**
+
+- The pass limit is a fixed 12. On a real site the count comes from a compaction trial (or the intelligent-compaction readout), and a lane still short after it is reported for proof-rolling, not left silently.
+- The stray column that never registers a pass is not explained. The pass rule works around it.

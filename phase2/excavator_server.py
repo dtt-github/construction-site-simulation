@@ -1606,6 +1606,10 @@ class ExcavatorSim:
                 # under an unspread heap wait for the dozer)
                 dz.may_switch = not r.has_work(1 - dz.cell, rolled, self._surface, grade(1 - dz.cell))  # all its lanes, the
                 # ones beside the pushes too (rolled while the dozer is parked)
+                # while the dozer waits, its pushes keep the roller off the lanes beside them; once those are all
+                # the roller has left there, the dozer pulls back to its park to let the roller in
+                dz.make_way = dz.hold_since is not None and not dz.may_switch and not r.has_work(
+                    1 - dz.cell, rolled, self._surface, grade(1 - dz.cell), self.roller_keep_off[1 - dz.cell])
         switches = dz.counters["switches"]
         self.traffic.step(self.traffic_dozer, lambda: dz.update(self.frame_dt, self._surface, self.blade_force, may_work), self.frame_dt)
         if self.use_roller and dz.counters["switches"] > switches:  # the dozer starts a lift on this cell: the soil it

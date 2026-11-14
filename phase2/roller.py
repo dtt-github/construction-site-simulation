@@ -12,7 +12,8 @@ Rolling, as fill is rolled on site: the roller works the spread area in straight
 width apart less an overlap, forward and back over each lane (a pass each way) until ROLL_PASSES passes have
 gone over nearly all the soil in the lane since soil was last added there. The fill area is two cells; the
 roller rolls the one the dozer is not spreading, and once that is done, the dozer's cell while the dozer is
-parked with nothing to spread (clearing out when it has), and then the buffer strip between the cells. It parks east of the area when it has no lane. A lane whose
+parked with nothing to spread (clearing out when it has), and then the buffer strip between the cells. A lane
+still short after MAX_PASSES passes is left until new soil lands on it. It parks east of the area when it has no lane. A lane whose
 soil still stands well above the design surface (a heap the dozer has not spread) is left for later.
 
 Machine (BOMAG data sheet via dealer listings): operating weight 10.6 t, drum 2.13 m wide and 1.50 m in
@@ -38,6 +39,9 @@ LIFT_M = 0.3  # m: the lift a pass compacts
 PASS_SHARE = 0.39  # share of the remaining gain to compacted density that one pass makes
 ROLL_PASSES = 6
 DONE_SHARE = 0.9  # a lane is done once this share of its soil has had ROLL_PASSES passes
+# as operators count passes: a lane still short of DONE_SHARE after this many passes is left until new soil lands
+# on it (its shortfall grows by NEW_SOIL_SHARE): a few stray soil columns at its edge otherwise held it for ever
+MAX_PASSES, NEW_SOIL_SHARE = 2 * ROLL_PASSES, 0.1
 ROUGH_M = 0.4  # a lane whose surface stands this far above the design surface (90th percentile) waits
 ROLL_SPEED, TRAVEL_SPEED = 4.0 / 3.6, 2.0  # m/s
 ACCEL = 0.5  # m/s2
@@ -68,7 +72,9 @@ class Roller:
         self.plan = []  # ("spin", yaw) | ("drive", x, y, dir, speed, stage)
         self.lane = None
         self.keep_off = set()  # lanes of the cell it may not roll now (next to the dozer's pushes)
-        self.counters = {"lanes_rolled": 0, "roll_m": 0.0, "parked_s": 0.0, "working_s": 0.0, "passes": 0}
+        self.lane_passes = 0  # passes over the lane in hand
+        self.left = {}  # (cell, lane): its shortfall when the roller left it after MAX_PASSES passes
+        self.counters = {"lanes_rolled": 0, "roll_m": 0.0, "parked_s": 0.0, "working_s": 0.0, "passes": 0, "lanes_left": 0}
 
     @property
     def parked(self):
@@ -84,7 +90,7 @@ class Roller:
     def has_work(self, cell, rolled_share, surface, grade, keep_off=()):
         """Whether a cell has a lane to roll (one not yet rolled enough that no heap stands in, nor keep_off)."""
         lanes, self.lanes = self.lanes, self.cell_lanes[cell]
-        short = self._shortfall(rolled_share, surface, grade, keep_off)
+        short = self._shortfall(rolled_share, surface, grade, keep_off, cell)
         self.lanes = lanes
         return max(short) > 1.0 - DONE_SHARE
 
@@ -134,13 +140,21 @@ class Roller:
         px, py, pyaw = self.park
         return math.hypot(self.x - px, self.y - py) < 0.1 and abs(math.sin(self.yaw - pyaw)) < 0.01
 
-    def _shortfall(self, rolled_share, surface, grade, keep_off=None):
-        """Per lane of the cell: the share of its soil not yet rolled ROLL_PASSES times (0 where a heap stands)."""
+    def _shortfall(self, rolled_share, surface, grade, keep_off=None, cell=None):
+        """Per lane of the cell (default: the one it rolls): the share of its soil not yet rolled ROLL_PASSES times
+        (0 where a heap stands, for a lane kept off, and for one left after MAX_PASSES until new soil lands)."""
         short = []
         for k in range(len(self.lanes)):
             pts = self._lane_points(k)
             rough = np.percentile(surface(pts), 90) - grade > ROUGH_M
-            short.append(0.0 if rough or k in (self.keep_off if keep_off is None else keep_off) else 1.0 - rolled_share(pts, ROLL_PASSES))
+            s = 0.0 if rough or k in (self.keep_off if keep_off is None else keep_off) else 1.0 - rolled_share(pts, ROLL_PASSES)
+            key = (self.cell if cell is None else cell, k)
+            if key in self.left:
+                if s > self.left[key] + NEW_SOIL_SHARE:
+                    del self.left[key]  # new soil: roll it again
+                else:
+                    s = 0.0
+            short.append(s)
         return short
 
     def _next_job(self, may_work, rolled_share, surface, grade):
@@ -148,6 +162,10 @@ class Roller:
             self.lane = None
             return [] if self._at_park() else self._to_park()
         short = self._shortfall(rolled_share, surface, grade)
+        if self.lane is not None and short[self.lane] > 1.0 - DONE_SHARE and self.lane_passes >= MAX_PASSES:
+            self.left[(self.cell, self.lane)] = short[self.lane]  # rolled as often as a lane gets: leave it
+            self.counters["lanes_left"] += 1
+            short[self.lane] = 0.0
         if self.lane is not None and short[self.lane] > 1.0 - DONE_SHARE:
             best = self.lane  # finish the lane in hand
         else:
@@ -162,6 +180,7 @@ class Roller:
         sx, sy = self._start(best)
         moves = []
         if best != self.lane:
+            self.lane_passes = 0
             moves += self._out_of_lane() + [("spin", math.atan2(sy - self.y, sx - self.x)), ("drive", sx, sy, +1, TRAVEL_SPEED, "to lane"), ("spin", math.pi)]
         moves += [("drive", self.x0 + DRUM_X, sy, +1, ROLL_SPEED, "roll"), ("drive", sx, sy, -1, ROLL_SPEED, "roll")]
         self.lane = best
@@ -230,6 +249,7 @@ class Roller:
                 self.plan.pop(0)
                 if move[0] == "drive" and move[5] == "roll":
                     self.counters["passes"] += 1
+                    self.lane_passes += 1
         self._follow_ground(surface)
 
     def base_pos(self):
