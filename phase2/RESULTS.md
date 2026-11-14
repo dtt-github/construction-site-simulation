@@ -2030,3 +2030,22 @@ Section 16 left the south cell covered nearly unrolled in sand and loam. Two cau
 
 - The pass limit is a fixed 12. On a real site the count comes from a compaction trial (or the intelligent-compaction readout), and a lane still short after it is reported for proof-rolling, not left silently.
 - The stray column that never registers a pass is not explained. The pass rule works around it.
+
+## A living site, 18: the first lift waits too
+
+The one lift section 17 still covered half rolled (loam, 331 s, 51 %) was the dozer's first move to the other cell. The dozer only waited for a cell it had filled before. That cell was still empty except its edge lane, beside the buffer, which held soil spilled from the dozer's pushes in the first cell, and the roller was part way through it. The dozer now waits whenever the other cell has soil not yet rolled, spill included; an empty cell still counts as ready.
+
+**Benchmark** (1500 s, one carrier; logs `logs/haul_bench_first_<soil>_1carrier.json`; lifts covered, density as a share of bank / share rolled ≥ 6 times):
+
+| | Dry sand | Loam | Clay |
+|---|---|---|---|
+| Holds (s held), section 17 → now | 1 (69 s) → 2 (511 s) | 2 (157 s) → 4 (341 s) | 1 (52 s) → 2 (86 s) |
+| Lifts covered unrolled | 0 | 0 | 0 |
+| Lifts covered (time, density / rolled) | 823 s: 1.034 / 100 %<br>1126 s: 1.026 / 96 % | 573 s: 1.047 / 91 %<br>878 s: 1.061 / 96 %<br>1228 s: 1.059 / 97 % | 407 s: 1.049 / 93 %<br>643 s: 1.024 / 93 %<br>1266 s: 1.004 / 98 % |
+| Least rolled lift, section 17 → now | 95 % → 96 % | 51 % → 91 % | 93 % → 93 % |
+| Loaded, section 17 → now | 71.5 → 71.0 t | 79.5 → 80.4 t | 72.3 → 76.8 t |
+| Overlapping outlines / give-way stops | 0 / 0 | 0 / 0 | 0 / 0 |
+
+- **Every lift in every soil is now covered at least 91 % rolled six times, at 1.00–1.06 of bank density.** No hold timed out.
+- **The dozer waits longer, but loading does not drop.** The carriers keep dumping while the dozer trims its own cell, so a wait costs the dozer's time, not output. In sand the dozer waited 511 s of 1500 s and the first move came at 823 s instead of 538 s; one fewer lift was covered in the run.
+- **Limit:** on a real site the spill along a cell edge would often be trimmed back by the dozer rather than rolled where it lies; here it is rolled in place.

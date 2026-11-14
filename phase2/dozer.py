@@ -24,7 +24,7 @@ reach). When the area holds more soil above grade than room below it, the layer 
 surface rises by one lift (up to MAX_FILL). The fill area may be split into cells (two, either side of the
 dump line), spread one at a time: when a cell's layer is full, spreading moves to the other cell (whose next
 lift starts, if it was spread before), and this one is rolled. If the site says the other cell is not rolled
-yet, the dozer holds: it keeps spreading its own cell (no new lift there) until the roller is done, or for at
+yet (any soil there, spill on a cell not yet filled too), the dozer holds: it keeps spreading its own cell (no new lift there) until the roller is done, or for at
 most HOLD_MAX_S, after which the next lift goes on unrolled soil (counted as lifts_on_unrolled). When the
 roller's only lanes left there lie beside the dozer's pushes (kept off while it works), the site sets make_way and
 the dozer waits at its park instead, so the roller can roll them. The carrier
@@ -332,7 +332,7 @@ class Dozer:
             # more soil above grade than room below it: this cell's lift is spread, so spreading moves to the
             # other cell and this one is rolled; if the other is not rolled yet, the dozer waits for the roller
             # (spreading its own cell) for at most HOLD_MAX_S, then its next lift goes on unrolled soil
-            held = self.full[other] and not self.may_switch
+            held = not self.may_switch  # any soil there not yet rolled, a first lift's spill too
             if held and self.hold_since is None:
                 self.hold_since = self.time
                 self.counters["holds"] += 1
