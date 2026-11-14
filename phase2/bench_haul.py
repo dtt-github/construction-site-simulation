@@ -2,7 +2,8 @@
 dumps it and comes back, for N simulated seconds. Reports what a site engineer would look at: loads, load
 mass, passes per load, loading time, the carrier's time away and its stages, the excavator's waiting time,
 and tonnes per hour delivered; the dozer's passes, blade forces and how flat it left the spread layer, and
-how long the carrier waited for it; plus the real-time factor. Each pass is logged too (`pass_log`): its strip,
+how long the carrier waited for it; a time study of every machine (`time_study`: each cycle split into the
+elements a field time study records, timestudy.py); plus the real-time factor. Each pass is logged too (`pass_log`): its strip,
 the most the bucket held while digging, what it held at the swing, what it carried to the carrier and what it
 left after the dump, so one run shows where a soil's loads go.
 
@@ -26,6 +27,7 @@ import numpy as np
 import dumper as dumper_mod
 
 import excavator_server as ex
+import timestudy as timestudy_mod
 
 secs = float(sys.argv[1]) if len(sys.argv) > 1 else 600.0
 soil = os.environ.get("SOIL", ex.soils.DEFAULT_SOIL)
@@ -44,8 +46,16 @@ prev = {c.index: c.stage for c in fleet}
 idle_spot = 0.0
 pass_log, cur, prev_stage, next_report = [], None, None, 100.0
 DIG = ("penetrate", "drag", "drag-curl", "curl")
+study = timestudy_mod.TimeStudy()
 while sim.sim_time < secs and (max_passes is None or sim.passes < max_passes):
     sim.step()
+    study.add("excavator", "excavator", sim.stage_name, sim.frame_dt)
+    for c in fleet:
+        study.add(f"carrier{c.index}", "carrier", c.stage, sim.frame_dt)
+    if sim.use_dozer:
+        study.add("dozer", "dozer", sim.dozer.stage, sim.frame_dt)
+    if sim.use_roller:
+        study.add("roller", "roller", sim.roller.stage, sim.frame_dt)
     if sim.stage_name != prev_stage:
         st, fill = sim.stage_name, round(sim._bucket_fill())
         if st == "approach" and cur is not None:
@@ -145,6 +155,8 @@ out = {
     "covered_lifts": sim.covered_lifts if sim.use_roller else None,
     # machines kept apart (traffic.py): waits per machine, and frames any two outlines overlapped
     "traffic": {"collision_frames": sim.collisions, **sim.traffic.counters()},
+    # each machine's cycle split into elements, as a field time study times them (timestudy.py)
+    "time_study": study.report(),
     "roller": {**{k: round(v, 2) for k, v in sim.roller.counters.items()}, **sim.roller_counters} if sim.use_roller else None,
 }
 print(json.dumps(out))

@@ -2049,3 +2049,47 @@ The one lift section 17 still covered half rolled (loam, 331 s, 51 %) was the do
 - **Every lift in every soil is now covered at least 91 % rolled six times, at 1.00–1.06 of bank density.** No hold timed out.
 - **The dozer waits longer, but loading does not drop.** The carriers keep dumping while the dozer trims its own cell, so a wait costs the dozer's time, not output. In sand the dozer waited 511 s of 1500 s and the first move came at 823 s instead of 538 s; one fewer lift was covered in the run.
 - **Limit:** on a real site the spill along a cell edge would often be trimmed back by the dozer rather than rolled where it lies; here it is rolled in place.
+
+## A living site, 19: a time study of the simulated site
+
+A field time study times each machine's cycle element by element, by stopwatch or from video. The benchmark now records the same thing (`timestudy.py`): it maps each machine's stages to the usual elements, cuts a cycle where the machine starts its cycle again, and reports each element's mean, spread and share, plus where each machine's time went over the run. Cycles that hold a delay (excavator moving on, dozer parked) are kept out of the cycle figures. Elements:
+
+- excavator: dig (bucket in, drag, curl), swing loaded, dump, swing empty, wait for a carrier;
+- carrier: load, haul loaded, dump (back up, tip, lower), return, wait;
+- dozer: push (blade down), return (blade up, back, to the next lane);
+- roller: roll, travel, parked.
+
+**Benchmark** (1500 s, one carrier; logs `logs/haul_bench_timestudy_<soil>_1carrier.json`; mean ± SD in s):
+
+| | Dry sand | Loam | Clay |
+|---|---|---|---|
+| Excavator cycles | 66 | 50 | 58 |
+| Dig | 6.98 ± 0.42 | 6.91 ± 0.45 | 6.74 ± 0.51 |
+| Swing loaded (103°) | 4.60 ± 1.20 | 3.53 ± 0.73 | 3.42 ± 0.69 |
+| Dump | 2.03 ± 0.15 | 2.86 ± 0.79 | 3.98 ± 0.69 |
+| Swing empty | 3.93 ± 1.09 | 3.91 ± 0.33 | 4.02 ± 0.51 |
+| **Net cycle** (sum of the four) | **17.5** | **17.2** | **18.2** |
+| Excavator time waiting for the carrier | 22 % | 26 % | 28 % |
+| Carrier cycle | 193 ± 25 | 167 ± 19 | 209 ± 19 |
+| … load / haul / dump / return / wait | 129 / 18 / 21 / 21 / 4 | 102 / 18 / 22 / 21 / 4 | 140 / 18 / 24 / 20 / 7 |
+| Dozer cycle: push / return | 7.4 / 7.7 | 8.6 / 9.1 | 11.3 / 8.5 |
+| Dozer parked (waiting for soil or the roller) | 53 % | 44 % | 38 % |
+| Roller rolling / travelling / parked | 47 / 17 / 36 % | 46 / 24 / 30 % | 42 / 21 / 37 % |
+
+**Published figures for a 20 t excavator** (research notes, *Earthmoving productivity reference figures*):
+
+| Source | Dig | Swing loaded | Dump | Swing empty | Cycle |
+|---|---|---|---|---|---|
+| Cat Performance Handbook 29, 320B, hard clay, 2.3 m deep, 60–90° | 5.4 | 3.6 | 1.8 | 3.0 | 13.8 |
+| Komatsu Specifications & Application Handbook 27, PC200, 45–90° / 90–180° | | | | | 13–16 / 16–19 |
+| BML estimating formula, about 1 m³, 90–103° | | | | | 17–18 |
+| Field study, 30 t PC300-8 | 7.35 (4.8–9.2) | 4.96 (3.6–6.3) | 4.23 (3.0–5.3) | 4.28 (3.1–5.8) | 20.8 |
+| Instrumented human operator, Baidu AES study | 5.8 | 6.2 | 5.8 | 5.7 | 23.6 |
+| Molaei et al., 13.4 t | | | | | 12–24 |
+
+- **The net cycle, 17–18 s at 103°, sits in Komatsu's 16–19 s band for 90–180° and on the BML figure.** A short loam check (its first 5 cycles) gave 15.2 s; over a shift the cut gets deeper and further away, and digging takes 0.6 s longer.
+- **The split matches the handbook shape.** Dig is the longest element (37–40 % of the net cycle; Cat 39 %, PC300 field study 35 %). Dump is the shortest in sand and loam; in clay it takes 4.0 s, because sticky soil leaves the bucket slowly, the same order as the PC300 field figure.
+- **The scripted operator is far too regular.** Digging varies by ±0.4–0.5 s (CV 7 %). In the PC300 field study digging alone ranged from 4.8 to 9.2 s, and human swing and dump times spread similarly. A real time study will show this at once; a simulated operator needs variability (reaction time, cut choice, bucket fill) before the spreads, not only the means, can be compared.
+- **With one carrier the excavator waits a quarter of its time.** The carrier is away 60–65 s a cycle (haul, dump, return), and the excavator has no second carrier to load meanwhile. This is the match-factor effect the handbooks describe; field studies with too few haul units report similar idle shares.
+- **Loading a carrier takes 1.7–2.3 min**, about six to eight passes. Here the comparison is weaker: Cat's 0.6–0.8 min truck exchange and 1.0–1.2 min manoeuvre-and-dump figures are for road trucks; our carrier backs up, tips and lowers in 21–24 s.
+- **Limit:** the reference figures come from other machines, soils and operators. The comparison checks magnitude and the shape of the cycle. Validating the means and spreads needs a time study of the real ZX200, IC120 and D37 on a known soil; that is the next step.
