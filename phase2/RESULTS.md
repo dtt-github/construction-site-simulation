@@ -2127,3 +2127,23 @@ Field study of a 30 t PC300-8 (mean, range): dig 7.35 (4.8–9.2), swing loaded 
 - **The net cycle, 20.0–20.6 s, matches the field study's 20.8 s.** The scripted 17–18 s sat at the handbooks' figures for a skilled operator; a human one is about 3 s slower, most of it in the pauses (1.0 s before digging alone).
 - **Output drops 4–7 %, less than the cycle grows (13–18 %).** With one carrier the excavator waited for it a fifth to a quarter of the time, and part of the slower cycle comes out of that wait.
 - **Limit:** the empty swing has a long tail in dry sand (90th percentile 8.4 s). One to three swing backs a run still stall where the bucket must lift clear of the carrier first, which the scripted operator did not do. The comparison is with other machines and operators; the operator values are to be fitted when a time study of the real machines is available.
+
+## A living site, 21: two carriers in the time study
+
+With one carrier the excavator waited for it 22–28 % of the time (section 19). The same runs with two carriers (scripted operator, 1500 s; logs `logs/haul_bench_timestudy_<soil>_2carrier.json`):
+
+| | Dry sand | Loam | Clay |
+|---|---|---|---|
+| Net cycle, 1 → 2 carriers | 17.5 → 17.4 s | 17.2 → 17.0 s | 18.2 → 18.3 s |
+| Excavator waiting, per load | 55 → 30 s | 49 → 26 s | 53 → 27 s |
+| Excavator waiting, share of the run | 22 → 14 % | 26 → 14 % | 28 → 15 % |
+| Time to load six carriers | 1099 → 950 s (−14 %) | 965 → 877 s (−9 %) | 1180 → 1033 s (−12 %) |
+| Loaded in 1500 s | 71.4 → 74.4 t | 80.6 → 81.1 t (pit dug out) | 77.0 → 78.3 t (pit dug out) |
+| Carrier cycle | 193 → 331 / 401 s | 167 → 297 / 303 s | 209 → 345 / 379 s |
+| Carrier waiting to load, share | 2 → 32 / 51 % | 2 → 27 / 54 % | 4 → 32 / 50 % |
+| Dozer parked | 53 → 48 % | 44 → 49 % | 38 → 45 % |
+
+- **The second carrier halves the excavator's wait, but does not end it.** About 26–30 s a load remain. This is the exchange time: the loaded carrier must leave the one-lane spot before the empty one drives from the waiting place and reverses in. This is 0.45 min. Cat's handbook gives 0.6–0.8 min for road trucks, and a short carrier backing a few metres should take less. Loading from both sides, or a waiting place beside the spot, would cut it.
+- **The fleet is now over-trucked.** Each carrier waits a third to a half of its time to load. A carrier is away for about 75 s (haul, dump, return through the waiting place) plus the 26–30 s exchange, against 100–150 s of loading. The match factor is about 1.2–1.4, so one carrier always waits. The handbooks' advice is that the cheaper machine should do the waiting, which is the carrier here.
+- **Output is set by the pit, not the fleet.** Over the run, the second carrier loads the same six carriers 9–14 % sooner. In loam and clay the pit is dug out earlier, and the excavator is then idle (12–24 % of the run). In dry sand the cut thins as the pit bottoms out: the last 25 passes carry 0.2–0.4 t each. So tonnes in 1500 s barely change, and a longer haul or a larger pit is where a second carrier pays off.
+- **The excavator cycle is unchanged** (within 0.2 s), as it should be. The machines keep clear of each other with no give-way or stuck events, and the carriers wait 42–62 s in all at the dump while the dozer clears it.
