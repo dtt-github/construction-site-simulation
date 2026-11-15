@@ -135,6 +135,7 @@ out = {
     "lost_particles": sim.zones.counters["lost"],
     "pool_short": sim.zones.counters["pool_short"],
     "skipped": sim.skipped,
+    "unblock_lift_s": round(sim.unblocks, 1),
     "carrier_wait_at_dump_s": round(sum(c.dozer_wait for c in fleet), 1),
     "carrier_wait_to_leave_s": round(sum(c.depart_wait for c in fleet), 1),
     "carrier_wait_to_load_s": round(sum(c.queue_wait for c in fleet), 1),

@@ -2147,3 +2147,28 @@ With one carrier the excavator waited for it 22–28 % of the time (section 19).
 - **The fleet is now over-trucked.** Each carrier waits a third to a half of its time to load. A carrier is away for about 75 s (haul, dump, return through the waiting place) plus the 26–30 s exchange, against 100–150 s of loading. The match factor is about 1.2–1.4, so one carrier always waits. The handbooks' advice is that the cheaper machine should do the waiting, which is the carrier here.
 - **Output is set by the pit, not the fleet.** Over the run, the second carrier loads the same six carriers 9–14 % sooner. In loam and clay the pit is dug out earlier, and the excavator is then idle (12–24 % of the run). In dry sand the cut thins as the pit bottoms out: the last 25 passes carry 0.2–0.4 t each. So tonnes in 1500 s barely change, and a longer haul or a larger pit is where a second carrier pays off.
 - **The excavator cycle is unchanged** (within 0.2 s), as it should be. The machines keep clear of each other with no give-way or stuck events, and the carriers wait 42–62 s in all at the dump while the dozer clears it.
+
+## A living site, 22: the swing back no longer stalls
+
+Sections 19–21 found one to three swing backs a run that stalled and timed out, each one late in the run (after 830 s). At the timeout the arm was where it should be and the house was not. The cause is a deadlock between two checks:
+
+- The arm lowers the bucket toward the pit as the house turns. It checks clearance only over the angles the house sweeps now.
+- The house checks the whole rest of its swing. Once spill and heaps between the carrier and the pit had grown, the lowered bucket would not clear them further round. So the house crept up to the obstacle and stopped.
+- Nothing then lifted the bucket. Both waited until the stage timed out (8–9 s). In some runs the house was still 1.2 rad short of the pit, and the next five or six stages timed out after it.
+
+Now, when the house has stopped on the swing back and the bucket would not clear something further round, the bucket lifts from where it is by the shortfall plus the 0.15 m margin. It holds there until the house is past the obstacle, then lowers as planned (`unblock_lift_s` in the benchmark output). Two narrower versions failed. Lifting on every swing stage also fired on the loaded swing, where the carrier itself is the obstacle (dry sand loaded 10.6 t). Lifting only once the arm had finished missed the stalls that start with the arm still moving.
+
+**Benchmark** (1500 s, one carrier, human operator, seed 1; logs `logs/haul_bench_unblock_<soil>_1carrier.json`, before from section 20):
+
+| | Dry sand | Loam | Clay |
+|---|---|---|---|
+| Stages timed out | 3 → 0 | 2 → 0 | 1 → 0 |
+| Lifting to clear, in total | 9.9 s | 0.3 s | 0 s |
+| Swing empty, mean ± SD | 5.37 ± 2.35 → 4.33 ± 0.57 s | 4.81 ± 1.86 → 4.59 ± 0.75 s | 4.65 ± 1.31 → 4.59 ± 0.84 s |
+| Swing empty, 90th percentile | 8.41 → 5.08 s | 5.37 → 5.61 s | 5.49 → 5.44 s |
+| Net cycle | 20.6 → 19.8 s | 20.0 → 19.9 s | 20.5 → 20.2 s |
+| Loaded in 1500 s | 68.7 → 67.7 t | 77.6 → 81.9 t | 71.4 → 72.9 t |
+
+- **No stage times out in any soil**, and the long tail of the empty swing is gone. Its spread, 0.6–0.8 s, now comes from the operator's pauses alone.
+- **The net cycle is 19.8–20.2 s** against the field study's 20.8 s.
+- **Limit:** the runs diverge once anything changes, and in clay the stall did not recur, so the lift was never needed there. The scripted-operator runs of sections 19 and 21 were not repeated.

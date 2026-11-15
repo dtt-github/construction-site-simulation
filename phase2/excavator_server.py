@@ -873,7 +873,7 @@ class ExcavatorSim:
         self.face_rest, self.pass_fill, self.pass_carried = {}, 0.0, 0.0  # strips set aside after a poor pass (until pass n); this pass's best fill and what it carried
         self.stage_time = 0.0
         self.auto_wait = 0.0
-        self.low_prev, self.low_rate, self.swing_held, self.arm_held = None, 0.0, 0.0, 0.0
+        self.low_prev, self.low_rate, self.swing_held, self.arm_held, self.unblocks, self.unblock_psi = None, 0.0, 0.0, 0.0, 0.0, None
         self.shaking, self.shakes = None, 0
         self.stage_name = "manual"
         self.sim_time = 0.0
@@ -1451,6 +1451,31 @@ class ExcavatorSim:
 
             def allow(direction):
                 return self._swing_allowance(local, math.radians(pb), direction, rise_to_end)
+
+            # swinging back, the arm may lower the bucket for the pit before the house is past what it must clear
+            # further along the swing (the arm checks only the angles the house sweeps now). The house then stops
+            # short of it: lift the bucket by what it lacks, and hold it there until the house is past it. Left
+            # low, the house waited until the stage timed out (8-9 s, one to three times a run, once the spill
+            # and heaps between carrier and pit had grown), and a skipped swing back could hang the next stages
+            left = math.radians(pb) - self.q[0]
+            way = math.copysign(1.0, left)
+            if b[0] == "swing back" and abs(left) > 0.05:
+                if self.unblock_psi is None and abs(self.qd[0]) < 0.1 and self.stage_time > 0.5:
+                    psi_path = self.q[0] + way * np.linspace(0.0, abs(left), max(2, int(abs(left) / 0.035) + 2))
+                    m = self._clearance(local, psi_path)
+                    if m.min() < 0.0:
+                        self.unblock_psi = float(psi_path[np.nonzero(m < 0.0)[0][-1]]) + way * 0.05
+                        pin = self._pin_pose()
+                        self.unblock_pin = (pin[1], pin[2] - float(m.min()) + self.ARM_MARGIN, pin[3])
+                if self.unblock_psi is not None and (self.unblock_psi - self.q[0]) * way > 0.0:
+                    r_u, z_u, f_u = self.unblock_pin
+                    q_goal = ik(self.q[0], r_u, z_u, math.radians(f_u))
+                    held = True
+                    self.unblocks += self.frame_dt
+                else:
+                    self.unblock_psi = None
+            else:
+                self.unblock_psi = None
 
         err = q_goal - self.q
         # lever: the opening the planned pace needs (feed-forward), corrected by the tracking error; in the
@@ -2089,6 +2114,7 @@ class ExcavatorSim:
             "swing_inertia": round(self.swing_inertia),
             "swing_held_s": round(self.swing_held, 1),
             "arm_held_s": round(self.arm_held, 1),
+            "unblock_lift_s": round(self.unblocks, 1),
             "shakes": self.shakes,
             "cyl_m": [round(float(v), 3) for v in self.cyl_L],
             "force_kN": [round(v / 1000, 1) for v in self.force],
