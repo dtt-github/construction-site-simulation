@@ -2172,3 +2172,18 @@ Now, when the house has stopped on the swing back and the bucket would not clear
 - **No stage times out in any soil**, and the long tail of the empty swing is gone. Its spread, 0.6–0.8 s, now comes from the operator's pauses alone.
 - **The net cycle is 19.8–20.2 s** against the field study's 20.8 s.
 - **Limit:** the runs diverge once anything changes, and in clay the stall did not recur, so the lift was never needed there. The scripted-operator runs of sections 19 and 21 were not repeated.
+
+## A living site, 23: pacing the plan to the pumps (tried, reverted)
+
+The auto cycle plans each stage with each joint's speed on its own at mid stroke. On the swing stages the pumps also feed the house, so the boom and arm get 52–62 % of their planned speed and the bucket, swinging back, about 35 %. The plan runs ahead, and the controller holds it whenever a joint trails by more than 0.12 rad.
+
+The try: slow the plan to what the slowest joint can do there, and ease the faster joints' levers to match, so the joints arrive together. Loam, scripted operator, 1500 s, against section 19:
+
+| | Before | Paced |
+|---|---|---|
+| Swing loaded | 3.53 ± 0.73 s | 7.48 ± 3.81 s |
+| Net cycle | 17.2 s | 24.5 s |
+| Stages timed out | 0 | 42 |
+| Loaded | 80.6 t | 69.1 t |
+
+The plan that runs ahead keeps the levers open. Paced, the boom rose more slowly on the swing to the carrier, and the house, which swings only as fast as the rising bucket clears the carrier, waited for it. The aim above the carrier (section "swing to truck" in `CYCLE`) is there so that the boom is still rising at full speed as the bucket arrives, as an operator would do it. So the planner stays as it was. The remaining bucket question, whether the four-bar's moment arm is about a quarter too long against PWRI's flow channels, waits for PWRI to confirm their bucket angle convention.
