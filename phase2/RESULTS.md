@@ -2093,3 +2093,37 @@ A field time study times each machine's cycle element by element, by stopwatch o
 - **With one carrier the excavator waits a quarter of its time.** The carrier is away 60–65 s a cycle (haul, dump, return), and the excavator has no second carrier to load meanwhile. This is the match-factor effect the handbooks describe; field studies with too few haul units report similar idle shares.
 - **Loading a carrier takes 1.7–2.3 min**, about six to eight passes. Here the comparison is weaker: Cat's 0.6–0.8 min truck exchange and 1.0–1.2 min manoeuvre-and-dump figures are for road trucks; our carrier backs up, tips and lowers in 21–24 s.
 - **Limit:** the reference figures come from other machines, soils and operators. The comparison checks magnitude and the shape of the cycle. Validating the means and spreads needs a time study of the real ZX200, IC120 and D37 on a known soil; that is the next step.
+
+## A living site, 20: an operator who varies
+
+Section 19 found the scripted operator far too regular: digging varied by ±0.4–0.5 s, where a field study of a 30 t excavator found 4.8–9.2 s. The autopilot can now run a human operator (`ExcavatorSim.HUMAN`, `OPERATOR=human SEED=n` in `bench_haul.py`; the scripted one stays the default). From a seeded generator, so a run repeats, it draws:
+
+- the lever opening of each stage: a fraction of full, mean 0.85, SD 0.1, at least 0.5;
+- a pause before each stage that starts a new motion (reaction, checking the carrier, aiming): exponential, mean 1.0 s before the bucket goes into the face, 0.4 s before the swing to the carrier, 0.3 s before the dump, and 0.5 s over the pit before the bucket goes down again; at most three times the mean;
+- each pass's cut depth: ±0.1 m (SD) about the planned cut, the floor clearance still holding.
+
+The pauses carry most of the spread. Digging is set by the soil, not the lever, and the 103° swing is limited mostly by the house's acceleration, so a part-open lever barely changes either. The values are first guesses sized to the published spreads, to be fitted to a real time study.
+
+The first version paused after the dump, before the swing back. In dry sand the bucket then sat in the heap it had just poured; the swing back stalled and every stage after it timed out, about 24 s each time (24 stages timed out in 1500 s). The pause now comes over the pit, and is still counted as swing empty.
+
+**Benchmark** (1500 s, one carrier, seed 1; logs `logs/haul_bench_human_<soil>_1carrier.json`, scripted runs from section 19; mean ± SD in s):
+
+| | Dry sand | Loam | Clay |
+|---|---|---|---|
+| Dig, scripted → human | 6.98 ± 0.42 → 7.93 ± 0.96 | 6.91 ± 0.45 → 7.98 ± 1.00 | 6.74 ± 0.51 → 7.86 ± 1.19 |
+| Swing loaded | 4.60 ± 1.20 → 4.93 ± 1.13 | 3.53 ± 0.73 → 4.06 ± 0.84 | 3.42 ± 0.69 → 3.90 ± 0.78 |
+| Dump | 2.03 ± 0.15 → 2.35 ± 0.42 | 2.86 ± 0.79 → 3.14 ± 0.87 | 3.98 ± 0.69 → 4.11 ± 0.81 |
+| Swing empty, median (10–90 %) | 4.35 (3.66–8.41) | 4.34 (3.79–5.37) | 4.40 (3.78–5.49) |
+| **Net cycle** | **17.5 → 20.6** | **17.2 → 20.0** | **18.2 → 20.5** |
+| Excavator cycles | 66 → 57 | 50 → 54 | 58 → 58 |
+| Loaded in 1500 s | 71.4 → 68.7 t | 80.6 → 77.6 t | 77.0 → 71.4 t |
+| Carrier cycle | 193 → 209 s | 167 → 206 s | 209 → 228 s |
+| Excavator time waiting for the carrier | 22 → 21 % | 26 → 24 % | 28 → 20 % |
+| Stages timed out | 2 → 3 | 0 → 2 | 0 → 1 |
+
+Field study of a 30 t PC300-8 (mean, range): dig 7.35 (4.8–9.2), swing loaded 4.96 (3.6–6.3), dump 4.23 (3.0–5.3), swing empty 4.28 (3.1–5.8), cycle 20.8 s; an instrumented human operator, 23.6 s.
+
+- **Digging now spreads as in the field.** Its SD of 1.0–1.2 s is a quarter of the field study's 4.4 s range, and its 10–90 % band (6.8–9.4 s) sits inside that range. Both swings and the dump spread by 0.4–1.1 s, about what the field ranges imply.
+- **The net cycle, 20.0–20.6 s, matches the field study's 20.8 s.** The scripted 17–18 s sat at the handbooks' figures for a skilled operator; a human one is about 3 s slower, most of it in the pauses (1.0 s before digging alone).
+- **Output drops 4–7 %, less than the cycle grows (13–18 %).** With one carrier the excavator waited for it a fifth to a quarter of the time, and part of the slower cycle comes out of that wait.
+- **Limit:** the empty swing has a long tail in dry sand (90th percentile 8.4 s). One to three swing backs a run still stall where the bucket must lift clear of the carrier first, which the scripted operator did not do. The comparison is with other machines and operators; the operator values are to be fitted when a time study of the real machines is available.

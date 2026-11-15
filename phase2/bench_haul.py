@@ -14,6 +14,7 @@ versions of the autopilot pass by pass, in a quarter of the time. Progress goes 
     SOIL=loam ../phase0/.venv-newton/bin/python bench_haul.py 600
     SOIL=loam CARRIERS=2 ../phase0/.venv-newton/bin/python bench_haul.py 600   # two carriers sharing the road
     SOIL=loam CARRIERS=3 HAUL_M=150 ../phase0/.venv-newton/bin/python bench_haul.py 1500   # 150 m more road each way
+    SOIL=loam OPERATOR=human SEED=1 ../phase0/.venv-newton/bin/python bench_haul.py 1500   # a human operator (ExcavatorSim.HUMAN)
     SOIL=clay PASSES=25 ../phase0/.venv-newton/bin/python bench_haul.py 1500   # quick check: the first 25 passes
 """
 
@@ -37,6 +38,10 @@ relocate_m = float(os.environ.get("RELOCATE_M", "0"))  # move on along the bank 
 max_passes = int(os.environ.get("PASSES", "0")) or None
 roller = os.environ.get("ROLLER", "1") != "0"
 sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m, relocate_m=relocate_m, roller=roller)
+operator = os.environ.get("OPERATOR", "scripted")  # human: an operator who varies from cycle to cycle
+op_seed = int(os.environ.get("SEED", "0"))
+if operator == "human":
+    sim.set_operator(ex.ExcavatorSim.HUMAN, op_seed)
 sim.traffic.enabled = os.environ.get("TRAFFIC", "1") != "0"  # TRAFFIC=0: machines drive through each other (collisions still counted)
 sim.auto = True
 fleet = sim.fleet
@@ -104,6 +109,7 @@ trips = fleet.trips
 delivered_t = fleet.delivered_kg / 1000.0
 out = {
     "soil": soil,
+    "operator": operator if operator != "human" else {"kind": "human", "seed": op_seed, **{k: v for k, v in ex.ExcavatorSim.HUMAN.items()}},
     "carriers": n_carriers,
     "haul_m": haul_m,
     "relocate_m": relocate_m,
@@ -157,6 +163,7 @@ out = {
     "traffic": {"collision_frames": sim.collisions, **sim.traffic.counters()},
     # each machine's cycle split into elements, as a field time study times them (timestudy.py)
     "time_study": study.report(),
+    "operator_paused_s": {k: round(v, 1) for k, v in sim.paused.items()},
     "roller": {**{k: round(v, 2) for k, v in sim.roller.counters.items()}, **sim.roller_counters} if sim.use_roller else None,
 }
 print(json.dumps(out))

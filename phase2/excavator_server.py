@@ -861,6 +861,8 @@ class ExcavatorSim:
         self.passes = 0
         self.skipped = []
         self.ease, self.seg_from, self.auto_frame, self.auto_fill, self.early_curls = 0.0, None, 0, 0.0, 0
+        self.op_rng = np.random.default_rng(self.operator_seed)
+        self.pace, self.pause_left, self.paused = 1.0, 0.0, {}  # paused: the operator's pauses drawn, s per stage
         self.curl_out = None  # curl waypoint replaced for this pass (lifting out of a full cohesive cut)
         self.curl_gain = self.CURL_GAIN_GUESS * self.payload_kg if self.heap_check else 0.0
         self.curl_from = None  # load when this pass's early curl began
@@ -909,6 +911,49 @@ class ExcavatorSim:
                 self.levers[k] = float(np.clip(v, -1.0, 1.0))
 
     DIG_STAGES = ("penetrate", "drag", "drag-curl", "curl")
+    # operator: None is the scripted operator, the same every cycle (full lever wherever the plan allows, no
+    # pause between stages, every cut at the planned depth). A human one varies from cycle to cycle, which a
+    # field time study shows as the spread of each element: in a 30 t excavator study dig took 4.8-9.2 s,
+    # swing loaded 3.6-6.3, dump 3.0-5.3 and swing empty 3.1-5.8 s, an SD of roughly 1.1, 0.7, 0.6 and 0.7 s,
+    # where the scripted operator spreads 0.4-0.5, 0.7, 0.8 and 0.3 s (RESULTS section 19). HUMAN draws, from a
+    # seeded generator so a run repeats: the lever opening of each stage (a fraction of full: mean pace_mean,
+    # SD pace_sd, at least pace_min), a pause before each stage that starts a new motion (exponential: its
+    # mean, which is also its SD, per stage in `pause`, at most 3 times the mean: reaction, checking the
+    # carrier, aiming the bucket), and each pass's cut depth (+-cut_sd m about the planned cut; the floor
+    # clearance still holds). The swing is mostly limited by the house's acceleration, not its top speed, so a
+    # part-open lever barely changes it; the pauses carry the spread there. The values are first guesses sized
+    # to the published spreads, to be fitted to a real time study.
+    HUMAN = {"pace_mean": 0.85, "pace_sd": 0.1, "pace_min": 0.5, "cut_sd": 0.1,
+             "pause": {"penetrate": 1.0, "swing to truck": 0.4, "dump": 0.3, "approach": 0.5}}
+    # (the pause on the empty swing comes over the pit, before the bucket goes down to the face: held still at
+    # the dump pose instead, the bucket sat in the heap it had just poured in dry sand, the swing back stalled
+    # and the stages after it timed out one by one, about 24 s each time, 4 times in 1500 s)
+    operator, operator_seed = None, 0
+
+    def set_operator(self, params=None, seed=0):
+        """params None: the scripted operator; a dict like HUMAN: a human one, drawn from `seed`."""
+        self.operator, self.operator_seed = params, seed
+        self.op_rng = np.random.default_rng(seed)
+        self.pace, self.pause_left, self.paused = 1.0, 0.0, {}
+        self._z_cache = {}
+
+    def _operator_next(self, stage):
+        """A human operator's lever opening for the next stage, and the pause before it."""
+        op = self.operator
+        if op is None:
+            return
+        self.pace = float(np.clip(self.op_rng.normal(op["pace_mean"], op["pace_sd"]), op["pace_min"], 1.0))
+        mean = op["pause"].get(stage)
+        if mean:
+            self.pause_left = float(min(self.op_rng.exponential(mean), 3.0 * mean))
+            self.paused[stage] = self.paused.get(stage, 0.0) + self.pause_left
+
+    def _cut_offset(self, p):
+        """How much shallower (+) or deeper (-) than planned a human operator cuts on pass p."""
+        if self.operator is None:
+            return 0.0
+        return float(np.random.default_rng((self.operator_seed, p)).normal(0.0, self.operator["cut_sd"]))
+
     STAGE_TIMEOUT = 4.0  # s of poor tracking before the auto cycle skips a stage
     DEEPEN_PER_PASS, MAX_DEEPEN = 0.15, BED_TOP  # per level (all lanes dug); the floor clearance stops it
 
@@ -950,7 +995,7 @@ class ExcavatorSim:
                 level = self.passes // len(self.LANES)  # deepen only after every lane has been dug
                 deepen = min(self.DEEPEN_PER_PASS * level, self.MAX_DEEPEN)
                 lowest = max(self.FLOOR_CLEARANCE, BED_TOP - self.FIRST_CUT - deepen)
-            z = wp_[3] - deepen
+            z = wp_[3] - deepen + self._cut_offset(self.passes)
             while self._bucket_lowest(prev, z_prev, wp_, z) < lowest:
                 z += 0.01
             self._z_cache[key] = z
@@ -1207,6 +1252,7 @@ class ExcavatorSim:
             self._after_dump()
             self.auto_stage = (self.auto_stage + 1) % len(self.CYCLE)
             self.auto_s, self.stage_time, self.auto_wait, self.seg_from = 0.0, 0.0, 0.0, None
+            self._operator_next(self.CYCLE[(self.auto_stage + 1) % len(self.CYCLE)][0])
             self.low_prev, self.low_rate = None, 0.0
         self.auto_frame += 1
 
@@ -1314,6 +1360,10 @@ class ExcavatorSim:
         a, b = (self.curl_out if self.curl_out is not None and w[0] == "curl" else w for w in (a, b))
         a, b = (self._dump_waypoint(w) if w[0] in ("swing to truck", "dump") else w for w in (a, b))
         self.stage_name = b[0]
+        if self.pause_left > 0.0:  # a human operator's pause before the stage: levers in neutral
+            self.pause_left -= self.frame_dt
+            self.levers[:] = 0.0
+            return
         waiting = self.haul and b[0] == "swing to truck" and self.fleet.at_spot is None
         if waiting:
             # no carrier at the loading spot: swing part way and hold the full bucket up there (the pit's
@@ -1349,7 +1399,7 @@ class ExcavatorSim:
         q_end = self._waypoint_q(b)
         rb = self._stage_r(b)
         q_end = ik(q_end[0], rb, self._stage_z(b) + ease_b, math.radians(b[4])) if ease_b else q_end
-        speed = b[5] if len(b) > 5 else 1.0
+        speed = (b[5] if len(b) > 5 else 1.0) * self.pace
         s = self.auto_s
         if self.seg_from is not None:
             pa, ra, za, fa = self.seg_from
@@ -1456,6 +1506,7 @@ class ExcavatorSim:
             self.auto_stage = (self.auto_stage + 1) % n
             self.auto_s = 0.0
             self.stage_time = 0.0
+            self._operator_next(self.CYCLE[(self.auto_stage + 1) % n][0])
             self.seg_from = None
             self.low_prev, self.low_rate = None, 0.0
             if self.auto_stage == 0:
