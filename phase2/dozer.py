@@ -28,8 +28,10 @@ yet (any soil there, spill on a cell not yet filled too), the dozer holds: it ke
 most HOLD_MAX_S, after which the next lift goes on unrolled soil (counted as lifts_on_unrolled). When the
 roller's only lanes left there lie beside the dozer's pushes (kept off while it works), the site sets make_way and
 the dozer waits at its park instead, so the roller can roll them. The carrier
-must not dump while the dozer works there: the server holds the carrier at its turn point until the dozer
-has parked, and recalls the dozer when the carrier leaves the loading spot.
+must not dump while the dozer works there: the server recalls the dozer when the carrier leaves the loading spot,
+and holds the carrier at its turn point until the dozer is clear. A push under way is finished, and the dozer waits
+at the lane's end with the blade up (where its outline keeps WAIT_CLEAR_GAP from the dumping carrier's, traffic.py) until the carrier has tipped and gone, then
+backs up and carries on; one recalled with the blade still at the heap backs out and parks.
 
 Geometry from the model (d37pxi_ros2, urdf/d37pxi24.xacro and the meshes): lift arm pivot 0.586 m ahead of
 base_link and 0.386 m above it, lift range -0.41..0.19 rad (positive lowers the blade); blade frame 1.588 m
@@ -42,6 +44,7 @@ import math
 import numpy as np
 
 import tracks
+import traffic
 
 ARM_PIVOT = np.array([0.5858, 0.0, 0.38606])  # lift_joint in base_link
 BLADE_ON_ARM = np.array([1.5881, 0.0, -0.10373])  # blade frame (angle_joint) in the arm frame
@@ -77,6 +80,7 @@ MAX_FILL = 1.5  # m: the design surface rises by layers up to this above the gro
 FUTILE_M3 = 0.15  # a pass that moves less than this out of its lane's heap part blocks the lane
 HOLD_MAX_S = 300.0  # longest the dozer waits for the roller before moving to an unrolled cell
 NEW_LOAD_M3 = 1.0  # the area's soil above grade growing by this much means a new load: blocked lanes reopen
+WAIT_CLEAR_GAP = 1.0  # m: the dozer waits for the carrier only where its outline is at least this far from the dumping carrier's
 
 
 def rot_z(a):
@@ -141,6 +145,7 @@ class Dozer:
         self.cell_lanes = [[(math.atan2(y - self.y_start, self.x_end - self.x_start), math.hypot(y - self.y_start, self.x_end - self.x_start)) for y in ends]
                            for ends in cells]
         self.start = np.array([self.x_start - self._edge_ahead(), self.y_start])  # base_link at the start of every push
+        self.dump_pose = None  # (x, y, yaw) of the carrier's base while it dumps, set by the site: where not to wait
         self.reset()
 
     def reset(self):
@@ -154,6 +159,7 @@ class Dozer:
         self.hold_since = None  # when the dozer started waiting for the other cell to be rolled
         self.make_way = False  # set by the site: while it waits, the roller's last lanes there lie beside its pushes
         self.stage, self.stage_time, self.time = "parked", 0.0, 0.0
+        self.may_work = True
         self.plan = []  # moves still to make: ("spin", yaw) | ("drive", x, y, dir, speed, stage) | ("lift", "up"/"raise"/"grade") | ("push", x, y)
         self.lane = None
         self.blocked = set()  # lanes whose last pass moved nothing
@@ -215,6 +221,16 @@ class Dozer:
     @property
     def parked(self):
         return self.stage == "parked"
+
+    @property
+    def clear_of_dump(self):
+        """Out of the carrier's way at the dump point: parked, or waiting at a lane's end for it to go."""
+        return self.stage in ("parked", "wait clear")
+
+    def _clear_of_dump_point(self):
+        """Whether the dozer, where it stands, is out of the way of a carrier dumping (its outline, tipped
+        vessel included, at least WAIT_CLEAR_GAP from the dozer's)."""
+        return self.dump_pose is None or not traffic.near("dozer", [(self.x, self.y, self.yaw)], "carrier", [self.dump_pose], WAIT_CLEAR_GAP)
 
     @property
     def grade(self):
@@ -429,10 +445,20 @@ class Dozer:
         f = max(-float(np.dot(blade_force, heading)), 0.0)
         self.force += (f - self.force) * min(dt / FORCE_TAU, 1.0)
         self.counters["parked_s" if self.parked else "working_s"] += dt
-        if not may_work and self.plan and self.stage in ("lower", "push"):
-            # the carrier is coming: stop pushing, back out with the blade up, and park
+        self.may_work = may_work
+        if not may_work and self.plan and self.stage == "lower":
+            # the carrier is coming before the push has begun (the blade still at the heap): back out and park
             self.plan = [("lift", "raise"), ("drive", *self.start, -1, SPEED_REVERSE, "back")]
             self._end_push()
+        elif not may_work and self.plan and self.stage == "push" and ("wait clear",) not in self.plan:
+            # the carrier is coming: finish the push (it carries the soil away from the dump point) and wait at
+            # the lane's end, blade up, until the carrier has tipped and gone, as a dozer on an end-dumped fill
+            # does. It used to drop the push, back up to the heap and drive to its park, and the carrier waited
+            # for all of it (in clay up to 108 s a run with two carriers), the push's soil left half way
+            self.plan = [self.plan[0], ("lift", "raise"), ("wait clear",), ("drive", *self.start, -1, SPEED_REVERSE, "back")]
+        elif not may_work and self.plan and self.stage == "back" and self.plan[0][0] == "drive" and self._clear_of_dump_point():
+            # backing toward the heap, still clear of the dump: stop here until the carrier has gone
+            self.plan = [("wait clear",)] + self.plan
         if not self.plan:
             self.plan = self._next_job(surface, may_work)
             if not self.plan and self._at_park():
@@ -464,6 +490,14 @@ class Dozer:
                 if move[1] == "raise":
                     self._set("raise")
                 done = self._lift_to(LIFT_LO, dt)
+        elif kind == "wait clear":
+            if not self._clear_of_dump_point():
+                done = True  # the push ended near the heap: not clear there, so back out and park as before
+            else:
+                self._set("wait clear")
+                self.speed = 0.0
+                self.counters["wait_clear_s"] = self.counters.get("wait_clear_s", 0.0) + dt
+                done = self.may_work
         elif kind == "push":
             self._set("push")
             done = self._push(move[1], move[2], dt)

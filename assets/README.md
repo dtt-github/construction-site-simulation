@@ -64,4 +64,44 @@ assets/
   fetch_assets.py    downloads "fetched" assets and checks licenses are recorded
   machinery/         machines (excavators, trucks, loaders, cranes, ...)
   site/              site equipment, people, materials
+  blender/           machines modelled in code, and the replay renderer (Blender 4.0)
 ```
+
+## Machines modelled in Blender
+
+`assets/blender/` builds detailed models procedurally with Blender's Python API, so they can be rebuilt,
+reviewed and changed like code. Install Blender (`sudo apt install blender` on Ubuntu, ARM included), then:
+
+```
+blender -b -t 4 --python assets/blender/zx200_hd.py      # -> assets/machinery/zx200_hd.glb
+blender -b -t 4 --python assets/blender/roller_hd.py     # -> assets/machinery/roller_hd.glb
+blender -b -t 4 --python assets/blender/ic120_hd.py      # -> assets/machinery/ic120_hd.glb
+blender -b -t 4 --python assets/blender/d37_hd.py        # -> assets/machinery/d37_hd.glb
+```
+
+- `blendkit.py`: shapes, bevelled parts, box-projected UVs, tileable procedural textures (paint, worn paint,
+  steel, track, rubber: colour variation, chips, scratches, grime, roughness and normal maps), glTF export.
+- `zx200_hd.py`: 20 t excavator to the dimensions and pins of PWRI's OPERA ZX200. It keeps the node names,
+  link frames, joint extras and free parts of `opera_zx200.glb`, so it replaces it without code changes
+  (the browser loads it in place of the OPERA model). `-- --beauty --render out/prefix` renders review
+  images with EEVEE.
+- `roller_hd.py`: 10.6 t single-drum roller to `phase2/roller.py`; the drum and rear wheels are nodes that
+  turn as it moves.
+- `ic120_hd.py`: rubber-tracked crawler carrier on the joint frames of PWRI's OPERA IC120; the vessel follows
+  the server's vessel boxes so the load sits on its floor. Replaces `opera_ic120.glb` in the browser.
+- `d37_hd.py`: crawler dozer with a power-angle-tilt blade on the joint frames of PWRI's OPERA D37PXi, lift
+  and angle cylinders on the source's joints. Replaces `opera_d37pxi.glb` in the browser.
+
+## Rendering a replay
+
+`assets/blender/render_replay.py` renders a recording (`phase2/record_replay.py`) with EEVEE: the site
+terrain, the soil surfaces, the grains and every machine posed as the browser poses them. Frames and an MP4
+go to `renders/` (git-ignored). Long renders load the CPU and GPU for a while: watch the temperature.
+
+```
+blender -b -t 4 --python assets/blender/render_replay.py -- --still --from 150 --camera overview
+blender -b -t 4 --python assets/blender/render_replay.py -- --from 140 --to 160 --camera excavator --res 1280x720
+```
+
+Cameras: `overview`, `excavator`, `spread`. Ubuntu's Blender has no Cycles (path tracing) on ARM; EEVEE takes
+a few seconds a frame.

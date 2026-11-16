@@ -745,6 +745,7 @@ class ExcavatorSim:
         self.track_counters = {"dozer_pressed": 0, "carrier_pressed": 0}
         edge_ahead = Dozer._edge_ahead()
         self.dozer = Dozer((DOZER_X_START - edge_ahead, DOZER_PARK_Y, math.pi / 2), (DOZER_X_START, BED_CENTER[1], DOZER_X_END, DOZER_CELLS), GROUND_Z, soil)
+        self.dozer.dump_pose = (HAUL_DUMP_X, BED_CENTER[1], math.pi)  # the carrier backs in facing -x
         self.blade_q, self.blade_qd = int(jq[joint_of[self.blade]]), int(jqd[joint_of[self.blade]])
         # the roller compacting the spread fill once the dozer has spread it
         self.use_roller = self.use_dozer and roller
@@ -1709,7 +1710,7 @@ class ExcavatorSim:
     def _haul(self):
         """Carriers: move the vessels, and hand each load over to and from the soil zone."""
         f = self.fleet
-        f.gates(self.dozer.parked or not self.use_dozer)
+        f.gates(self.dozer.clear_of_dump or not self.use_dozer)
         spot = f.at_spot
         if self.dispatch_pending and spot is not None and (not self.auto or self.stage_name not in ("swing to truck", "dump")) and self.side_sign * self.q[0] > math.radians(-70):
             self.dispatch_pending = False

@@ -2,9 +2,12 @@
 // Machines keep their real joints (from the source URDF) in node extras; "Animate machines" drives
 // them through their ranges to show the articulation. Static box colliders let site props hit them.
 
+import { makeLinkage } from "./linkage.js";
+
 export async function addShowcase({ THREE, scene, loader, addStatic, terrainHeight, site, panel }) {
   const items = site.showcase ?? [];
   const animated = [];
+  const linkages = [];
   for (const item of items) {
     let gltf;
     try {
@@ -17,15 +20,23 @@ export async function addShowcase({ THREE, scene, loader, addStatic, terrainHeig
     const [x, y, z] = item.pos;
     root.position.set(x, terrainHeight(x, z) + (y ?? 0), z);
     root.rotation.y = THREE.MathUtils.degToRad(item.yaw ?? 0);
+    scene.add(root);
+    root.updateMatrixWorld(true);
+    // cylinders and linkages follow the joints (linkage.js); free parts it can't pose stay hidden
     root.traverse((o) => {
-      if (o.userData?.free_part) o.visible = false; // cylinders and links the physics server places
+      if (o.userData?.free_part) o.visible = false;
+    });
+    const linkage = makeLinkage(THREE, root);
+    if (linkage) linkages.push(linkage);
+    const driven = new Set(linkage?.drivenJoints ?? []);
+    root.traverse((o) => {
       if (o.isMesh) o.castShadow = o.receiveShadow = true;
       const j = o.userData?.urdf_joint;
-      if (j && j.type !== "fixed" && !(item.animate_skip ?? []).includes(j.name)) {
-        animated.push({ node: o, joint: j, rest: o.quaternion.clone(), restPos: o.position.clone(), phase: Math.random() * Math.PI * 2 });
+      if (j && j.type !== "fixed" && !driven.has(j.name) && !(item.animate_skip ?? []).includes(j.name)) {
+        animated.push({ node: o, joint: j, rest: o.quaternion.clone(), restPos: o.position.clone(), phase: Math.random() * Math.PI * 2, cycle: item.cycle });
       }
     });
-    scene.add(root);
+    linkage?.update();
     root.updateMatrixWorld(true);
     if (item.collider === "parts") {
       // one axis-aligned box per mesh, in world space (rough, but keeps props out of the machine)
@@ -53,21 +64,52 @@ export async function addShowcase({ THREE, scene, loader, addStatic, terrainHeig
   btn.addEventListener("click", () => {
     on = !on;
     btn.textContent = on ? "Stop machines" : "Animate machines";
-    if (!on) for (const a of animated) {
-      a.node.quaternion.copy(a.rest);
-      a.node.position.copy(a.restPos);
+    if (!on) {
+      for (const a of animated) {
+        a.node.quaternion.copy(a.rest);
+        a.node.position.copy(a.restPos);
+      }
+      for (const l of linkages) l.update();
     }
   });
   panel.querySelector(".buttons")?.appendChild(btn);
 
   const q = new THREE.Quaternion();
   const axis = new THREE.Vector3();
+  function setJoint(a, value) {
+    axis.set(...a.joint.axis_local).normalize();
+    if (a.joint.type === "prismatic") a.node.position.copy(a.restPos).addScaledVector(axis, value);
+    else a.node.quaternion.copy(a.rest).multiply(q.setFromAxisAngle(axis, value));
+  }
+  // item.cycle: a work cycle as keyframes {period, keys: [[time s, {joint: value}], ...]}, eased between keys
+  function cycleValue(cycle, name, time) {
+    const keys = cycle.keys.filter(([, v]) => v[name] !== undefined);
+    if (!keys.length) return undefined;
+    const tt = time % cycle.period;
+    for (let k = 0; k < keys.length; k++) {
+      const [t0, v0] = keys[k];
+      const [t1raw, v1] = keys[(k + 1) % keys.length];
+      const t1 = k + 1 < keys.length ? t1raw : t1raw + cycle.period;
+      const tq = tt < keys[0][0] ? tt + cycle.period : tt;
+      if (tq >= t0 && tq <= t1) {
+        const u = (tq - t0) / Math.max(t1 - t0, 1e-6);
+        const e = u * u * (3 - 2 * u);
+        return v0[name] + (v1[name] - v0[name]) * e;
+      }
+    }
+    return keys[0][1][name];
+  }
   function update(dt) {
     if (!on) return;
     t += dt;
     for (const a of animated) {
       const j = a.joint;
       axis.set(...j.axis_local).normalize();
+      if (a.cycle) {
+        const v = cycleValue(a.cycle, j.name, t);
+        if (v !== undefined) setJoint(a, v);
+        continue; // joints the cycle doesn't name stay put
+      }
       const s = Math.sin(t * 0.6 + a.phase);
       if (j.type === "prismatic") {
         const lo = j.lower ?? 0, hi = j.upper ?? 0.2;
@@ -83,7 +125,23 @@ export async function addShowcase({ THREE, scene, loader, addStatic, terrainHeig
       }
       a.node.quaternion.copy(a.rest).multiply(q.setFromAxisAngle(axis, angle));
     }
+    for (const l of linkages) l.update();
   }
-  window.__showcase = { count: items.length, animated: animated.length, joints: animated.map((a) => a.joint.name) };
+  window.__showcase = {
+    count: items.length,
+    animated: animated.length,
+    joints: animated.map((a) => a.joint.name),
+    linkages: linkages.length,
+    // test hook: advance the articulation demo by t seconds and pose everything
+    step(t) {
+      on = true;
+      update(t);
+    },
+    // test hook: set joints by name directly, e.g. pose({boom_joint: -0.4}), then pose the linkages
+    pose(values) {
+      for (const a of animated) if (values[a.joint.name] !== undefined) setJoint(a, values[a.joint.name]);
+      for (const l of linkages) l.update();
+    },
+  };
   return { update };
 }

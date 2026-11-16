@@ -10,7 +10,8 @@ Elements follow the usual breakdown, so field data can be set beside it directly
 - carrier: load (at the loading spot), haul loaded (to the dump point), dump (back up, tip, lower),
   return (back to the loading spot), wait (at the dump point, for the loading spot, on the road); a cycle
   starts as loading starts;
-- dozer: push (blade down and pushing), return (blade raised, back and to the next lane), parked;
+- dozer: push (blade down and pushing), return (blade raised, back and to the next lane), wait (at a lane's
+  end for a carrier to tip and go), parked;
   a cycle starts as the blade lowers;
 - roller: roll, travel (to and from lanes), parked.
 """
@@ -27,13 +28,13 @@ ELEMENTS = {
                 "to queue": "return", "from queue": "return", "to dump": "haul loaded", "to lane": "return",
                 "wait at dump": "wait", "wait to load": "wait", "queue on road": "wait"},
     "dozer": {"lower": "push", "push": "push", "raise": "return", "back": "return", "to lane": "return",
-              "to park": "return", "parked": "parked"},
+              "to park": "return", "parked": "parked", "wait clear": "wait"},
     "roller": {"roll": "roll", "to lane": "travel", "to park": "travel", "parked": "parked"},
 }
 CYCLE_START = {"excavator": "dig", "carrier": "load", "dozer": "push", "roller": None}
 # elements that are not part of a work cycle: a cycle holding one of these is reported, but kept out of the
 # cycle statistics (a carrier waiting 300 s for the dozer is a delay, not a slow haul)
-DELAYS = {"excavator": ("move on", "idle"), "carrier": (), "dozer": ("parked",), "roller": ("parked",)}
+DELAYS = {"excavator": ("move on", "idle"), "carrier": (), "dozer": ("parked", "wait"), "roller": ("parked",)}
 
 
 class Machine:

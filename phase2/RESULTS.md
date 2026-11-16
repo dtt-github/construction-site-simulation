@@ -2213,3 +2213,27 @@ Section 21 left 26–30 s of excavator wait per load: the exchange at the one-la
 - **Total tonnes barely change**, as in section 21. In loam and clay the pit is dug out, and the excavator is then idle (24–35 % of the run). In dry sand the last passes carry little. The gain shows as time: the same pit dug sooner.
 - **The fleet is more over-trucked still.** Each carrier spends 76–86 % of its cycle at its spot, much of it waiting while the other one is loaded. A longer haul is where both-side loading pays off fully: there the second carrier's time away fills the other's loading time.
 - No collisions, give-ways or stuck machines in any soil.
+
+## A living site, 25: the dozer finishes its push and waits clear
+
+Section 24 left the dozer as the limit in clay: with the carriers arriving closer together, one waited at the dump up to 108 s a run. Each time a loaded carrier left its spot, the dozer was recalled. It dropped the push it was making, backed up to the heap with the soil left half way, and drove round to its park. The carrier waited at its turn point for all of that.
+
+Now a push under way is finished. The dozer then stops at the lane's end with the blade up until the carrier has tipped and gone, and backs up and carries on. On an end-dumped fill a dozer works this way. The carrier is let in as soon as the dozer is parked or waiting clear. A dozer recalled before its push has begun, with the blade still at the heap, backs out and parks as before. So does one caught backing up close to the heap.
+
+- **Where it may wait.** The dozer waits only where its outline keeps 1 m from the outline of a carrier dumping at the dump point, tipped vessel included (`traffic.near`). On the dump line that is from about 29.5 m of base_link x. A push ends at about 30.9 m. A first version used a fixed 4 m past the start of the pushes (26.7 m). In dry sand it stopped the dozer inside the carrier's way: the carrier gave way to the dozer, the dozer waited for the carrier, and both stood for the rest of the run (875 s).
+- **Time study.** The dozer has a new element, `wait`: 3–7 % of the run, 46–101 s.
+
+**Benchmark** (1500 s, scripted operator; logs `logs/haul_bench_waitclear_<soil>_<n>carrier.json`, before from sections 24 and 21):
+
+| | Dry sand, 2 sides | Loam, 2 sides | Clay, 2 sides | Loam, 1 carrier |
+|---|---|---|---|---|
+| Carrier waiting at the dump for the dozer | 29 → 22 s | 56 → 70 s | 108 → 63 s | 31 → 31 s |
+| No carrier at either spot | 0 → 0 s | 0 → 10 s | 53 → 0 s | (one carrier) |
+| Time to load six carriers | 771 → 753 s | 749 → 699 s | 986 → 949 s | 965 → 959 s |
+| Loaded in 1500 s | 76.0 → 77.4 t | 80.1 → 82.8 t | 75.6 → 79.2 t | 80.6 → 79.5 t |
+| Spread: RMS from grade, soil left unspread | 0.25 → 0.24 m, 6.9 → 5.0 m³ | 0.41 → 0.41 m, 10.9 → 7.1 m³ | 0.49 → 0.51 m, 13.8 → 16.3 m³ | 0.34 → 0.32 m, 8.1 → 6.5 m³ |
+
+- **In clay the dump wait falls by 40 %** (108 → 63 s), and the excavator no longer runs out of carriers. Before, for 53 s neither spot had one.
+- **Elsewhere it changes little.** Six loads go 1–7 % sooner. Runs diverge on the GPU by about 2 % in dry sand and loam and 7 % in clay, so only the clay change in the dump wait is clearly more than run-to-run spread. In loam the wait rose by 14 s while six loads went 7 % sooner. With one carrier the dozer has time to park between loads anyway.
+- **The spread is as good** in the same time, with less soil left over in three of the four setups. A push is no longer dropped half way.
+- No collisions, give-ways or stuck machines in any setup.
