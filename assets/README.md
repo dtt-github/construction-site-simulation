@@ -75,6 +75,8 @@ reviewed and changed like code. Install Blender (`sudo apt install blender` on U
 ```
 blender -b -t 4 --python assets/blender/zx200_hd.py      # -> assets/machinery/zx200_hd.glb
 blender -b -t 4 --python assets/blender/roller_hd.py     # -> assets/machinery/roller_hd.glb
+blender -b -t 4 --python assets/blender/ic120_hd.py      # -> assets/machinery/ic120_hd.glb
+blender -b -t 4 --python assets/blender/d37_hd.py        # -> assets/machinery/d37_hd.glb
 ```
 
 - `blendkit.py`: shapes, bevelled parts, box-projected UVs, tileable procedural textures (paint, worn paint,
@@ -85,6 +87,10 @@ blender -b -t 4 --python assets/blender/roller_hd.py     # -> assets/machinery/r
   images with EEVEE.
 - `roller_hd.py`: 10.6 t single-drum roller to `phase2/roller.py`; the drum and rear wheels are nodes that
   turn as it moves.
+- `ic120_hd.py`: rubber-tracked crawler carrier on the joint frames of PWRI's OPERA IC120; the vessel follows
+  the server's vessel boxes so the load sits on its floor. Replaces `opera_ic120.glb` in the browser.
+- `d37_hd.py`: crawler dozer with a power-angle-tilt blade on the joint frames of PWRI's OPERA D37PXi, lift
+  and angle cylinders on the source's joints. Replaces `opera_d37pxi.glb` in the browser.
 
 ## Rendering a replay
 

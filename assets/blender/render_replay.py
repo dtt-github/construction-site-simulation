@@ -54,7 +54,11 @@ FPS = arg("--fps", 24, int)
 STILL = "--still" in ARGS
 
 # upgraded models (assets/blender), as soil.js loads them
-UPGRADES = {"assets/machinery/opera_zx200.glb": "assets/machinery/zx200_hd.glb"}
+UPGRADES = {
+    "assets/machinery/opera_zx200.glb": "assets/machinery/zx200_hd.glb",
+    "assets/machinery/opera_ic120.glb": "assets/machinery/ic120_hd.glb",
+    "assets/machinery/opera_d37pxi.glb": "assets/machinery/d37_hd.glb",
+}
 CB = Matrix.Rotation(math.radians(90), 4, "X")  # viewer (Y up) -> Blender (Z up)
 ZUP = Matrix.Rotation(math.radians(-90), 4, "X")  # soil.js wrapZup / the models' root: URDF Z up -> Y up
 
@@ -285,7 +289,7 @@ CAMERAS = {
     # Blender frame: x as the viewer's x, y = -viewer z, z up
     "overview": ((20.0, -38.0, 21.0), (44.0, -8.0, 0.0), 28),
     "excavator": ((23.5, -1.0, 6.5), (30.5, -9.0, 1.4), 30),
-    "spread": ((40.0, 10.0, 12.0), (54.0, -8.0, 0.0), 30),
+    "spread": ((39.0, 13.0, 10.0), (53.0, -4.0, 0.5), 30),
 }
 
 
@@ -353,7 +357,7 @@ def main():
     doz = None
     if "dozer" in geom:
         d = geom["dozer"]
-        doz = Model(ROOT / d["file"], {"base_link", d["arm_node"], d["cylinder_node"], d["piston_node"]})
+        doz = Model(ROOT / UPGRADES.get(d["file"], d["file"]), {"base_link", d["arm_node"], d["cylinder_node"], d["piston_node"]})
         piston_axis = Vector((1.0055, 0, -0.056785)).normalized()  # soil.js pistonAxis (blade_arm_piston_joint)
     rol = None
     if "roller" in geom and (ROOT / "assets/machinery/roller_hd.glb").exists():

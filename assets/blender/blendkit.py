@@ -319,6 +319,7 @@ def add_prism_frame(bm, pts, origin, u, v, w0, w1):
     pts = _dedupe(pts)
     o, u, v = Vector(origin), Vector(u).normalized(), Vector(v).normalized()
     w = u.cross(v).normalized()
+    pts = [(float(x), float(y)) for x, y in pts]
     a = [bm.verts.new(o + x * u + y * v + w0 * w) for x, y in pts]
     b = [bm.verts.new(o + x * u + y * v + w1 * w) for x, y in pts]
     bm.faces.new(a[::-1])
@@ -441,6 +442,90 @@ def offset_polyline(pts, d):
         t /= np.linalg.norm(t)
         out.append(tuple(P[i] + d * np.array([-t[1], t[0]])))
     return out
+
+
+# ------------------------------------------------------------------ tracks: a belt wrapped round wheels
+
+
+def belt_path(wheels, n=360):
+    """Closed path (x-z, counter-clockwise seen from +y... as returned by hull) of a belt pulled tight round
+    wheels [((x, z), r), ...], resampled to n points evenly by length. Returns points and total length."""
+    h = np.array(circle_hull(wheels, n=96))
+    h = np.vstack([h, h[:1]])
+    seg = np.linalg.norm(np.diff(h, axis=0), axis=1)
+    s = np.concatenate([[0], np.cumsum(seg)])
+    t = np.linspace(0, s[-1], n, endpoint=False)
+    pts = np.stack([np.interp(t, s, h[:, 0]), np.interp(t, s, h[:, 1])], axis=1)
+    return pts, s[-1]
+
+
+def belt_frames(pts, length, count, phase=0.0):
+    """count evenly spaced (position, tangent, outward normal) along a closed belt path (x-z)."""
+    n = len(pts)
+    c = pts.mean(axis=0)
+    out = []
+    for k in range(count):
+        u = ((k + phase) / count) * n
+        i = int(u) % n
+        f = u - int(u)
+        p = pts[i] * (1 - f) + pts[(i + 1) % n] * f
+        t = pts[(i + 1) % n] - pts[i - 1]
+        t = t / np.linalg.norm(t)
+        nrm = np.array([t[1], -t[0]])
+        if np.dot(nrm, p - c) < 0:
+            nrm = -nrm
+        out.append((p, t, nrm))
+    return out
+
+
+def add_ring_y(bm, inner, outer, y0, y1):
+    """Closed band between two closed x-z outlines (same point count), extruded along y."""
+    rings = []
+    for pts in (inner, outer):
+        rings.append([[bm.verts.new((x, y, z)) for x, z in pts] for y in (y0, y1)])
+    (i0, i1), (o0, o1) = rings
+    n = len(inner)
+    for k in range(n):
+        j = (k + 1) % n
+        bm.faces.new((i0[k], i0[j], i1[j], i1[k]))
+        bm.faces.new((o0[k], o1[k], o1[j], o0[j]))
+        bm.faces.new((i0[k], o0[k], o0[j], i0[j]))
+        bm.faces.new((i1[k], i1[j], o1[j], o1[k]))
+
+
+def frame_matrix(p, t, nrm, y):
+    """Object matrix for a part on a belt: x along the belt, z outward, at (p.x, y, p.z)."""
+    X = Vector((t[0], 0, t[1]))
+    Z = Vector((nrm[0], 0, nrm[1]))
+    Y = Z.cross(X)
+    m = Matrix.Identity(4)
+    for c, v in enumerate((X, Y, Z)):
+        m[0][c], m[1][c], m[2][c] = v
+    m.translation = (p[0], y, p[1])
+    return m
+
+
+# ------------------------------------------------------------------ hydraulic cylinder (barrel + rod)
+
+
+def cylinder_meshes(bm_barrel, bm_rod, origin, axis, r, rod_r, barrel_len, rod_from, rod_to, eye_r=0.06, eye_w=0.1, ycs=(0.0,), eye_axis=(0, 1, 0)):
+    """A cylinder along `axis` from `origin`: barrel (head eye at the origin) into bm_barrel, chrome rod
+    from rod_from to rod_to (eye at rod_to) into bm_rod. Several copies side by side at offsets ycs (y)."""
+    o, d = Vector(origin), Vector(axis).normalized()
+    ea = Vector(eye_axis).normalized()
+    side = d.cross(ea).normalized() if abs(d.dot(ea)) < 0.95 else d.orthogonal().normalized()
+    for yc in ycs:
+        c = o + Vector((0, yc, 0))
+        add_cyl(bm_barrel, eye_r, c - ea * eye_w / 2, c + ea * eye_w / 2, 20)
+        add_cyl(bm_barrel, r + 0.012, c + d * 0.04, c + d * 0.12, 28)
+        add_cyl(bm_barrel, r, c + d * 0.12, c + d * (barrel_len - 0.06), 28)
+        add_cyl(bm_barrel, r + 0.014, c + d * (barrel_len - 0.06), c + d * barrel_len, 28)
+        for s in (0.2, barrel_len - 0.16):
+            add_obox(bm_barrel, c + d * s + side * (r + 0.015), (d, ea, side), (0.025, 0.022, 0.02))
+        if bm_rod is not None:
+            add_cyl(bm_rod, rod_r, c + d * rod_from, c + d * (rod_to - 0.07), 24)
+            add_cyl(bm_rod, rod_r + 0.01, c + d * (rod_to - 0.08), c + d * (rod_to - 0.04), 24)
+            add_cyl(bm_rod, eye_r, c + d * rod_to - ea * eye_w / 2, c + d * rod_to + ea * eye_w / 2, 20)
 
 
 # ------------------------------------------------------------------ glTF post-processing

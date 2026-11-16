@@ -231,6 +231,17 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     "wait at dump", "to queue", "wait to load", "from queue"];
   // dozer (dozer.py): base group posed from the "DOZ1" trailer; the blade arm turns about its lift joint
   const dozer = (window.__dozer = { base: null, arm: null, cylinder: null, piston: null, pistonAxis: null, stages: [], stage: "" });
+  // models rebuilt in detail in this repo (assets/blender) with the same nodes and frames as the server's:
+  // load the detailed one, and the original if it is missing
+  const MODEL_UPGRADES = {
+    "assets/machinery/opera_zx200.glb": "assets/machinery/zx200_hd.glb",
+    "assets/machinery/opera_ic120.glb": "assets/machinery/ic120_hd.glb",
+    "assets/machinery/opera_d37pxi.glb": "assets/machinery/d37_hd.glb",
+  };
+  const loadModel = (file) => {
+    const up = MODEL_UPGRADES[file];
+    return up ? loader.loadAsync(`../${up}`).catch(() => loader.loadAsync(`../${file}`)) : loader.loadAsync(`../${file}`);
+  };
   // roller (roller.py): drawn from its dimensions, posed from the "ROL1" trailer
   const roller = (window.__roller = { base: null, stages: [], stage: "" });
   function buildRoller(r) {
@@ -374,7 +385,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   async function loadDozerModel(d) {
     let gltf;
     try {
-      gltf = await loader.loadAsync(`../${d.file}`);
+      gltf = await loadModel(d.file);
     } catch (err) {
       console.warn(`dozer: could not load ${d.file}, drawing boxes`, err);
       return;
@@ -415,7 +426,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   async function loadCarrierModel(c) {
     let gltf;
     try {
-      gltf = await loader.loadAsync(`../${c.file}`);
+      gltf = await loadModel(c.file);
     } catch (err) {
       console.warn(`carrier: could not load ${c.file}, drawing boxes`, err);
       return;
@@ -451,14 +462,10 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     }
   }
 
-  // models rebuilt in detail in this repo (assets/blender) with the same nodes and frames as the server's:
-  // load the detailed one, and the original if it is missing
-  const MODEL_UPGRADES = { "assets/machinery/opera_zx200.glb": "assets/machinery/zx200_hd.glb" };
   async function loadMachineModel(model) {
     let gltf;
     try {
-      const up = MODEL_UPGRADES[model.file];
-      gltf = up ? await loader.loadAsync(`../${up}`).catch(() => loader.loadAsync(`../${model.file}`)) : await loader.loadAsync(`../${model.file}`);
+      gltf = await loadModel(model.file);
     } catch (err) {
       console.warn(`excavator: could not load ${model.file}, drawing boxes`, err);
       return;
