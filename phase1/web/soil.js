@@ -264,6 +264,41 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     roller.base.add(wrapZup(g));
     roller.base.visible = false;
     scene.add(roller.base);
+    if (loader) loadRollerModel();
+  }
+
+  // detailed roller (assets/blender/roller_hd.py), same base frame as the boxes; the drum and rear wheels
+  // turn by distance / radius as it moves
+  async function loadRollerModel() {
+    let gltf;
+    try {
+      gltf = await loader.loadAsync("../assets/machinery/roller_hd.glb");
+    } catch (err) {
+      console.warn("roller: no detailed model, drawing boxes", err);
+      return;
+    }
+    const base = gltf.scene.getObjectByName("base_link");
+    if (!base) return;
+    base.position.set(0, 0, 0);
+    base.quaternion.identity();
+    const spin = base.userData?.spin_nodes ?? {};
+    roller.spinners = Object.entries(spin)
+      .map(([name, r]) => ({ node: base.getObjectByName(name), r }))
+      .filter((s) => s.node)
+      .map((s) => ({ ...s, rest: s.node.quaternion.clone() }));
+    roller.base.clear();
+    roller.base.add(wrapZup(base));
+  }
+  const _rollerFwd = new THREE.Vector3();
+  const _rollerQ = new THREE.Quaternion();
+  const _yAxis = new THREE.Vector3(0, 1, 0);
+  function spinRoller(prev) {
+    if (!roller.spinners?.length || !prev) return;
+    _rollerFwd.set(1, 0, 0).applyQuaternion(roller.base.quaternion);
+    const d = roller.base.position.clone().sub(prev).dot(_rollerFwd);
+    if (Math.abs(d) > 2) return; // a jump (reset, seek): don't spin
+    roller.travel = (roller.travel ?? 0) + d;
+    for (const s of roller.spinners) s.node.quaternion.copy(s.rest).multiply(_rollerQ.setFromAxisAngle(_yAxis, roller.travel / s.r));
   }
   function buildExcavator(geom) {
     for (const name of ["house", "boom", "stick", "bucket"]) {
@@ -416,10 +451,14 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     }
   }
 
+  // models rebuilt in detail in this repo (assets/blender) with the same nodes and frames as the server's:
+  // load the detailed one, and the original if it is missing
+  const MODEL_UPGRADES = { "assets/machinery/opera_zx200.glb": "assets/machinery/zx200_hd.glb" };
   async function loadMachineModel(model) {
     let gltf;
     try {
-      gltf = await loader.loadAsync(`../${model.file}`);
+      const up = MODEL_UPGRADES[model.file];
+      gltf = up ? await loader.loadAsync(`../${up}`).catch(() => loader.loadAsync(`../${model.file}`)) : await loader.loadAsync(`../${model.file}`);
     } catch (err) {
       console.warn(`excavator: could not load ${model.file}, drawing boxes`, err);
       return;
@@ -898,8 +937,10 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     }
     if (f.roller && roller.base) {
       roller.base.visible = true;
+      const prev = roller.base.position.clone();
       roller.base.position.set(...f.roller.base.slice(0, 3));
       roller.base.quaternion.set(...f.roller.base.slice(3));
+      spinRoller(prev);
       roller.stage = roller.stages[f.roller.stage] ?? "";
     }
     if (f.spoilHm) {

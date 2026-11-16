@@ -29,3 +29,6 @@ assets/_downloads/
 
 # Validation outreach drafts (kept local)
 outreach/
+
+# Replay renders (assets/blender/render_replay.py): frames and videos
+renders/

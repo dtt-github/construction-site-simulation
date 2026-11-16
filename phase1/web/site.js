@@ -7,6 +7,11 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
+import { Sky } from "three/addons/objects/Sky.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import initJolt from "https://cdn.jsdelivr.net/npm/jolt-physics@1.1.1/dist/jolt-physics.wasm-compat.js";
 
 const LAYER_STATIC = 0;
@@ -28,28 +33,87 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.75;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color("#b9c4cc");
-scene.fog = new THREE.Fog("#b9c4cc", 60, 140);
+const HAZE = "#c3ccd2";
+scene.fog = new THREE.Fog(HAZE, 70, 190);
 
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 400);
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 600);
 camera.position.set(-34, 24, 40);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(-2, 0, 0);
 controls.maxPolarAngle = Math.PI * 0.49;
 controls.update();
 
-scene.add(new THREE.HemisphereLight("#dfe8ef", "#6b5d4a", 1.1));
-const sun = new THREE.DirectionalLight("#fff4e0", 2.4);
-sun.position.set(-20, 35, 15);
+// Lighting: a physical sky gives the backdrop and, prefiltered, the image-based light that metal, glass
+// and paint reflect (without it metallic PBR materials render near black). The sun is the key light.
+const SUN_DIR = new THREE.Vector3(-20, 35, 15).normalize();
+const sky = new Sky();
+sky.scale.setScalar(500);
+sky.material.uniforms.turbidity.value = 4;
+sky.material.uniforms.rayleigh.value = 1.2;
+sky.material.uniforms.mieCoefficient.value = 0.004;
+sky.material.uniforms.mieDirectionalG.value = 0.8;
+sky.material.uniforms.sunPosition.value.copy(SUN_DIR);
+scene.add(sky);
+{
+  // environment map from the sky alone, plus a ground-coloured disc so reflections see dirt below the horizon
+  const envScene = new THREE.Scene();
+  const envSky = new Sky();
+  envSky.scale.setScalar(100);
+  for (const k of ["turbidity", "rayleigh", "mieCoefficient", "mieDirectionalG"]) envSky.material.uniforms[k].value = sky.material.uniforms[k].value;
+  envSky.material.uniforms.sunPosition.value.copy(SUN_DIR);
+  envScene.add(envSky);
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(60, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: "#6f6250" }));
+  floor.position.y = -2;
+  envScene.add(floor);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(envScene, 0.02).texture;
+  scene.environmentIntensity = 0.55;
+  pmrem.dispose();
+}
+
+scene.add(new THREE.HemisphereLight("#dfe8ef", "#6b5d4a", 0.35));
+const sun = new THREE.DirectionalLight("#fff1dc", 3.0);
+const SUN_OFFSET = SUN_DIR.clone().multiplyScalar(60);
 sun.castShadow = true;
 sun.shadow.mapSize.set(4096, 4096);
-Object.assign(sun.shadow.camera, { left: -35, right: 35, top: 30, bottom: -30, near: 1, far: 100 });
-sun.shadow.bias = -0.0004;
-scene.add(sun);
+// the shadow box follows the orbit target (see tick), so close-ups keep sharp shadows
+Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 140 });
+sun.shadow.bias = -0.0002;
+sun.shadow.normalBias = 0.03;
+sun.shadow.radius = 2;
+scene.add(sun, sun.target);
+function placeSun() {
+  // snap to shadow texels so the shadow edges don't crawl while orbiting
+  const texel = 80 / 4096;
+  const t = controls.target;
+  const tx = Math.round(t.x / texel) * texel;
+  const tz = Math.round(t.z / texel) * texel;
+  sun.target.position.set(tx, 0, tz);
+  sun.position.set(tx, 0, tz).add(SUN_OFFSET);
+}
+placeSun();
+
+// Post: multisampled HDR scene render, ground-truth ambient occlusion (contact shading in joints, under
+// machines and between parts), then tone mapping and sRGB output.
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
+composer.setPixelRatio(renderer.getPixelRatio());
+composer.setSize(window.innerWidth, window.innerHeight);
+composer.addPass(new RenderPass(scene, camera));
+const gtao = new GTAOPass(scene, camera, window.innerWidth, window.innerHeight);
+gtao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.5, thickness: 1, scale: 1, samples: 8 });
+gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 4, rings: 2, samples: 8 });
+gtao.blendIntensity = 0.9;
+// Ambient occlusion re-renders the scene for normals: ?quality=low turns it off, ?quality=high keeps it on;
+// otherwise it turns itself off if the page can't hold 50 fps with it (slow GPU, or one shared with a simulation)
+const QUALITY = new URLSearchParams(location.search).get("quality") ?? "auto";
+gtao.enabled = QUALITY !== "low";
+composer.addPass(gtao);
+composer.addPass(new OutputPass());
 
 function groundTexture() {
   const c = document.createElement("canvas");
@@ -655,11 +719,20 @@ function tick() {
   soil?.update();
   showcase?.update(dt);
   controls.update();
-  renderer.render(scene, camera);
+  placeSun();
+  composer.render(dt);
   frames++;
   const now = performance.now();
   if (now - fpsT > 500) {
     stats.fps = (frames * 1000) / (now - fpsT);
+    // judge the frame rate once the site has loaded and settled, only while the page is visible
+    if (QUALITY === "auto" && gtao.enabled && stats.loadMs > 0 && !document.hidden) {
+      stats.fpsSamples = [...(stats.fpsSamples ?? []), stats.fps].slice(-6);
+      if (stats.fpsSamples.length === 6 && Math.max(...stats.fpsSamples) < 50) {
+        gtao.enabled = false;
+        console.info(`ambient occlusion off: ${stats.fps.toFixed(0)} fps with it (?quality=high keeps it on)`);
+      }
+    }
     frames = 0;
     fpsT = now;
     renderStats();
@@ -670,11 +743,35 @@ window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
 });
 
 // Test hook: positions and speeds of every body
 window.__site = {
   stats,
+  scene,
+  // draw one frame now (the animation loop pauses while the page is hidden)
+  frame() {
+    controls.update();
+    placeSun();
+    showcase?.update(0);
+    soil?.update();
+    composer.render(0);
+  },
+  // render cost in ms per frame, with and without post-processing (GPU synced with readPixels)
+  renderTiming(n = 20) {
+    const gl = renderer.getContext();
+    const px = new Uint8Array(4);
+    const time = (fn) => {
+      fn();
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      const t = performance.now();
+      for (let i = 0; i < n; i++) fn();
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      return (performance.now() - t) / n;
+    };
+    return { post: time(() => composer.render(0)), plain: time(() => renderer.render(scene, camera)), size: [innerWidth, innerHeight, renderer.getPixelRatio()] };
+  },
   view(px, py, pz, tx, ty, tz) {
     camera.position.set(px, py, pz);
     controls.target.set(tx, ty, tz);

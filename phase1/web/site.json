@@ -617,7 +617,7 @@
  "showcase": [
   {
    "id": "opera_zx200",
-   "file": "assets/machinery/opera_zx200.glb",
+   "file": "assets/machinery/zx200_hd.glb",
    "pos": [
     3,
     0,
@@ -627,7 +627,76 @@
    "collider": "parts",
    "animate_skip": [
     "bucket_end_joint"
-   ]
+   ],
+   "cycle": {
+    "_note": "dig cycle: reach, crowd, curl, lift and swing, dump, swing back (joint values in rad, URDF sense)",
+    "period": 16,
+    "keys": [
+     [
+      0,
+      {
+       "swing_joint": 0,
+       "boom_joint": 0.25,
+       "arm_joint": 1.0,
+       "bucket_joint": 0.3
+      }
+     ],
+     [
+      3,
+      {
+       "swing_joint": 0,
+       "boom_joint": 0.35,
+       "arm_joint": 1.9,
+       "bucket_joint": 1.0
+      }
+     ],
+     [
+      4.5,
+      {
+       "swing_joint": 0,
+       "boom_joint": 0.25,
+       "arm_joint": 2.2,
+       "bucket_joint": 2.2
+      }
+     ],
+     [
+      6.5,
+      {
+       "swing_joint": 0.3,
+       "boom_joint": -0.6,
+       "arm_joint": 2.1,
+       "bucket_joint": 2.2
+      }
+     ],
+     [
+      9,
+      {
+       "swing_joint": 1.3,
+       "boom_joint": -0.7,
+       "arm_joint": 1.6,
+       "bucket_joint": 2.1
+      }
+     ],
+     [
+      10.5,
+      {
+       "swing_joint": 1.3,
+       "boom_joint": -0.7,
+       "arm_joint": 1.2,
+       "bucket_joint": -0.3
+      }
+     ],
+     [
+      13,
+      {
+       "swing_joint": 0.3,
+       "boom_joint": -0.2,
+       "arm_joint": 0.9,
+       "bucket_joint": 0.2
+      }
+     ]
+    ]
+   }
   },
   {
    "id": "opera_ic120",
@@ -646,6 +715,17 @@
    "pos": [
     24,
     0,
+    -16
+   ],
+   "yaw": 0,
+   "collider": "parts"
+  },
+  {
+   "id": "roller_hd",
+   "file": "assets/machinery/roller_hd.glb",
+   "pos": [
+    32,
+    0.75,
     -16
    ],
    "yaw": 0,
