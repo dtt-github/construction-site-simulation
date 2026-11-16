@@ -127,7 +127,7 @@ def blade_plates():
     return out
 
 
-STAGES = ["parked", "to lane", "lower", "push", "raise", "back", "to park"]
+STAGES = ["parked", "to lane", "lower", "push", "raise", "back", "to park", "wait clear"]
 
 
 class Dozer:
