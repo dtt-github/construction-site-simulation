@@ -17,7 +17,7 @@ WebSocket sends it (head + grains + tail). Head and tail are stored XOR the prev
 when those have the same length (mostly zeros: the heightmaps barely change from frame to frame), which
 lets gzip shrink a long recording about tenfold. Version 1 stored u32 length + frame.
 
-    ../phase0/.venv-newton/bin/python record_replay.py site                # assets/replay/site_cycle.bin.gz
+    ../phase0/.venv-newton/bin/python record_replay.py site --sides 2      # assets/replay/site_cycle.bin.gz
     ../phase0/.venv-newton/bin/python record_replay.py cycle --passes 1    # assets/replay/zx200_cycle.bin.gz
 """
 
