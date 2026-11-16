@@ -24,7 +24,7 @@ ELEMENTS = {
     "carrier": {"loading": "load", "drive out": "haul loaded", "turn to dump": "haul loaded", "haul out": "haul loaded",
                 "reverse to dump": "dump", "tip": "dump", "dump": "dump", "lower": "dump",
                 "return": "return", "turn to load": "return", "haul back": "return", "reverse in": "return",
-                "to queue": "return", "from queue": "return",
+                "to queue": "return", "from queue": "return", "to dump": "haul loaded", "to lane": "return",
                 "wait at dump": "wait", "wait to load": "wait", "queue on road": "wait"},
     "dozer": {"lower": "push", "push": "push", "raise": "return", "back": "return", "to lane": "return",
               "to park": "return", "parked": "parked"},

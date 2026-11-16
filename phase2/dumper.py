@@ -29,6 +29,14 @@ past its turn point; a carrier turns and backs into the dump point only while no
 is there (it waits short of the turn, at WAIT_X). The places were checked against each spin turn's swept
 circle (4.15 m radius about base_link), and traffic.py keeps every machine's outline clear of the others.
 
+Two-sided loading (Fleet sides=2, two carriers, the short road): a second loading spot south of the excavator,
+the north one mirrored across the machine's axis, so the excavator loads one carrier while the other drives out
+or comes back. Each carrier keeps to its own spot. The south carrier drives out east along its own lane to
+WAIT_X, then (dump side clear) north-east up to the north road at its turn point, turns and backs to the dump
+point as the north one does; back at RETURN_X it heads south-west to SOUTH_TURN_X on its lane, turns and backs
+into its spot. Where the two meet (the road east of JUNCTION_X, and the dump side) one carrier at a time:
+a carrier enters it only while the other is out of it, and the south one goes first when both are ready.
+
 Geometry from the model (ic120_ros2, urdf/ic120.xacro and the vessel mesh): vessel pin 3.015 m behind
 base_link and 0.946 m above the ground, tip range 0..65 deg; the vessel's floor centre 1.575 m ahead of the
 pin and 0.354 m above it (inside floor 1.3 m above the ground).
@@ -67,11 +75,16 @@ QUEUE = (14.5, 11.0, -math.pi / 2)  # waiting place north of the road: base_link
 # longer hauls: base_link x where a loaded carrier leaves the view, and where it comes back into it facing the dump
 # point (its cab clears a carrier spinning onto the spot from QUEUE, and a loaded one driving out to HIDE_X)
 HIDE_X, EMERGE_X = 14.5, 21.5
+# two-sided loading: where the south carrier turns onto its own lane on the way back (its spin circle stays south
+# of the north road), and the shared part of the site: the north road east of JUNCTION_X and everything north of
+# JUNCTION_Y there (a carrier waiting on its own lane at WAIT_X is outside it)
+SOUTH_TURN_X = 14.5
+JUNCTION_X, JUNCTION_Y = 13.5, -3.9
 DOZER_CLEAR_S = 20.0  # s before a loaded carrier is due at the dump side that the dozer stops work there
 HIDE_DEPTH = 20.0  # m below the ground where an off-screen carrier is parked (as the dozer's blade when unused)
 
 STAGES = ("loading", "drive out", "turn to dump", "reverse to dump", "tip", "dump", "lower", "return", "turn to load", "reverse in",
-          "wait at dump", "to queue", "wait to load", "from queue", "haul out", "haul back", "queue on road")
+          "wait at dump", "to queue", "wait to load", "from queue", "haul out", "haul back", "queue on road", "to dump", "to lane")
 AT_SPOT = ("loading", "reverse in", "from queue")  # using the loading spot or on the way into it
 LEAVING = ("drive out", "turn to dump", "wait at dump")  # loaded, on the lane between the spot and the dump point
 AT_DUMP = ("reverse to dump", "tip", "dump", "lower", "return")
@@ -97,16 +110,18 @@ def rot(yaw, tip):
 
 
 class Dumper:
-    def __init__(self, load_center, ground_z, dump_x, turn_x, capacity_kg, start="spot", index=0, haul_m=None):
+    def __init__(self, load_center, ground_z, dump_x, turn_x, capacity_kg, start="spot", index=0, haul_m=None, spot=0, road_y=None):
         """load_center: vessel centre (x, y) at the loading spot; dump_x: base_link x when dumping (the
         rear, and the soil, further +x); turn_x: where the loaded carrier spins round; start: "spot" (at the
         loading spot), "queue" (waiting to load) or "road" (off-screen, queueing for the waiting place);
-        haul_m: the off-screen road's length each way (None: the short road, no off-screen part)."""
+        haul_m: the off-screen road's length each way (None: the short road, no off-screen part); spot: the
+        loading spot it keeps to (1: the south one, two-sided loading); road_y: the north road's y (the dump line)."""
         self.ground_z, self.capacity_kg = ground_z, capacity_kg
         self.haul_m = haul_m
         self.load_base = np.array([load_center[0] - VESSEL_X, load_center[1]])
         self.dump_x, self.turn_x = dump_x, turn_x
-        self.start, self.index = start, index
+        self.start, self.index, self.spot = start, index, spot
+        self.road_y = self.load_base[1] if road_y is None else road_y
         self.reset()
 
     def reset(self):
@@ -184,6 +199,15 @@ class Dumper:
                     ("drive", self.dump_x, y, -1, SPEED_REVERSE, "reverse to dump"), ("tip",), ("dump",), ("lower",),
                     ("drive", EMERGE_X, y, +1, SPEED_EMPTY, "return"), ("hide", self.haul_m, SPEED_EMPTY, "haul back"),
                     ("emerge", *QUEUE, "queue_free", "queue on road"), *self._from_queue()]
+        if self.spot == 1:
+            # the south spot: out along its own lane to WAIT_X, then up to the north road at the turn point
+            ry = self.road_y
+            return [("drive", WAIT_X, self.base[1], +1, SPEED_LOADED, "drive out"), ("gate", "dump_clear", "wait at dump"),
+                    ("face", self.turn_x, ry, "to dump"), ("drive", self.turn_x, ry, +1, SPEED_LOADED, "to dump"),
+                    ("spin", math.pi, "turn to dump"), ("drive", self.dump_x, ry, -1, SPEED_REVERSE, "reverse to dump"),
+                    ("tip",), ("dump",), ("lower",), ("drive", RETURN_X, ry, +1, SPEED_EMPTY, "return"),
+                    ("face", SOUTH_TURN_X, self.load_base[1], "to lane"), ("drive", SOUTH_TURN_X, self.load_base[1], +1, SPEED_EMPTY, "to lane"),
+                    *self._into_spot("turn to load")]
         # it waits short of its turn: spinning round there sweeps the dozer's way between the heap and its park
         return [("drive", WAIT_X, self.base[1], +1, SPEED_LOADED, "drive out"), ("gate", "dump_clear", "wait at dump"),
                 ("drive", self.turn_x, self.base[1], +1, SPEED_LOADED, "drive out"), ("spin", math.pi, "turn to dump"),
@@ -351,12 +375,21 @@ class Dumper:
 class Fleet:
     """The carriers and the traffic rules between them (see the module docstring)."""
 
-    def __init__(self, n, load_center, ground_z, dump_x, turn_x, capacity_kg, haul_m=0.0):
-        """haul_m: the off-screen road's length each way; more than two carriers need it (they queue on it)."""
+    def __init__(self, n, load_center, ground_z, dump_x, turn_x, capacity_kg, haul_m=0.0, sides=1):
+        """haul_m: the off-screen road's length each way; more than two carriers need it (they queue on it).
+        sides=2: two-sided loading, the second spot at load_center mirrored to -y (two carriers, the short road)."""
         self.long = haul_m > 0.0 or n > 2
+        self.sides = sides
+        self.active = 0  # the spot the excavator loads at (set by the server)
         h = haul_m if self.long else None
-        self.carriers = [Dumper(load_center, ground_z, dump_x, turn_x, capacity_kg, start=("spot", "queue")[i] if i < 2 else "road", index=i, haul_m=h)
-                         for i in range(n)]
+        if sides == 2:
+            assert n == 2 and not self.long, "two-sided loading: two carriers on the short road"
+            centers = (load_center, (load_center[0], -load_center[1]))
+            self.carriers = [Dumper(centers[i], ground_z, dump_x, turn_x, capacity_kg, start="spot", index=i, spot=i, road_y=load_center[1])
+                             for i in range(n)]
+        else:
+            self.carriers = [Dumper(load_center, ground_z, dump_x, turn_x, capacity_kg, start=("spot", "queue")[i] if i < 2 else "road", index=i, haul_m=h)
+                             for i in range(n)]
 
     def __iter__(self):
         return iter(self.carriers)
@@ -370,10 +403,32 @@ class Fleet:
 
     @property
     def at_spot(self):
-        """The carrier parked at the loading spot, or None."""
-        return next((c for c in self.carriers if c.parked), None)
+        """The carrier parked at the loading spot the excavator loads at, or None."""
+        return self.parked_at(self.active)
+
+    def parked_at(self, spot):
+        return next((c for c in self.carriers if c.parked and c.spot == spot), None)
+
+    @staticmethod
+    def in_junction(c):
+        """Whether carrier c is in (or turning into) the part of the site both carriers use with two-sided
+        loading: the dump side, and the north road east of JUNCTION_X."""
+        if c.stage in AT_DUMP or c.stage in ("turn to dump", "to dump", "to lane"):
+            return True
+        return c.stage != "loading" and c.base[0] > JUNCTION_X and c.base[1] > JUNCTION_Y
 
     def gates(self, dozer_parked):
+        if self.sides == 2:
+            north, south = self.carriers
+            south.may_depart = True  # its own lane
+            south.dump_clear = dozer_parked and not self.in_junction(north) and north.stage not in LEAVING
+            # the south carrier, waiting at its lane's end with the way clear, goes first
+            south_goes = south.stage == "wait at dump" and south.dump_clear
+            north.may_depart = not self.in_junction(south) and not south_goes
+            north.dump_clear = dozer_parked and not self.in_junction(south)
+            for c in self.carriers:
+                c.spot_busy, c.may_leave_queue, c.queue_free = False, True, True
+            return
         if self.long:
             # one carrier at a time on each side of the view: the spot side (driving out, or from the waiting
             # place into the spot), the dump side, and the waiting place
@@ -403,7 +458,8 @@ class Fleet:
             return not any(c.stage in AT_DUMP or c.stage == "wait at dump" or c.stage == "haul out" and c.hide_left < DOZER_CLEAR_S
                            for c in self.carriers)
         return all(c.stage in ("loading", "reverse in", "wait to load", "from queue") or (c.stage == "drive out" and c.base[0] < c.turn_x - 6.0)
-                   or c.stage in ("to queue",) and c.base[1] > 8.0 for c in self.carriers)
+                   or c.stage in ("to queue",) and c.base[1] > 8.0 or c.stage in ("to lane", "turn to load") and c.spot == 1 and c.base[1] < -2.0
+                   for c in self.carriers)
 
     @property
     def delivered_kg(self):

@@ -51,6 +51,7 @@ def main():
     ap.add_argument("--max-s", type=float, default=None)
     ap.add_argument("--soil", default=ex.soils.DEFAULT_SOIL)
     ap.add_argument("--carriers", type=int, default=None, help="site: carriers (default 2)")
+    ap.add_argument("--sides", type=int, default=1, help="site: 2 loads from both sides of the excavator (two carriers)")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     site = args.what == "site"
@@ -59,7 +60,7 @@ def main():
     n_grains = args.grains or (700 if site else 3000)
     max_s = args.max_s or (600.0 if site else 90.0)
 
-    sim = ex.ExcavatorSim(soil=args.soil, dozer=site, haul=site, carriers=(args.carriers or 2) if site else 1)
+    sim = ex.ExcavatorSim(soil=args.soil, dozer=site, haul=site, carriers=(args.carriers or 2) if site else 1, sides=args.sides if site else 1)
     sim.auto = True
     every = max(1, round(1 / (fps * sim.frame_dt)))
     frames, n, spread, rolled = [], 0, False, False
@@ -83,7 +84,7 @@ def main():
         frames.append(struct.pack("<III", len(head), len(grains), len(tail)) + xor(head, prev[0]) + grains + xor(tail, prev[1]))
         prev = (head, tail)
     hello = sim.hello()
-    hello["replay"] = {"speed": speed, "what": args.what, "soil": args.soil, "carriers": len(sim.fleet)}
+    hello["replay"] = {"speed": speed, "what": args.what, "soil": args.soil, "carriers": len(sim.fleet), "sides": sim.sides}
     hello = json.dumps(hello).encode()
     blob = b"RPLY" + struct.pack("<II", 2, len(hello)) + hello + struct.pack("<I", len(frames)) + b"".join(frames)
     out = pathlib.Path(args.out or OUT[args.what])

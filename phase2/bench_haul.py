@@ -13,6 +13,7 @@ versions of the autopilot pass by pass, in a quarter of the time. Progress goes 
     ../phase0/.venv-newton/bin/python bench_haul.py 600                 # dry sand
     SOIL=loam ../phase0/.venv-newton/bin/python bench_haul.py 600
     SOIL=loam CARRIERS=2 ../phase0/.venv-newton/bin/python bench_haul.py 600   # two carriers sharing the road
+    SOIL=loam CARRIERS=2 SIDES=2 ../phase0/.venv-newton/bin/python bench_haul.py 600   # two-sided loading
     SOIL=loam CARRIERS=3 HAUL_M=150 ../phase0/.venv-newton/bin/python bench_haul.py 1500   # 150 m more road each way
     SOIL=loam OPERATOR=human SEED=1 ../phase0/.venv-newton/bin/python bench_haul.py 1500   # a human operator (ExcavatorSim.HUMAN)
     SOIL=clay PASSES=25 ../phase0/.venv-newton/bin/python bench_haul.py 1500   # quick check: the first 25 passes
@@ -37,7 +38,8 @@ haul_m = float(os.environ.get("HAUL_M", "0"))  # the off-screen two-lane road, e
 relocate_m = float(os.environ.get("RELOCATE_M", "0"))  # move on along the bank when the face is dug out
 max_passes = int(os.environ.get("PASSES", "0")) or None
 roller = os.environ.get("ROLLER", "1") != "0"
-sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m, relocate_m=relocate_m, roller=roller)
+sides = int(os.environ.get("SIDES", "1"))  # 2: two-sided loading (two carriers, a spot each side of the excavator)
+sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m, relocate_m=relocate_m, roller=roller, sides=sides)
 operator = os.environ.get("OPERATOR", "scripted")  # human: an operator who varies from cycle to cycle
 op_seed = int(os.environ.get("SEED", "0"))
 if operator == "human":
@@ -87,8 +89,8 @@ while sim.sim_time < secs and (max_passes is None or sim.passes < max_passes):
     if sim.sim_time >= next_report:
         print(f"{sim.sim_time:.0f} s: {sim.passes} passes, {sum(x['load_kg'] for x in loads) / 1000:.1f} t in {len(loads)} loads", file=sys.stderr, flush=True)
         next_report += 100.0
-    if fleet.at_spot is None:
-        idle_spot += sim.frame_dt  # no carrier at the loading spot
+    if all(fleet.parked_at(k) is None for k in range(fleet.sides)):
+        idle_spot += sim.frame_dt  # no carrier at a loading spot
     for c in fleet:
         if c.stage != prev[c.index]:
             if prev[c.index] == "loading":  # left with a load
@@ -135,6 +137,8 @@ out = {
     "lost_particles": sim.zones.counters["lost"],
     "pool_short": sim.zones.counters["pool_short"],
     "skipped": sim.skipped,
+    "sides": sides,
+    "side_changes": sim.side_changes,
     "unblock_lift_s": round(sim.unblocks, 1),
     "carrier_wait_at_dump_s": round(sum(c.dozer_wait for c in fleet), 1),
     "carrier_wait_to_leave_s": round(sum(c.depart_wait for c in fleet), 1),

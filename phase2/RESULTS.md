@@ -2187,3 +2187,29 @@ The try: slow the plan to what the slowest joint can do there, and ease the fast
 | Loaded | 80.6 t | 69.1 t |
 
 The plan that runs ahead keeps the levers open. Paced, the boom rose more slowly on the swing to the carrier, and the house, which swings only as fast as the rising bucket clears the carrier, waited for it. The aim above the carrier (section "swing to truck" in `CYCLE`) is there so that the boom is still rising at full speed as the bucket arrives, as an operator would do it. So the planner stays as it was. The remaining bucket question, whether the four-bar's moment arm is about a quarter too long against PWRI's flow channels, waits for PWRI to confirm their bucket angle convention.
+
+## A living site, 24: loading from both sides
+
+Section 21 left 26–30 s of excavator wait per load: the exchange at the one-lane loading spot. Now there is a second loading spot south of the excavator, mirrored from the first (`SIDES=2` in the benchmark, `--sides 2` in `record_replay.py`). Each of the two carriers has its own spot. While one is loaded, the other hauls, dumps and comes back to its own spot, so the excavator swings to whichever carrier is there and never waits for an exchange.
+
+- **Routes.** The north carrier keeps the road of section 21. The south carrier drives out along its own lane (y = −5.2) and joins the road through a junction east of the excavator. It dumps at the same dump point and comes back the same way. Gates at the junction keep the two apart: the north carrier does not leave while the south one is in the junction, and the south one goes to the dump first if both are waiting.
+- **The operator.** When the carrier being loaded leaves, the excavator turns to the other spot if a carrier is parked there (`side_changes`). The waiting pose and every swing angle flip sign for the south spot.
+- **A stall the south spot exposed.** The arm checks its clearance while the house swings, and it held the bucket even after the house had arrived. Coming back to a face by the −y wall, the bucket was inside the wall's clearance band, so it waited out the stage's timeout. That happened three to seven times a run, every time loading the south carrier, which reaches the face from the other side. The arm is no longer held once the house is at its angle and still, because the house has nothing left to sweep.
+
+**Benchmark** (1500 s, two carriers, scripted operator; logs `logs/haul_bench_twosided_<soil>_2carrier.json`, one side from section 21):
+
+| | Dry sand | Loam | Clay |
+|---|---|---|---|
+| Excavator waiting, share of the run | 14 → 0 % | 14 → 0 % | 15 → 0 % |
+| Cycle incl. waits, mean ± SD | 20.3 ± 8.2 → 17.9 ± 0.9 s | 20.8 ± 9.8 → 17.6 ± 1.5 s | 21.4 ± 9.2 → 18.7 ± 1.5 s |
+| Time to load six carriers | 950 → 771 s (−19 %) | 877 → 749 s (−15 %) | 1033 → 986 s (−5 %) |
+| Loaded in 1500 s | 74.4 → 76.0 t | 81.1 → 80.1 t (pit dug out) | 78.3 → 75.6 t (pit dug out) |
+| Carrier waiting at the dump for the dozer | 42 → 29 s | 55 → 56 s | 62 → 108 s |
+| Stages timed out | 1 → 0 | 0 → 0 | 1 → 0 |
+
+- **The excavator no longer waits for a carrier.** Its cycle, waits included, is now its net cycle: 17.6–18.7 s with a spread of 1–1.5 s, against 8–10 s with the exchange.
+- **Six loads go 5–19 % sooner.** The run before the stall fix, with the same setup, gave 760 / 738 / 921 s. Runs diverge on the GPU: the two runs agree within 2 % in dry sand and loam, and 7 % in clay.
+- **In clay the dozer becomes the limit.** It spreads clay more slowly (pushing 29 % of the time against 16–19 %). With the carriers now arriving closer together, one waits at the dump up to 108 s in all, and for 53 s no carrier was at either spot.
+- **Total tonnes barely change**, as in section 21. In loam and clay the pit is dug out, and the excavator is then idle (24–35 % of the run). In dry sand the last passes carry little. The gain shows as time: the same pit dug sooner.
+- **The fleet is more over-trucked still.** Each carrier spends 76–86 % of its cycle at its spot, much of it waiting while the other one is loaded. A longer haul is where both-side loading pays off fully: there the second carrier's time away fills the other's loading time.
+- No collisions, give-ways or stuck machines in any soil.
