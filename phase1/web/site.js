@@ -12,6 +12,7 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { statList } from "./statlist.js";
 import initJolt from "https://cdn.jsdelivr.net/npm/jolt-physics@1.1.1/dist/jolt-physics.wasm-compat.js";
 
 const LAYER_STATIC = 0;
@@ -21,6 +22,7 @@ const MAX_RESTITUTION = 0.3;
 
 const statusEl = document.getElementById("status");
 const statsEl = document.getElementById("stats");
+const siteRows = statList(statsEl);
 const setStatus = (text, isError = false) => {
   statusEl.textContent = text;
   statusEl.classList.toggle("error", isError);
@@ -691,7 +693,7 @@ function renderStats() {
     ["Physics step", stats.stepMs < 0.005 ? "all asleep" : `${stats.stepMs.toFixed(2)} ms`],
     ["Frame rate", `${stats.fps.toFixed(0)} fps`],
   ];
-  statsEl.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  siteRows.set(rows);
 }
 
 function tick() {

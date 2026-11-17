@@ -3,6 +3,7 @@
 // them through their ranges to show the articulation. Static box colliders let site props hit them.
 
 import { makeLinkage } from "./linkage.js";
+import { steadyWidth } from "./statlist.js";
 
 export async function addShowcase({ THREE, scene, loader, addStatic, terrainHeight, site, panel }) {
   const items = site.showcase ?? [];
@@ -73,6 +74,7 @@ export async function addShowcase({ THREE, scene, loader, addStatic, terrainHeig
     }
   });
   panel.querySelector(".buttons")?.appendChild(btn);
+  steadyWidth(btn, ["Animate machines", "Stop machines"]);
 
   const q = new THREE.Quaternion();
   const axis = new THREE.Vector3();
