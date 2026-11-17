@@ -2237,3 +2237,29 @@ Now a push under way is finished. The dozer then stops at the lane's end with th
 - **Elsewhere it changes little.** Six loads go 1–7 % sooner. Runs diverge on the GPU by about 2 % in dry sand and loam and 7 % in clay, so only the clay change in the dump wait is clearly more than run-to-run spread. In loam the wait rose by 14 s while six loads went 7 % sooner. With one carrier the dozer has time to park between loads anyway.
 - **The spread is as good** in the same time, with less soil left over in three of the four setups. A push is no longer dropped half way.
 - No collisions, give-ways or stuck machines in any setup.
+
+## A living site, 26: fleet match on a longer haul
+
+How many carriers an excavator needs is set by the match factor, MF = N × loading time / carrier cycle time (Morgan & Peterson 1968). Below 1 the excavator waits for carriers, and its idle share is about 1 − MF. Above 1 the carriers queue. Section 24 found that a second loading spot pays off fully only on a longer haul, so this study runs a 300 m haul each way in loam with 1–4 carriers, from one side and from both.
+
+- **Two-sided loading on a longer haul.** Before, two-sided loading worked only with two carriers on the short road. Now any number of carriers can use it on a longer haul. Each spot has its own lane out and its own waiting place; the south one mirrors the north one at y = −11 m. A carrier back from the dump comes into view at whichever waiting place is free. It prefers the spot with fewer carriers at it or bound for it, and on a tie the one whose carrier has more in its vessel. The one-sided rules for a longer haul hold per spot, and the dump side is shared. The existing modes are unchanged: a frame-by-frame replay of the fleet logic gives the same stages and poses as before.
+- **How it is measured.** Loading time is the passes per load (load ÷ mean dumped per pass) × the excavator's net cycle (dig, swings, dump). Carrier cycle time is the loading time plus the time away, without waits: 295 s on this road. Production and the excavator's idle share are taken up to the sixth load (four with one carrier), before the pit is dug out at about 80 t. All runs start with the carriers at the spots or about to arrive, so the window includes the start-up.
+
+**Benchmark** (loam, 300 m haul each way, 1500 s, scripted operator; logs `logs/haul_bench_fleet_<sides>side_<n>carrier.json`):
+
+| Carriers | Spots | Match factor | Excavator idle | Loaded per hour | Six loads loaded |
+|---|---|---|---|---|---|
+| 1 | 1 | 0.34 | 65 % | 114 t | (four loads: 1307 s) |
+| 2 | 1 | 0.63 | 39 % | 212 t | 1016 s |
+| 2 | 2 | 0.71 | 33 % | 216 t | 1060 s |
+| 3 | 1 | 1.05 | 10 % | 301 t | 765 s |
+| 3 | 2 | 1.00 | 11 % | 287 t | 776 s |
+| 4 | 1 | 1.37 | 8 % | 310 t | 737 s |
+| 4 | 2 | 1.41 | 0 % | 304 t | 734 s |
+
+- **Below a match factor of 1, the excavator idles about 1 − MF of the time,** as fleet theory says: 65 % at 0.34 (66 % expected), 39 % at 0.63 (37 %), 33 % at 0.71 (29 %). Field figures follow the same law. In a Korean tunnel one excavator with 7 trucks idled 44 % of the time, and 10 trucks cut that to 21 % (Kim et al., ISARC 2018). If MF was 0.56 with 7 trucks, 10 trucks make it 0.80, and the law gives 20 %. Output grows with each carrier until MF ≈ 1, from 114 to about 300 t/h.
+- **At MF ≈ 1 about 10 % is still lost.** Carriers bunch up: one is late, and the next arrives before the excavator is free. The same happens on sites. An Indonesian mine reached MF 0.99 with six trucks, and a seventh (MF 1.15) brought queues.
+- **Above 1, from one side the excavator still waits 8 %: the exchange at the spot.** With a second spot that wait is gone (0 %). One carrier backs in while the other is loaded, as in section 24. Production stays about the same (304–310 t/h), because the excavator was already nearly always busy. The gain is in its idle time, and the spot exchange no longer sets the pace.
+- **A second spot does not help an under-trucked fleet.** With two carriers (MF 0.63–0.71) both setups idle 33–39 %. The excavator waits for carriers on the road, not for an exchange.
+- No collisions, give-ways or stuck machines in any run.
+- **Not measured: carrier waiting.** The start-up in a six-load window inflates the carriers' own figures. A longer run on a pit that is not dug out (or moving on along the bank, which one-sided loading already does) would give them.

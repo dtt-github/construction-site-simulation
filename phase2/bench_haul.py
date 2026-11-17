@@ -15,6 +15,7 @@ versions of the autopilot pass by pass, in a quarter of the time. Progress goes 
     SOIL=loam CARRIERS=2 ../phase0/.venv-newton/bin/python bench_haul.py 600   # two carriers sharing the road
     SOIL=loam CARRIERS=2 SIDES=2 ../phase0/.venv-newton/bin/python bench_haul.py 600   # two-sided loading
     SOIL=loam CARRIERS=3 HAUL_M=150 ../phase0/.venv-newton/bin/python bench_haul.py 1500   # 150 m more road each way
+    SOIL=loam CARRIERS=4 SIDES=2 HAUL_M=300 ../phase0/.venv-newton/bin/python bench_haul.py 1500   # four carriers, two spots
     SOIL=loam OPERATOR=human SEED=1 ../phase0/.venv-newton/bin/python bench_haul.py 1500   # a human operator (ExcavatorSim.HUMAN)
     SOIL=clay PASSES=25 ../phase0/.venv-newton/bin/python bench_haul.py 1500   # quick check: the first 25 passes
 """
@@ -38,7 +39,7 @@ haul_m = float(os.environ.get("HAUL_M", "0"))  # the off-screen two-lane road, e
 relocate_m = float(os.environ.get("RELOCATE_M", "0"))  # move on along the bank when the face is dug out
 max_passes = int(os.environ.get("PASSES", "0")) or None
 roller = os.environ.get("ROLLER", "1") != "0"
-sides = int(os.environ.get("SIDES", "1"))  # 2: two-sided loading (two carriers, a spot each side of the excavator)
+sides = int(os.environ.get("SIDES", "1"))  # 2: two-sided loading (a spot each side of the excavator; more than two carriers need HAUL_M)
 sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m, relocate_m=relocate_m, roller=roller, sides=sides)
 operator = os.environ.get("OPERATOR", "scripted")  # human: an operator who varies from cycle to cycle
 op_seed = int(os.environ.get("SEED", "0"))

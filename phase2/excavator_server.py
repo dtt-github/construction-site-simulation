@@ -568,8 +568,8 @@ class ExcavatorSim:
 
     def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, haul_m=0.0, relocate_m=0.0, command_response=False, roller=True, sides=1):
         wp.init()
-        assert sides in (1, 2) and (sides == 1 or (carriers == 2 and haul_m == 0.0 and relocate_m == 0.0)), \
-            "two-sided loading: two carriers, the short road, no moves along the bank (they go toward the south spot)"
+        assert sides in (1, 2) and (sides == 1 or (carriers >= 2 and relocate_m == 0.0)), \
+            "two-sided loading: two carriers or more, no moves along the bank (they go toward the south spot)"
         self.sides = sides
         self.kwargs = {"voxel": voxel, "ppc": ppc, "soil": soil, "iterations": iterations, "fps": fps, "pool": pool, "mpm_every": mpm_every, "carriers": carriers, "haul_m": haul_m, "relocate_m": relocate_m, "command_response": command_response, "sides": sides}
         # levers reach the spools through the dead time and lag of PWRI's ZX200 under velocity commands
