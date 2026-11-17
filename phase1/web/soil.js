@@ -8,6 +8,8 @@
 // Draws the sand surface from the streamed heightmap, the moving grains as points and the
 // bucket / arm, and mirrors the surface into a Jolt heightfield so site props rest on the dug ground.
 
+import { statList, steadyWidth } from "./statlist.js";
+
 const HM_HEADER_BYTES = 16;
 const P_HEADER_BYTES = 20;
 const MAGIC_SOIL = 0x4c494f53; // "SOIL"
@@ -840,6 +842,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     ws.onopen = () => {
       if (replay) location.reload(); // a live server appeared: start clean with live control
       buttonsEl.hidden = controlsEl.hidden = false;
+      steadyWidth(autoBtn, ["Auto dig cycle", "Stop auto dig"]);
       failures = 0;
       statusEl.textContent = `Connected to ${url}`;
     };
@@ -868,6 +871,45 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
   }
   if (params.has("replay") || !tryConnect) startReplay(); // ?replay forces the recording
   else connect();
+
+  // ------------------------------------------------------------ panel rows
+  // Fixed formats (padded numbers, the parts of a value on their own lines) so a row keeps its width and
+  // line count as the values change; see statlist.js.
+  const statRows = statList(statsEl);
+  const pad = (v, n) => String(v).padStart(n, "\u2007"); // figure space: as wide as a digit
+  const kN = (v, n = 6) => `${pad((v / 1000).toFixed(1), n)} kN`;
+  function soilRows(f, g, stalled) {
+    const rows = [
+      ["Server step", `${f.stepMs.toFixed(1)} ms<br>${f.rtf.toFixed(2)}× real time`],
+      ["Stream", `${stats.fps.toFixed(0)} frames/s<br>${stats.mbps.toFixed(1)} Mbit/s`],
+    ];
+    if (zoneMode) rows.push(["Active soil", `${f.particles.toLocaleString()} particles`, "Soil particles simulated near the bucket"]);
+    if (f.kind === "excavator") {
+      rows.push(["Auto stage", f.stage === 255 ? "manual" : stages[(f.stage + 1) % stages.length] ?? f.stage]);
+      rows.push(["Joints", f.q.map((v) => pad(`${Math.round((v * 180) / Math.PI) || 0}°`, 4)).join(" "), "Swing · boom · stick · bucket"]);
+      if (f.cylBar) {
+        const side = (n, v) => `${n.padEnd(6, "\u2007")} ${pad(Math.abs(v).toFixed(0), 3)} bar ${v >= 0 ? "head" : "rod\u2007"}`;
+        rows.push(["Cylinders", ["boom", "arm", "bucket"].map((n, k) => side(n, f.cylBar[k])).join("<br>"), "Cylinder pressure and the side it acts on"]);
+      }
+      rows.push(["Stall", stalled.length ? `<strong class="stall">${stalled.join(", ")} at relief</strong>` : "–"]);
+    } else {
+      rows.push(["Moving grains", g.count.toLocaleString()]);
+    }
+    rows.push(["Soil force", `${kN(Math.hypot(f.force[0], f.force[2]))} horiz<br>${kN(f.force[1])} vert`, "Soil force on the bucket"]);
+    rows.push(["McKyes ref.", f.cut > 0.01 ? `${kN(f.fee, 0)} at ${(f.cut * 100).toFixed(0)} cm cut` : "–", "McKyes reference force for the current cut"]);
+    rows.push(["Bucket load", `${f.fill.toFixed(0)} kg`]);
+    if (f.kind === "excavator") rows.push(["Truck load", `${(f.truck / 1000).toFixed(2)} t of ${(f.capacity / 1000).toFixed(0)} t<br>${Math.round((100 * f.truck) / f.capacity)}%`]);
+    if (f.carriers) {
+      if (f.carriers.length === 1) rows.push(["Carrier", `${f.carriers[0].stage}<br>${(f.delivered / 1000).toFixed(1)} t dumped`]);
+      else {
+        f.carriers.forEach((c, i) => rows.push([`Carrier ${i + 1}`, c.stage]));
+        rows.push(["Dumped", `${(f.delivered / 1000).toFixed(1)} t`]);
+      }
+    }
+    if (f.dozer) rows.push(["Dozer", `${dozer.stage}${f.dozer.force > 0.5 ? ` · blade ${f.dozer.force.toFixed(0)} kN` : ""}`]);
+    if (f.roller) rows.push(["Roller", roller.stage]);
+    return rows;
+  }
 
   // ------------------------------------------------------------ per render frame
   function update() {
@@ -993,15 +1035,9 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       stats.bytes = 0;
       stats.lastT = now;
     }
-    const kN = (v) => `${(v / 1000).toFixed(1)} kN`;
-    const rows = [
-      ["Server step", `${f.stepMs.toFixed(1)} ms (${f.rtf.toFixed(2)}× real time)`],
-      ["Stream", `${stats.fps.toFixed(0)} frames/s · ${stats.mbps.toFixed(1)} Mbit/s`],
-    ];
-    if (zoneMode) rows.push(["Active soil", `${f.particles.toLocaleString()} particles near the bucket`]);
+    // stall check (and the pressure gauges) every frame; the text rows a few times a second
     const stalled = [];
     if (f.kind === "excavator") {
-      rows.push(["Auto stage", f.stage === 255 ? "manual" : stages[(f.stage + 1) % stages.length] ?? f.stage]);
       LEVERS.forEach((l, k) => {
         const p = f.press[k];
         const el = controlsEl.querySelector(`#gauge-${l.key}`);
@@ -1013,29 +1049,11 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
           if (atRelief && Math.abs(f.qd[k]) < 0.02 && (Math.abs(levers[l.key]) > 0.1 || f.stage !== 255)) stalled.push(l.label);
         }
       });
-      rows.push(["Joints", f.q.map((v) => `${((v * 180) / Math.PI).toFixed(0)}°`).join(" · ")]);
-      if (f.cylBar) {
-        const side = (v) => `${Math.abs(v).toFixed(0)} bar ${v >= 0 ? "head" : "rod"}`;
-        rows.push(["Cylinders", ["boom", "arm", "bucket"].map((n, k) => `${n} ${side(f.cylBar[k])}`).join(" · ")]);
-      }
-      rows.push(["Stall", stalled.length ? `<strong class="stall">${stalled.join(", ")} at relief</strong>` : "–"]);
-    } else {
-      rows.push(["Moving grains", g.count.toLocaleString()]);
     }
-    rows.push(["Soil force on bucket", `${kN(Math.hypot(f.force[0], f.force[2]))} horiz · ${kN(f.force[1])} vert`]);
-    rows.push(["McKyes reference", f.cut > 0.01 ? `${kN(f.fee)} at ${(f.cut * 100).toFixed(0)} cm cut` : "–"]);
-    rows.push(["Bucket load", `${f.fill.toFixed(0)} kg`]);
-    if (f.kind === "excavator") rows.push(["Truck load", `${(f.truck / 1000).toFixed(2)} t of ${(f.capacity / 1000).toFixed(0)} t (${Math.round((100 * f.truck) / f.capacity)}%)`]);
-    if (f.carriers) {
-      if (f.carriers.length === 1) rows.push(["Carrier", `${f.carriers[0].stage} · ${(f.delivered / 1000).toFixed(1)} t dumped`]);
-      else {
-        f.carriers.forEach((c, i) => rows.push([`Carrier ${i + 1}`, c.stage]));
-        rows.push(["Dumped", `${(f.delivered / 1000).toFixed(1)} t`]);
-      }
+    if (now - stats.textT >= 250 || !stats.textT) {
+      stats.textT = now;
+      statRows.set(soilRows(f, g, stalled));
     }
-    if (f.dozer) rows.push(["Dozer", `${dozer.stage}${f.dozer.force > 0.5 ? ` · blade ${f.dozer.force.toFixed(0)} kN` : ""}`]);
-    if (f.roller) rows.push(["Roller", roller.stage]);
-    statsEl.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     window.__soil = { lastFrame: f, stats: { ...stats }, stalled, model: arm.model };
   }
 
