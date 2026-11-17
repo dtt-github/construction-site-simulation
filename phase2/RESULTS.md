@@ -2243,23 +2243,45 @@ Now a push under way is finished. The dozer then stops at the lane's end with th
 How many carriers an excavator needs is set by the match factor, MF = N × loading time / carrier cycle time (Morgan & Peterson 1968). Below 1 the excavator waits for carriers, and its idle share is about 1 − MF. Above 1 the carriers queue. Section 24 found that a second loading spot pays off fully only on a longer haul, so this study runs a 300 m haul each way in loam with 1–4 carriers, from one side and from both.
 
 - **Two-sided loading on a longer haul.** Before, two-sided loading worked only with two carriers on the short road. Now any number of carriers can use it on a longer haul. Each spot has its own lane out and its own waiting place; the south one mirrors the north one at y = −11 m. A carrier back from the dump comes into view at whichever waiting place is free. It prefers the spot with fewer carriers at it or bound for it, and on a tie the one whose carrier has more in its vessel. The one-sided rules for a longer haul hold per spot, and the dump side is shared. The existing modes are unchanged: a frame-by-frame replay of the fleet logic gives the same stages and poses as before.
-- **How it is measured.** Loading time is the passes per load (load ÷ mean dumped per pass) × the excavator's net cycle (dig, swings, dump). Carrier cycle time is the loading time plus the time away, without waits: 295 s on this road. Production and the excavator's idle share are taken up to the sixth load (four with one carrier), before the pit is dug out at about 80 t. All runs start with the carriers at the spots or about to arrive, so the window includes the start-up.
+- **How it is measured.** Loading time is the passes per load (counted up to the sixth load) × the excavator's net cycle (dig, swings, dump). A first version took passes per load as load ÷ the mass the bucket is estimated to carry at the swing. That estimate reads about 25 % below what arrives in the vessel, so the loading times and match factors came out too high. They are corrected here. Carrier cycle time is the loading time plus the time away, without waits: 295 s on this road. Production and the excavator's idle share are taken up to the sixth load (four with one carrier), before the pit is dug out at about 80 t. All runs start with the carriers at the spots or about to arrive, so the window includes the start-up.
 
 **Benchmark** (loam, 300 m haul each way, 1500 s, scripted operator; logs `logs/haul_bench_fleet_<sides>side_<n>carrier.json`):
 
 | Carriers | Spots | Match factor | Excavator idle | Loaded per hour | Six loads loaded |
 |---|---|---|---|---|---|
-| 1 | 1 | 0.34 | 65 % | 114 t | (four loads: 1307 s) |
-| 2 | 1 | 0.63 | 39 % | 212 t | 1016 s |
-| 2 | 2 | 0.71 | 33 % | 216 t | 1060 s |
-| 3 | 1 | 1.05 | 10 % | 301 t | 765 s |
-| 3 | 2 | 1.00 | 11 % | 287 t | 776 s |
-| 4 | 1 | 1.37 | 8 % | 310 t | 737 s |
-| 4 | 2 | 1.41 | 0 % | 304 t | 734 s |
+| 1 | 1 | 0.28 | 65 % | 114 t | (four loads: 1307 s) |
+| 2 | 1 | 0.53 | 39 % | 212 t | 1016 s |
+| 2 | 2 | 0.58 | 33 % | 216 t | 1060 s |
+| 3 | 1 | 0.84 | 10 % | 301 t | 765 s |
+| 3 | 2 | 0.86 | 11 % | 287 t | 776 s |
+| 4 | 1 | 1.13 | 8 % | 310 t | 737 s |
+| 4 | 2 | 1.17 | 0 % | 304 t | 734 s |
 
-- **Below a match factor of 1, the excavator idles about 1 − MF of the time,** as fleet theory says: 65 % at 0.34 (66 % expected), 39 % at 0.63 (37 %), 33 % at 0.71 (29 %). Field figures follow the same law. In a Korean tunnel one excavator with 7 trucks idled 44 % of the time, and 10 trucks cut that to 21 % (Kim et al., ISARC 2018). If MF was 0.56 with 7 trucks, 10 trucks make it 0.80, and the law gives 20 %. Output grows with each carrier until MF ≈ 1, from 114 to about 300 t/h.
-- **At MF ≈ 1 about 10 % is still lost.** Carriers bunch up: one is late, and the next arrives before the excavator is free. The same happens on sites. An Indonesian mine reached MF 0.99 with six trucks, and a seventh (MF 1.15) brought queues.
+- **Below a match factor of 1, the excavator's idle share follows 1 − MF, 7–9 points lower:** 65 % at 0.28 (72 % by the law), 39 % at 0.53 (47 %), 33 % at 0.58 (42 %), 10–11 % at 0.84–0.86 (14–16 %). Part of the gap is the start-up: every run begins with carriers at the spots, so the first loads see no wait. Section 27 measures over a steady 40-minute shift instead. Field figures follow the same law. In a Korean tunnel one excavator with 7 trucks idled 44 % of the time, and 10 trucks cut that to 21 % (Kim et al., ISARC 2018). If MF was 0.56 with 7 trucks, 10 trucks make it 0.80, and the law gives 20 %. Output grows with each carrier until MF ≈ 1, from 114 to about 300 t/h.
 - **Above 1, from one side the excavator still waits 8 %: the exchange at the spot.** With a second spot that wait is gone (0 %). One carrier backs in while the other is loaded, as in section 24. Production stays about the same (304–310 t/h), because the excavator was already nearly always busy. The gain is in its idle time, and the spot exchange no longer sets the pace.
-- **A second spot does not help an under-trucked fleet.** With two carriers (MF 0.63–0.71) both setups idle 33–39 %. The excavator waits for carriers on the road, not for an exchange.
+- **A second spot does not help an under-trucked fleet.** With two carriers (MF 0.53–0.58) both setups idle 33–39 %. The excavator waits for carriers on the road, not for an exchange.
 - No collisions, give-ways or stuck machines in any run.
 - **Not measured: carrier waiting.** The start-up in a six-load window inflates the carriers' own figures. A longer run on a pit that is not dug out (or moving on along the bank, which one-sided loading already does) would give them.
+
+## A living site, 27: fleet match over a steady 40-minute shift
+
+Section 26 stopped when the pit was dug out, after six to eight loads, so its figures included the start-up. Now both loading spots work with the excavator moving on along the bank (`RELOCATE_M=4`, section 8). Nothing physical moves: the pit's soil slides under the machine. The south spot stays beside the excavator on the bench, as the north one always has. The fresh bank enters at the original fill level, the state two-sided runs already start from. So the runs go on for 40 minutes, and the figures below are measured from 600 s to 2400 s.
+
+- **How it is measured.** Loading time = passes per load in the window × the excavator's net cycle. Carrier cycle = loading time + time away without waits (295–296 s on the 300 m road). Excavator idle = the window less its passes and its moves along the bank. Carrier wait per trip = queueing (on the road, at the dump, at the waiting place) plus time at the spot beyond the net loading time, which covers waiting while the other spot is loaded. For a fleet the excavator limits (MF > 1), fleet theory gives each carrier N × loading time − cycle time of waiting per trip.
+
+**Benchmark** (loam, 300 m haul each way, moving on 4 m, 2400 s; logs `logs/haul_bench_shift_<sides>side_<n>carrier.json`):
+
+| Carriers | Spots | Match factor | Excavator idle (1 − MF) | Moving on | Loaded per hour | Carrier wait per trip (theory) |
+|---|---|---|---|---|---|---|
+| 2 | 1 | 0.59 | 41 % (41 %) | 2 % | 189 t | 11 s (0) |
+| 2 | 2 | 0.57 | 42 % (43 %) | 2 % | 184 t | 5 s (0) |
+| 3 | 1 | 0.88 | 14 % (12 %) | 4 % | 254 t | 29 s (0) |
+| 3 | 2 | 0.87 | 12 % (13 %) | 4 % | 267 t | 16 s (0) |
+| 4 | 1 | 1.17 | 10 % (0 %) | 4 % | 275 t | 159 s (70) |
+| 4 | 2 | 1.13 | 1 % (0 %) | 6 % | 284 t | 75 s (53) |
+
+- **Below a match factor of 1, the excavator's idle share is 1 − MF to within 2 points.** That is the law of fleet theory (Morgan & Peterson 1968), which the field figures in section 26 also follow. Section 26's 7–9 point gap was the start-up.
+- **Above 1, the excavator should never wait, and from two spots it nearly doesn't (1 %).** From one spot it still waits 10 %: each exchange at the spot. The exchange also lengthens every load, so the carriers queue more than theory says: 159 s per trip against 70 s. From two spots, 75 s against 53 s.
+- **Output follows the excavator's busy time:** 184–189 t/h with two carriers, 254–267 t/h with three, 275–284 t/h with four. From two spots, four carriers load 3 % more than from one, and three carriers 5 % more. A move along the bank costs 34 s, 2–6 % of the shift.
+- No collisions, give-ways or stuck machines in any run, and no stage was skipped.
+- **The next limit is the spoil area.** Over 40 minutes it takes 124–200 t, and how evenly it is spread falls with the tonnage: RMS from grade 0.46–0.60 m at 125 t, 0.96 m at 200 t. Soil left unspread rises from 12 to 37 m³. The dozer is not the limit: it is parked 30–45 % of the time, and carriers wait at the dump only 0–12 s a run. The area is full. Its heaps keep particles awake, and the particle pool ran short 135–900 times in the runs over 170 t (none below). A spoil area that moves on, as the excavator does, would remove the limit.

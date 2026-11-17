@@ -568,8 +568,7 @@ class ExcavatorSim:
 
     def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, haul_m=0.0, relocate_m=0.0, command_response=False, roller=True, sides=1):
         wp.init()
-        assert sides in (1, 2) and (sides == 1 or (carriers >= 2 and relocate_m == 0.0)), \
-            "two-sided loading: two carriers or more, no moves along the bank (they go toward the south spot)"
+        assert sides in (1, 2) and (sides == 1 or carriers >= 2), "two-sided loading: two carriers or more"
         self.sides = sides
         self.kwargs = {"voxel": voxel, "ppc": ppc, "soil": soil, "iterations": iterations, "fps": fps, "pool": pool, "mpm_every": mpm_every, "carriers": carriers, "haul_m": haul_m, "relocate_m": relocate_m, "command_response": command_response, "sides": sides}
         # levers reach the spools through the dead time and lag of PWRI's ZX200 under velocity commands
@@ -1381,7 +1380,8 @@ class ExcavatorSim:
 
     def _relocate(self):
         """The face within reach is dug out: move relocate_m along the bank (toward -y, away from the
-        carrier's side), with everything but the pit. The pit's soil is put to sleep and slid +y under the
+        north carrier's side; with two-sided loading the south spot moves along with the machine, on the bench
+        beside the pit), with everything but the pit. The pit's soil is put to sleep and slid +y under the
         machine by that much; fresh bank soil comes in from the -y side, and what passes the pit's +y edge
         is left behind. The machine stands still for the time the move takes."""
         z = self.zones
