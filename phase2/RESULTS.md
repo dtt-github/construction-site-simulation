@@ -2285,3 +2285,26 @@ Section 26 stopped when the pit was dug out, after six to eight loads, so its fi
 - **Output follows the excavator's busy time:** 184–189 t/h with two carriers, 254–267 t/h with three, 275–284 t/h with four. From two spots, four carriers load 3 % more than from one, and three carriers 5 % more. A move along the bank costs 34 s, 2–6 % of the shift.
 - No collisions, give-ways or stuck machines in any run, and no stage was skipped.
 - **The next limit is the spoil area.** Over 40 minutes it takes 124–200 t, and how evenly it is spread falls with the tonnage: RMS from grade 0.46–0.60 m at 125 t, 0.96 m at 200 t. Soil left unspread rises from 12 to 37 m³. The dozer is not the limit: it is parked 30–45 % of the time, and carriers wait at the dump only 0–12 s a run. The area is full. Its heaps keep particles awake, and the particle pool ran short 135–900 times in the runs over 170 t (none below). A spoil area that moves on, as the excavator does, would remove the limit.
+
+## A living site, 28: rolling the finished lift before it is covered
+
+Section 27's four-carrier shift left the spread lifts worse rolled before they were covered: 37–79 % for four of six lifts, against at least 91 % on the one-carrier site (section 18). Two rules caused it, and both are fixed.
+
+- **Spill counted as a lift.** Each new particle layer on a column reset its roll count, so a few grains blown onto a rolled lane made it unrolled again, and bare ground with spill on it a lane to roll. The roller rolled such lanes over and over, and the dozer waited for it. Now soil thinner than 0.08 m (two particle layers, about a quarter of a lift) is spill: it does not reset a column, and the rolled share counts only columns thicker than that (`SPILL_M`, `SoilZones.NEW_LIFT_M`). This alone cut the dozer's wait in the shift from 776 to 494 s and particle-pool shortfalls from 900 to 174. Covered lifts were still 22–94 % rolled.
+- **A bump on a finished cell hid unrolled soil.** The roller leaves a lane whose surface stands more than 0.4 m above grade (90th percentile), so as not to roll soil the dozer is about to spread. On a cell the dozer had already spread and left, that rule hid the lane: the dozer saw nothing left to roll and put the next lift on top. In loam one lift was covered 62 % rolled that way, its lane 0.41 m rough. Now the rule holds only on the cell the dozer is spreading; on a cell it has finished, the roller rolls every lane as it stands, and the dozer waits for it. A first attempt, sending the dozer back to trim the bump at the old grade, made it flip between cells about 7,950 times (the cell it went back to was already full at that grade) and was dropped.
+
+**Benchmark** (rolled 6 times when covered, per lift; logs `logs/haul_bench_finished_*.json`):
+
+| Run | Before (section 18 / 27) | Now | Dozer waiting | Spread RMS from grade | Loaded |
+|---|---|---|---|---|---|
+| Loam, 1 carrier, 1500 s | 91, 95, 95 % | 100, 94, 94 % | 341 → 386 s | 0.35 → 0.30 m | 80.4 → 79.5 t |
+| Dry sand, 1 carrier | 94, 94 % | 81, 92, 93 % | 511 → 113 s | 0.30 → 0.26 m | 71.0 → 72.0 t |
+| Clay, 1 carrier | 89, 93, 96 % | 100, 95, 100 % | 86 → 224 s | 0.78 → 0.87 m | 76.8 → 73.7 t |
+| Loam, 4 carriers, 2 spots, 300 m, 2400 s | 79, 0*, 90, 37, 64, 71 % | 100, 93, 99, 95, 93, 94 % | 776 → 771 s | 0.96 → 0.87 m | 199.9 → 193.1 t |
+
+\* the first switch, onto a cell with no lift yet.
+
+- **Every lift in loam and clay is now covered at least 93 % rolled, in the shift too.** The roller does 22 % more passes in the shift (149 against 122) and is parked a third less.
+- **One dry-sand lift reached only 81 %,** though 97 % of it was passed six times: loose sand slid onto rolled columns after they were rolled, and over 0.08 m that counts as a new layer. The roller also left two dry-sand lanes after 12 passes, which it did not before the spill rule. Dry sand is the one soil where a bump keeps flowing under the drum.
+- **The dozer waits as long as before in the shift (771 s), now for rolling it needs.** Output is 3 % lower, within the run-to-run spread at this tonnage. The particle pool ran short 489 times (900 in section 27). What the spoil area takes is still the shift's limit (section 27): one shared dump point, busy about a third of the shift.
+- No collisions, give-ways or stuck machines in any run.

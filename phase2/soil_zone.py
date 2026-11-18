@@ -409,6 +409,9 @@ class SoilZones:
     FAST_FRAC = 0.03  # this fraction of them (MPM jitter on a heap's surface would keep it awake for good)
     V_CREEP = 0.25  # m/s: ... and none faster than this (soil falling or flowing onto it)
     LOST_Z = -0.5  # m: particles below this fell through the ground and are removed
+    # m: soil added to a column counts as a new layer to roll (and soil on bare ground as soil to roll) only
+    # from this thickness; 0 keeps every particle layer. The site sets it (excavator_server.py, SPILL_M)
+    NEW_LIFT_M = 0.0
     REPOSE_SLOPE = 0.75  # tan of the angle of repose (sand friction 0.75, 37 deg)
     AVALANCHE_DROP = 0.2  # m to a neighbour: faces this high slump (smaller steps are below MPM's 8 cm resolution)
 
@@ -571,7 +574,10 @@ class SoilZones:
             layer = (before[got] * self.col_layer_np[got] + vol) / self.count_np[got]
             self.col_layer_np[got] = np.clip(layer, self.dense_layer, self.loose_layer)
             self.col_layer.assign(self.col_layer_np.astype(np.float32))
-            self.col_rolled[got[self.count_np[got] - before[got] >= PER_LAYER]] = 0  # a new layer of soil: roll it again
+            # a new layer of soil, at least NEW_LIFT_M thick: roll it again (a thinner skin of spill rides on, and
+            # is rolled with the lift that covers it)
+            added = (self.count_np[got] - before[got]) * self.col_layer_np[got]
+            self.col_rolled[got[(self.count_np[got] - before[got] >= PER_LAYER) & (added >= self.NEW_LIFT_M)]] = 0
 
     def columns_at(self, xy, names):
         """Column index under each point xy (n, 2) in the named regions (-1 outside them)."""
@@ -631,10 +637,11 @@ class SoilZones:
 
     def rolled_share(self, xy, names, passes):
         """Share of the soil-bearing loose columns under the points xy rolled at least `passes` times since
-        soil was last added (1.0 where there is none)."""
+        soil was last added (1.0 where there is none). Columns holding less than NEW_LIFT_M of soil (spill on
+        bare ground) do not count: a few grains on an empty lane would otherwise make all of it unrolled."""
         col = np.unique(self.columns_at(xy, names))
         col = col[(col >= 0)]
-        col = col[self.col_loose[col] & (self.count_np[col] > 0)]
+        col = col[self.col_loose[col] & (self.count_np[col] * self.col_layer_np[col] >= max(self.NEW_LIFT_M, 1e-9))]
         return float((self.col_rolled[col] >= passes).mean()) if len(col) else 1.0
 
     def compaction(self, name, xy=None):
@@ -652,8 +659,14 @@ class SoilZones:
         n = self.count_np[m]
         p = self.col_passes[m]
         return {"of_bank": round(float(n.sum() * LAYER_PER_PARTICLE / (n * self.col_layer_np[m]).sum()), 4), "loose_of_bank": round(1.0 / (1.0 + self.swell), 4),
-                "compacted_of_bank": round(LAYER_PER_PARTICLE / self.dense_layer, 4), "rolled_6": round(float((self.col_rolled[m] >= 6).mean()), 3),
+                "compacted_of_bank": round(LAYER_PER_PARTICLE / self.dense_layer, 4), "rolled_6": self._rolled_6(m),
                 "passed_1": round(float((p >= 1).mean()), 3), "passed_3": round(float((p >= 3).mean()), 3), "passed_6": round(float((p >= 6).mean()), 3)}
+
+    def _rolled_6(self, m):
+        """Share of the columns m rolled six times, of those holding at least NEW_LIFT_M of soil (thinner spill is
+        rolled with the lift that covers it, as rolled_share counts it)."""
+        lift = m & (self.count_np * self.col_layer_np >= max(self.NEW_LIFT_M, 1e-9))
+        return round(float((self.col_rolled[lift] >= 6).mean()), 3) if lift.any() else 1.0
 
     def unpress_empty(self):
         """Columns emptied of dormant soil take the loose layer again, for the next soil that settles there."""

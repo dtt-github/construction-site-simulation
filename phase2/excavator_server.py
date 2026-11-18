@@ -223,6 +223,10 @@ ROLLER_STRIP = (5.2 - roller_mod.DRUM_W / 2, 5.2 + roller_mod.DRUM_W / 2)
 ROLLER_STRIP_CELL = len(ROLLER_CELLS)
 ROLLER_PARK = (37.5, 5.2, math.pi)
 DOZER_SEES_SPEED = 1.0  # m/s: the dozer plans on all soil slower than this (dumped clay creeps for minutes)
+# soil thinner than this (two particle layers, about a quarter of a lift) is spill, not a lift: it does not make a
+# rolled lane unrolled, nor bare ground a lane to roll; the lift that covers it is rolled with it. Counting every
+# grain made the roller roll bare lanes over and over as spill blew onto them, and the dozer wait for it
+SPILL_M = 0.08
 # the haul road between the loading spot and the spoil area: soil falling off a carrier settles there
 ROAD_REGION = ("road", 13.3, -2.5, 134, 190, lambda x, y: np.full(np.shape(x), GROUND_Z))
 # the spoil area reaches 4.6 m past the dozer's lanes, for the soil carried ahead of the blade at the end,
@@ -716,6 +720,7 @@ class ExcavatorSim:
         self.zones = SoilZones(regions, self.n_particles, SPACING**3,
                                swell=self.swell, loose_regions=tuple(r[0] for r in regions if r[0] in ("truck", "truck_s", "road", "south_road", "spoil")), compacted=material.get("compacted", 1.0))
         z = self.zones
+        z.NEW_LIFT_M = SPILL_M
         # dormant faces lower than a cohesive soil's critical height stand; only higher ones are woken to fail
         z.AVALANCHE_DROP = max(SoilZones.AVALANCHE_DROP, 0.8 * soils.critical_height(soil)[0])
         ground = z.region_mask("ground")
@@ -1754,6 +1759,9 @@ class ExcavatorSim:
             keep_off = lambda cell: () if dz.parked else self.roller_keep_off[cell]  # lanes beside the dozer's pushes
             if self.zone_frame % 30 == 0:  # the other cell is rolled: the roller has no lane left there (lanes
                 # under an unspread heap wait for the dozer)
+                # a cell the dozer has spread and left is finished: the roller rolls its lanes as they stand, a
+                # bump the dozer left too (otherwise the next lift buries the unrolled soil under it)
+                r.finished = {c for c in range(len(dz.grades)) if dz.full[c] and c != dz.cell}
                 dz.may_switch = not r.has_work(1 - dz.cell, rolled, self._surface, grade(1 - dz.cell))  # all its lanes, the
                 # ones beside the pushes too (rolled while the dozer is parked)
                 # while the dozer waits, its pushes keep the roller off the lanes beside them; once those are all

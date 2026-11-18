@@ -42,7 +42,8 @@ DONE_SHARE = 0.9  # a lane is done once this share of its soil has had ROLL_PASS
 # as operators count passes: a lane still short of DONE_SHARE after this many passes is left until new soil lands
 # on it (its shortfall grows by NEW_SOIL_SHARE): a few stray soil columns at its edge otherwise held it for ever
 MAX_PASSES, NEW_SOIL_SHARE = 2 * ROLL_PASSES, 0.1
-ROUGH_M = 0.4  # a lane whose surface stands this far above the design surface (90th percentile) waits
+ROUGH_M = 0.4  # a lane whose surface stands this far above the design surface (90th percentile) waits for the
+# dozer, on a cell it is still spreading
 ROLL_SPEED, TRAVEL_SPEED = 4.0 / 3.6, 2.0  # m/s
 ACCEL = 0.5  # m/s2
 SPIN_RATE = math.radians(20.0)
@@ -73,6 +74,7 @@ class Roller:
         self.lane = None
         self.keep_off = set()  # lanes of the cell it may not roll now (next to the dozer's pushes)
         self.lane_passes = 0  # passes over the lane in hand
+        self.finished = set()  # set by the site: cells the dozer has spread and left (their bumps are rolled as they stand)
         self.left = {}  # (cell, lane): its shortfall when the roller left it after MAX_PASSES passes
         self.counters = {"lanes_rolled": 0, "roll_m": 0.0, "parked_s": 0.0, "working_s": 0.0, "passes": 0, "lanes_left": 0}
 
@@ -142,11 +144,11 @@ class Roller:
 
     def _shortfall(self, rolled_share, surface, grade, keep_off=None, cell=None):
         """Per lane of the cell (default: the one it rolls): the share of its soil not yet rolled ROLL_PASSES times
-        (0 where a heap stands, for a lane kept off, and for one left after MAX_PASSES until new soil lands)."""
+        (0 where a heap stands on a cell not finished, for a lane kept off, and for one left after MAX_PASSES until new soil lands)."""
         short = []
         for k in range(len(self.lanes)):
             pts = self._lane_points(k)
-            rough = np.percentile(surface(pts), 90) - grade > ROUGH_M
+            rough = (self.cell if cell is None else cell) not in self.finished and np.percentile(surface(pts), 90) - grade > ROUGH_M
             s = 0.0 if rough or k in (self.keep_off if keep_off is None else keep_off) else 1.0 - rolled_share(pts, ROLL_PASSES)
             key = (self.cell if cell is None else cell, k)
             if key in self.left:
