@@ -158,6 +158,7 @@ class Dozer:
         self.may_switch = False  # set by the site: the other cell is rolled
         self.hold_since = None  # when the dozer started waiting for the other cell to be rolled
         self.make_way = False  # set by the site: while it waits, the roller's last lanes there lie beside its pushes
+        self.topped = False  # both cells are spread at the top lift: the fill area is finished, the dozer parks
         self.stage, self.stage_time, self.time = "parked", 0.0, 0.0
         self.may_work = True
         self.plan = []  # moves still to make: ("spin", yaw) | ("drive", x, y, dir, speed, stage) | ("lift", "up"/"raise"/"grade") | ("push", x, y)
@@ -240,6 +241,15 @@ class Dozer:
     def grade(self, z):
         self.grades[self.cell] = z
 
+    def advance(self):
+        """The fill area has moved on: fresh ground in both cells, the first lift's design surface again."""
+        self.grades = [self.ground_z + LIFT] * len(self.cell_lanes)
+        self.full = [False] * len(self.cell_lanes)
+        self.topped, self.hold_since, self.may_switch = False, None, False
+        self.blocked.clear()
+        self.area_soil = 0.0
+        self.counters["advances"] = self.counters.get("advances", 0) + 1
+
     def switch(self, cell):
         """Spread the other cell from now on; one whose lift was spread before gets the next lift."""
         self.cell, self.lanes = cell, self.cell_lanes[cell]
@@ -317,6 +327,8 @@ class Dozer:
 
     def wants_work(self, surface):
         """Whether the dozer, parked, would go out to spread (a lane with soil to push, or a new load)."""
+        if self.topped:
+            return False
         soil, room = self._lane_scores(surface)
         h = surface(self._area_points())
         if float(np.clip(h - self.grade - TOL, 0.0, None).sum() * 0.01) > self.area_soil + NEW_LOAD_M3:
@@ -328,6 +340,9 @@ class Dozer:
     def _next_job(self, surface, may_work):
         """Pick the next moves once the current ones are done."""
         at_lane = self.lane is not None
+        if self.topped:  # the fill area is finished: parked until the site moves it on
+            self.lane = None
+            return [] if self._at_park() else self._to_park()
         if not may_work:
             self.lane = None
             return [] if self._at_park() else self._to_park()
@@ -343,6 +358,18 @@ class Dozer:
             self.blocked.clear()  # a new load: every lane may have soil to move again
         self.area_soil = area_soil
         other = 1 - self.cell
+        top = self.ground_z + MAX_FILL + 1e-6
+        if (len(self.cell_lanes) > 1 and area_soil >= 2 * DONE_M3 and area_soil > area_room and self.grade + LIFT > top
+                and self.full[other] and self.grades[other] + LIFT > top):
+            # this cell's top lift is spread, and the other's was: the fill area is finished. The dozer parks; the
+            # roller rolls the last lift, then the site moves the fill area on (advance)
+            if self.hold_since is not None:
+                self.counters["held_s"] += self.time - self.hold_since
+                self.hold_since = None
+            self.full[self.cell] = True
+            self.topped = True
+            self.lane = None
+            return [] if self._at_park() else self._to_park()
         if area_soil >= 2 * DONE_M3 and area_soil > area_room and len(self.cell_lanes) > 1 and (
                 not self.full[other] or self.grades[other] + LIFT <= self.ground_z + MAX_FILL + 1e-6):
             # more soil above grade than room below it: this cell's lift is spread, so spreading moves to the

@@ -199,7 +199,7 @@ TRUCK_REGION_S = ("truck_s", float(SPOT_LO[1][0]), float(SPOT_LO[1][1]), int(BED
 # every soil region never sleeps (it stays awake, using up the particle pool)
 GROUND_REGION = ("ground", -ZONE_HALF[0] - 2.0, -ZONE_HALF[1] - 2.0, 229, 181, ground_height)
 # haul: the carrier spins round at TURN_X and reverses to DUMP_X (its base), tipping onto a spoil area east
-# of the machine, flat site ground from x = 13 to 34 m
+# of the machine, flat site ground from x = 13 to 42 m
 HAUL_TURN_X, HAUL_DUMP_X = 20.0, 23.0
 CARRIER_STAGES = dumper_mod.STAGES
 # the fill area east of the dump point is two cells, south and north of the dump line (y 5.2): the dozer
@@ -207,13 +207,15 @@ CARRIER_STAGES = dumper_mod.STAGES
 # cell rolled
 # dozer (dozer.py): spreads the dumped loads in lanes fanning out along +x into its cell (cutting edge from
 # DOZER_X_START to DOZER_X_END), and parks north-west of the dump point, out of the carrier's way
-DOZER_X_START, DOZER_X_END = 25.2, 33.4  # cutting edge x where the pushes start (the dump heap) and end
+DOZER_X_START, DOZER_X_END = 25.2, 36.4  # cutting edge x where the pushes start (the dump heap) and end
+# (11.2 m lanes; with 8.2 m, a 0.3 m lift on one cell held only about 2.5 loads, and the dump heap grew to 6 m in a
+# four-carrier hour: RESULTS section 29)
 # the inner lanes of each cell end 2.3 m from the dump line, so the blade's side spill stays out of the other cell
 DOZER_CELLS = ((2.9, 0.7, -1.5), (7.5, 9.7, 11.9))  # y where each cell's fanned lanes reach DOZER_X_END
 DOZER_PARK_Y = 11.4
 # roller (roller.py): rolls its cell in lanes along +x, clear of the dump heap and of the dozer's pushes
 # near it, and parks east of the area
-ROLLER_X = (28.0, 35.0)  # drum x along every lane
+ROLLER_X = (28.0, 38.0)  # drum x along every lane
 # the cells leave a 1.2 m buffer on the dump line that neither rolls: the spill from the dozer's cell lands
 # there, not on the edge lane the roller has just finished in the other cell
 ROLLER_CELLS = ((-3.2, 4.6), (5.8, 13.6))  # y covered by each cell's lanes
@@ -221,7 +223,7 @@ ROLLER_CELLS = ((-3.2, 4.6), (5.8, 13.6))  # y covered by each cell's lanes
 # and both cells are rolled (the dozer's pushes cross it near the heap)
 ROLLER_STRIP = (5.2 - roller_mod.DRUM_W / 2, 5.2 + roller_mod.DRUM_W / 2)
 ROLLER_STRIP_CELL = len(ROLLER_CELLS)
-ROLLER_PARK = (37.5, 5.2, math.pi)
+ROLLER_PARK = (40.5, 5.2, math.pi)
 DOZER_SEES_SPEED = 1.0  # m/s: the dozer plans on all soil slower than this (dumped clay creeps for minutes)
 # soil thinner than this (two particle layers, about a quarter of a lift) is spill, not a lift: it does not make a
 # rolled lane unrolled, nor bare ground a lane to roll; the lift that covers it is rolled with it. Counting every
@@ -232,7 +234,7 @@ ROAD_REGION = ("road", 13.3, -2.5, 134, 190, lambda x, y: np.full(np.shape(x), G
 # the spoil area reaches 4.6 m past the dozer's lanes, for the soil carried ahead of the blade at the end,
 # and 2 m beside them, for the soil spilled off the blade's ends (soil outside a soil region never settles)
 SPOIL_REGION = ("spoil", 24.0, -5.5, 175, 220, lambda x, y: np.full(np.shape(x), GROUND_Z))
-SPOIL_HM = (24.0, -5.5, 140, 210)  # display heightmap of the spoil area: x0, y0, nx, ny (0.1 m cells)
+SPOIL_HM = (24.0, -5.5, 175, 210)  # display heightmap of the spoil area: x0, y0, nx, ny (0.1 m cells)
 # two-sided loading: ground south of the ground region (the south spot and its lane), and between it and the road
 SOUTH_REGION = ("south", 5.0, -4.5 - 44 * CELL, 237, 44, lambda x, y: ground_height(x, y))
 SOUTH_ROAD_REGION = ("south_road", 13.3, -4.5, 134, 25, lambda x, y: np.full(np.shape(x), GROUND_Z))
@@ -673,7 +675,7 @@ class ExcavatorSim:
         # Pit: 6 x 5 m floor, sides 1V:1.5H up to ground level at |x| = 6.75, |y| = 6.25 (as in the site terrain).
         ground = newton.ModelBuilder.ShapeConfig(mu=0.6)
         b.add_shape_box(-1, xform=wp.transform(wp.vec3(10.0, 1.0, GROUND_Z / 2)), hx=3.25, hy=9.0, hz=GROUND_Z / 2, cfg=ground)  # behind the machine
-        b.add_shape_box(-1, xform=wp.transform(wp.vec3(25.625, 3.0, GROUND_Z / 2)), hx=12.375, hy=11.0, hz=GROUND_Z / 2, cfg=ground)  # haul road and spoil area
+        b.add_shape_box(-1, xform=wp.transform(wp.vec3(27.625, 3.0, GROUND_Z / 2)), hx=14.375, hy=11.0, hz=GROUND_Z / 2, cfg=ground)  # haul road and spoil area
         b.add_shape_box(-1, xform=wp.transform(wp.vec3(0.0, 8.1, GROUND_Z / 2)), hx=6.75, hy=1.85, hz=GROUND_Z / 2, cfg=ground)  # beside the pit, truck side
         # behind the walls on the -x and -y sides: site ground, where spill from the bucket lands
         b.add_shape_box(-1, xform=wp.transform(wp.vec3(-6.2, -3.05, GROUND_Z / 2)), hx=2.8, hy=5.95, hz=GROUND_Z / 2, cfg=ground)
@@ -876,6 +878,7 @@ class ExcavatorSim:
         self.traffic.reset()
         self.collisions = {}
         self.roller_idle_dozer = False  # the dozer is parked with nothing to spread
+        self.fill_advances = []  # each time the finished fill area moved on: what it held (placed_t, density, rolled)
         self.covered_lifts = []  # each time the dozer starts a lift on a cell: that cell's soil then
         self.blade_force = np.zeros(3)
         for r in self.spot_regions:
@@ -1761,7 +1764,7 @@ class ExcavatorSim:
                 # under an unspread heap wait for the dozer)
                 # a cell the dozer has spread and left is finished: the roller rolls its lanes as they stand, a
                 # bump the dozer left too (otherwise the next lift buries the unrolled soil under it)
-                r.finished = {c for c in range(len(dz.grades)) if dz.full[c] and c != dz.cell}
+                r.finished = {c for c in range(len(dz.grades)) if dz.full[c] and (c != dz.cell or dz.topped)}
                 dz.may_switch = not r.has_work(1 - dz.cell, rolled, self._surface, grade(1 - dz.cell))  # all its lanes, the
                 # ones beside the pushes too (rolled while the dozer is parked)
                 # while the dozer waits, its pushes keep the roller off the lanes beside them; once those are all
@@ -1784,12 +1787,34 @@ class ExcavatorSim:
                     r.set_cell(dz.cell if r.has_work(dz.cell, rolled, self._surface, grade(dz.cell)) else ROLLER_STRIP_CELL)
             may_roll = r.cell == 1 - dz.cell or (dz.parked and self.roller_idle_dozer)
             self.traffic.step(self.traffic_roller, lambda: r.update(self.frame_dt, self._surface, may_roll, rolled, grade(r.cell)), self.frame_dt)
+            if self.zone_frame % 30 == 0 and dz.topped and dz.parked and may_work and not any(
+                    r.has_work(c, rolled, self._surface, grade(c)) for c in range(len(dz.grades))):
+                self._advance_fill()
         p, R = dz.blade_pose()
         q, qd = self.state_0.joint_q.numpy(), self.state_0.joint_qd.numpy()
         q[self.blade_q:self.blade_q + 7] = [*p, *dz.blade_quat()]
         qd[self.blade_qd:self.blade_qd + 6] = [*dz.v, *dz.w]
         self.state_0.joint_q.assign(q)
         self.state_0.joint_qd.assign(qd)
+
+    def _advance_fill(self):
+        """The fill area is finished (both cells spread to MAX_FILL and rolled): it moves on, as the excavator does
+        along the bank. The finished fill is recorded as placed and taken out of the simulation, and the dozer and
+        roller start again on fresh ground at the same place (nothing physical moves, as with the pit). Only while
+        no carrier is at the dump, so no soil is in the air."""
+        z, r = self.zones, self.roller
+        m = z.region_mask("spoil")
+        z.settle(m)
+        rec = {"t": round(self.sim_time, 1), "placed_t": round(float(z.count_np[m].sum()) * self.particle_mass / 1000, 2),
+               **z.compaction("spoil"), "cells": [z.compaction("spoil", r.cell_points(c)) for c in range(len(self.dozer.grades))]}
+        counts = z.count_np.copy()
+        counts[m] = 0
+        z.set_counts(counts)
+        z.col_passes[m] = 0
+        z.unpress_empty()
+        self.fill_advances.append(rec)
+        self.dozer.advance()
+        r.left.clear()
 
     def _press_tracks(self):
         """Ruts and compaction: each pass of the dozer's and carriers' tracks presses the loose soil under them

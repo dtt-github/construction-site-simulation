@@ -2308,3 +2308,25 @@ Section 27's four-carrier shift left the spread lifts worse rolled before they w
 - **One dry-sand lift reached only 81 %,** though 97 % of it was passed six times: loose sand slid onto rolled columns after they were rolled, and over 0.08 m that counts as a new layer. The roller also left two dry-sand lanes after 12 passes, which it did not before the spill rule. Dry sand is the one soil where a bump keeps flowing under the drum.
 - **The dozer waits as long as before in the shift (771 s), now for rolling it needs.** Output is 3 % lower, within the run-to-run spread at this tonnage. The particle pool ran short 489 times (900 in section 27). What the spoil area takes is still the shift's limit (section 27): one shared dump point, busy about a third of the shift.
 - No collisions, give-ways or stuck machines in any run.
+
+## A living site, 29: what the fill area takes
+
+Section 27 found the spoil area to be the four-carrier shift's limit. A per-second log of the dozer and the roller over that 2400 s shift (four carriers, two loading spots, 300 m haul, loam) showed where the time went: the dozer worked 54 % of it, was kept off by carriers 29 % (parked 420 s, waiting clear 219 s, driving to its park 46 s), held for the roller about 10 % and was parked with nothing to spread about 10 %. The carriers hardly waited at the dump (0 s). The design surface rose 0.3 m every 600 s or so, so the fill area would reach its 1.5 m maximum in about 50 minutes. The dump point was not the limit; the fill area's capacity was.
+
+- **The fill area moves on when it is full.** Once both cells are spread to `MAX_FILL` and the roller has rolled them, the dozer parks (`Dozer.topped`), and the site records the finished fill (tonnage, density and rolled share, whole area and per cell, `fill_advances`), removes it, and starts both cells again at the first lift (`ExcavatorSim._advance_fill`, `Dozer.advance`), as `_relocate` slides the pit under the excavator. The machines' travel to the next area is not charged. In a check with the maximum set to one lift (the old 8.2 m lanes, 1200 s), the area was full at about 630 s and moved on at 854 s with 60.6 t placed. The two cells were 94 and 100 % rolled at 1.05 and 1.03 of bank density, and the whole area 40 % rolled, counting the heaps beside the lanes. The dozer and roller then started on fresh ground with no collisions. The dozer stood about 220 s while the roller rolled the last lift; a real one would go on to the next area.
+- **In a full hour the area did not fill, and the soil piled up instead.** Over 3600 s each cell reached 1.2 m. Unspread soil grew from 32 m³ at 2400 s to 53 m³, with a heap 6.1 m above grade at the dump point. On 8.2 m lanes, a 0.3 m lift on one cell holds only about 2.5 loads, so the dozer and roller changed cells every few minutes and waited on each other; each worked about 65 % of the hour.
+- **The lanes are now 11.2 m long** (`DOZER_X_END` 33.4 → 36.4 m; the roller's lanes to x 38, its park at x 40.5, and the ground and spoil heightmap to x 42), 31 % more area (128 m²).
+
+**Benchmark** (loam, two loading spots, 300 m haul, 3600 s; logs `logs/haul_bench_lanes*_2side_*.json`):
+
+| Run | Loaded | Unspread at the end | Heap above grade | Spread RMS from grade | Dozer holding for the roller | Roller working | Excavator waiting | Lifts rolled when covered |
+|---|---|---|---|---|---|---|---|---|
+| 8.2 m lanes, 4 carriers | 293 t/h | 53 m³ | 6.1 m | 1.32 m | 873 s | 65 % | 0 s | 93–100 % (one 0 %*) |
+| 11.2 m lanes, 4 carriers | 296 t/h | 46 m³ | 5.7 m | 1.06 m | 1110 s | 68 % | 18 s | 96–97 % |
+| 11.2 m lanes, 3 carriers | 265 t/h | 28 m³ | 3.6 m | 0.66 m | 902 s | 65 % | 392 s | 92–97 % |
+
+\* the first switch, onto a cell with no lift yet.
+
+- **The longer lanes helped only a little: the roller is now the limit.** On a cell of four 11.2 m lanes, the roller takes about 107–117 s a lane, of which about 60 s is rolling: six passes at 4 km/h. The rest is reversing between passes and moving between lanes. That is about 470 s a cell-lift, about 160 m³ an hour of bank volume (about half the textbook W·S·L·E/N figure, 330 m³ an hour compacted, for long strips at 83 % efficiency), and four carriers deliver about 160. Every minute lost to changing cells or giving way becomes backlog. Real fills roll strips 30–100 m long, which the soil region here cannot hold. The roller's 4 km/h is mid-range for soil, and its spin turns are already quicker than an articulated roller's three-point turn.
+- **Three carriers roughly match one dozer and one roller on this area.** The unspread soil at the end was 40 % less, and the heap 3.6 m against 5.7 m. The excavator then waits 392 s for carriers (11 %), so loading falls by 10 %. The dozer still holds about 25 % of the hour, so even three carriers keep the roller near its limit; a site at four would add a second roller.
+- Every lift was covered at least 92 % rolled. No collisions, give-ways or stuck machines in any run. With a single run each, these figures carry the usual spread (about 2 % in loam).

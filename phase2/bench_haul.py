@@ -165,6 +165,7 @@ out = {
                         for k in range(len(sim.roller.cell_lanes))] if sim.use_roller else None,
     # each cell's soil as the dozer started a new lift on it, so it does not depend on where the dozer is at the end
     "covered_lifts": sim.covered_lifts if sim.use_roller else None,
+    "fill_advances": sim.fill_advances if sim.use_roller else None,
     # machines kept apart (traffic.py): waits per machine, and frames any two outlines overlapped
     "traffic": {"collision_frames": sim.collisions, **sim.traffic.counters()},
     # each machine's cycle split into elements, as a field time study times them (timestudy.py)
