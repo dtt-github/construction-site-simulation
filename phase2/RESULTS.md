@@ -2358,3 +2358,27 @@ The excavator made 193–194 passes in every run, so loading is the same; the lo
 - Single runs each; loam runs differ by about 2 % between seeds.
 
 Logs: `logs/haul_bench_pushfix_2side_4carrier_1roller.json`, `logs/haul_bench_wide_2side_4carrier_2roller.json`.
+
+## A living site, 31: the dozer keeps working while the roller finishes
+
+Section 30 left the dozer's waiting as the next thing to cut. A per-second log of the dozer over the two-roller hour (once soil had begun to arrive) split its time into spreading (58 %), held for the roller but still pushing (18 %), parked while carriers tip (13 %), parked to make way for the roller (10 %), and parked with nothing to push (under 0.1 %). While it was held or making way, 14–18 m³ piled up in its lanes against 1–6 m³ of room below grade.
+
+- **The cause was the handover between cells.** Before the dozer moves to the other cell, the roller finishes that cell's edge lane. Any dozer push counted as blocking that lane, so the dozer parked until the roller was done. Only the dozer's innermost lane passes near the edge lane, though (x 24.2–31.1); its other lanes never do.
+- **Now the roller is kept off only by the lane the dozer is pushing** (`roller_keep_off_by_lane`). When the dozer has to make way, or a roller is rolling the edge lane, the dozer leaves that one lane alone (`Dozer.spare`) and pushes the others. It parks only when nothing else needs pushing.
+
+**Benchmark** (loam, four carriers, two loading spots, 300 m haul, 4 m moves along the bank, 3600 s):
+
+| Run | Loaded | Unspread at the end | Heap above grade | Spread RMS from grade | At grade | Dozer held | Dozer parked | Made way | Dozer work | Rollers parked | Lifts rolled when covered |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| one roller (§30) | 301 t/h | 29 m³ | 2.8 m | 0.70 m | 45 % | 1,158 s | 987 s | 8 | 12.3 MJ | 34 % | 7 lifts, 91–97 % (one 46 %) |
+| one roller, spare lane | 297 t/h | **19 m³** | **2.0 m** | **0.60 m** | 46 % | **433 s** | **442 s** | **0** | 14.9 MJ | **19 %** | **8 lifts, 94–100 %** |
+| two rollers, 6-lane cells (§30) | 295 t/h | 77 m³ | 6.9 m | 1.50 m | 26 % | 1,123 s | 1,105 s | 5 | 10.0 MJ | 58 % | 6 lifts, 96–97 % (one 56 %) |
+| two rollers, 6-lane cells, spare lane | 289 t/h | 80 m³ | 7.1 m | 1.62 m | 32 % | 169 s | 521 s | 0 | 10.7 MJ | 53 % | 5 lifts, 92–98 % |
+
+The excavator made 193–194 passes in every run, so loading is the same.
+
+- **With one roller the fill area now keeps up much better with four carriers.** The unspread soil fell from 29 to 19 m³, and the dozer did 21 % more work in the same hour. The roller is no longer kept waiting behind a parked dozer either: it rolled 31 lanes against 22, and every lift was at least 94 % rolled when covered. No lift went on unrolled soil, and no hour had a collision.
+- **On the wide fill the freed time did not become work.** The dozer was held and parked 1,538 s less, yet did only 7 % more work, and 33 of its 95 pushes carried under 2 kN. With 182 m² to keep at grade, its lanes are long and fanned, and much of its time goes on driving them. One dozer cannot feed two rollers there; a second dozer, or a fill layout with shorter pushes, is the next step for that site.
+- Futile pushes rose with one roller (17 to 27), as the dozer now works lanes it used to leave while parked. Single runs each; loam runs differ by about 2 % between seeds.
+
+Logs: `logs/haul_bench_spare_2side_4carrier_1roller.json`, `logs/haul_bench_spare_wide_2side_4carrier_2roller.json`.

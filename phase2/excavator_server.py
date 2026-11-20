@@ -774,10 +774,14 @@ class ExcavatorSim:
         self.roller_counters = {"rolled": 0}
         # per cell, the roller's lanes that pass within the clearance of the dozer's pushes in the other cell: it
         # leaves them while the dozer works (traffic.py)
-        self.roller_keep_off = []
+        # roller_keep_off_by_lane[cell][k]: those beside the dozer's lane k there alone; on the fanned lanes only the
+        # innermost comes near the other cell's edge lane, so while the dozer works the others the roller may roll it
+        self.roller_keep_off, self.roller_keep_off_by_lane = [], []
         for cell, lanes in enumerate(self.roller.cell_lanes):
-            pushes = self.dozer.push_poses(1 - cell) if cell < len(self.dozer.cell_lanes) else []
-            self.roller_keep_off.append({k for k, y in enumerate(lanes) if traffic_mod.near("roller", self.roller.lane_poses(y), "dozer", pushes)})
+            by_lane = [{k for k, y in enumerate(lanes) if traffic_mod.near("roller", self.roller.lane_poses(y), "dozer", self.dozer.push_poses(1 - cell, lane=j))}
+                       for j in range(len(self.dozer.cell_lanes[1 - cell]))] if cell < len(self.dozer.cell_lanes) else []
+            self.roller_keep_off_by_lane.append(by_lane)
+            self.roller_keep_off.append(set().union(*by_lane))
         # every mobile machine keeps clear of the others (traffic.py): the carriers first, so zip(fleet, machines)
         self.traffic = traffic_mod.Traffic()
         for k, c in enumerate(self.fleet):
@@ -1779,7 +1783,9 @@ class ExcavatorSim:
             r = self.roller
             rolled = lambda xy, n: self.zones.rolled_share(xy, ("spoil",), n)
             grade = lambda cell: dz.grades[cell] if cell < len(dz.grades) else max(dz.grades)  # the strip: the higher cell's
-            keep_off = lambda cell: () if dz.parked else self.roller_keep_off[cell]  # lanes beside the dozer's pushes
+            # lanes beside the dozer's pushes: its lane's, or all of them while it is between lanes
+            keep_off = lambda cell: () if dz.parked else (self.roller_keep_off[cell] if dz.lane is None or cell != 1 - dz.cell
+                                                          else self.roller_keep_off_by_lane[cell][dz.lane])
             if self.zone_frame % 30 == 0:  # the other cell is rolled: the roller has no lane left there (lanes
                 # under an unspread heap wait for the dozer)
                 # a cell the dozer has spread and left is finished: the roller rolls its lanes as they stand, a
@@ -1793,6 +1799,10 @@ class ExcavatorSim:
                 # the roller has left there, the dozer pulls back to its park to let the roller in
                 dz.make_way = dz.hold_since is not None and not dz.may_switch and not r.has_work(
                     1 - dz.cell, rolled, self._surface, grade(1 - dz.cell), self.roller_keep_off[1 - dz.cell])
+                # the dozer's lanes it leaves alone: those beside a lane a roller is on in the other cell, and while it
+                # makes way, all that pass beside that cell's lanes (it works the others instead of parking)
+                by_lane = self.roller_keep_off_by_lane[1 - dz.cell]
+                dz.spare = {k for k, ko in enumerate(by_lane) if ko and (dz.make_way or any(q.cell == 1 - dz.cell and q.lane in ko for q in self.rollers))}
         switches = dz.counters["switches"]
         self.traffic.step(self.traffic_dozer, lambda: dz.update(self.frame_dt, self._surface, self.blade_force, may_work), self.frame_dt)
         if self.use_roller and dz.counters["switches"] > switches:  # the dozer starts a lift on this cell: the soil it

@@ -26,8 +26,9 @@ dump line), spread one at a time: when a cell's layer is full, spreading moves t
 lift starts, if it was spread before), and this one is rolled. If the site says the other cell is not rolled
 yet (any soil there, spill on a cell not yet filled too), the dozer holds: it keeps spreading its own cell (no new lift there) until the roller is done, or for at
 most HOLD_MAX_S, after which the next lift goes on unrolled soil (counted as lifts_on_unrolled). When the
-roller's only lanes left there lie beside the dozer's pushes (kept off while it works), the site sets make_way and
-the dozer waits at its park instead, so the roller can roll them. The carrier
+roller's only lanes left there lie beside the dozer's pushes (kept off while it works on the lanes beside them), the
+site sets make_way and the dozer leaves those lanes (spare) and works the others; only with nothing else to push does
+it wait at its park, so the roller can roll them. The carrier
 must not dump while the dozer works there: the server recalls the dozer when the carrier leaves the loading spot,
 and holds the carrier at its turn point until the dozer is clear. A push under way is finished, and the dozer waits
 at the lane's end with the blade up (where its outline keeps WAIT_CLEAR_GAP from the dumping carrier's, traffic.py) until the carrier has tipped and gone, then
@@ -157,6 +158,7 @@ class Dozer:
         self.full = [False] * len(self.cell_lanes)  # the cell's lift is spread
         self.may_switch = False  # set by the site: the other cell is rolled
         self.hold_since = None  # when the dozer started waiting for the other cell to be rolled
+        self.spare = set()  # set by the site: lanes it leaves alone, as their pushes pass beside a lane being rolled
         self.make_way = False  # set by the site: while it waits, the roller's last lanes there lie beside its pushes
         self.topped = False  # both cells are spread at the top lift: the fill area is finished, the dozer parks
         self.stage, self.stage_time, self.time = "parked", 0.0, 0.0
@@ -321,10 +323,11 @@ class Dozer:
         """Cutting edge ahead of base_link with the blade down (m)."""
         return float((ARM_PIVOT + rot_y(LIFT_HI) @ (BLADE_ON_ARM + EDGE))[0])
 
-    def push_poses(self, cell, step=0.25):
-        """Base poses (x, y, yaw) along every push of a cell, from the start to the far end of its lane."""
+    def push_poses(self, cell, step=0.25, lane=None):
+        """Base poses (x, y, yaw) along every push of a cell (or of one lane), from the start to the far end of its lane."""
+        lanes = self.cell_lanes[cell] if lane is None else [self.cell_lanes[cell][lane]]
         return [(*(self.start + s * np.array([math.cos(th), math.sin(th)])), th)
-                for th, L in self.cell_lanes[cell] for s in np.arange(0.0, L + step, step)]
+                for th, L in lanes for s in np.arange(0.0, L + step, step)]
 
     def wants_work(self, surface):
         """Whether the dozer, parked, would go out to spread (a lane with soil to push, or a new load)."""
@@ -392,9 +395,12 @@ class Dozer:
         elif self.hold_since is not None and len(self.cell_lanes) > 1:
             self.counters["held_s"] += self.time - self.hold_since  # the soil was spread below the lift while it waited
             self.hold_since = None
-        if self.hold_since is not None and self.make_way:
-            # waiting, and the roller can only finish the other cell on the lanes beside this one's pushes: the
-            # dozer stops trimming and pulls back to its park so the roller may roll them
+        score = np.minimum(soil, room)
+        score[list(self.blocked | self.spare)] = 0.0
+        if self.hold_since is not None and self.make_way and score.max() < DONE_M3:
+            # waiting, and the roller can only finish the other cell on the lanes beside this one's pushes (spare),
+            # with no other lane to work: the dozer pulls back to its park so the roller may roll them. With other
+            # lanes to work it keeps to those (section 31; it used to park at once)
             if self.lane is not None or not self._at_park():
                 self.counters["made_way"] += 1
             self.lane = None
@@ -406,8 +412,6 @@ class Dozer:
             self.blocked.clear()
             self.area_soil = 0.0
             return []
-        score = np.minimum(soil, room)
-        score[list(self.blocked)] = 0.0
         if score.max() < DONE_M3:
             self.lane = None
             return [] if self._at_park() else self._to_park()
