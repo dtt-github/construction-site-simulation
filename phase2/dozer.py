@@ -170,6 +170,7 @@ class Dozer:
         self.force = 0.0  # soil resisting the blade along the heading (N), low-passed
         self.load_lift = False
         self.empty_t = 0.0
+        self.soil_until = 0.0  # m along the lane in hand to the last soil above grade in its heap part
         self.prev = None
         self.v, self.w = np.zeros(3), np.zeros(3)
         self.counters = {"passes": 0, "push_m": 0.0, "work_MJ": 0.0, "load_lifts": 0, "lifts_raised": 0, "parked_s": 0.0, "working_s": 0.0, "peak_kN": 0.0, "slip_s": 0.0, "slip_m": 0.0, "futile_passes": 0,
@@ -416,6 +417,13 @@ class Dozer:
         moves = [] if at_lane else self._to_start()
         moves += [("lift", "up"), ("spin", th), ("lift", "grade"), ("push", *(self.start + d * L)), ("lift", "raise"), ("drive", *self.start, -1, SPEED_REVERSE, "back")]
         self.lane, self.pass_soil = k, soil[k]
+        # where the lane's soil ends: on a lane fanning out steeply the blade crosses the heap's flank and bare
+        # ground before it reaches the soil further along (spilled beside the lanes next to it), and a push that
+        # ended as soon as the blade ran empty never got there (section 30)
+        pts = self._swath(k, 0.0, HEAP_PART)
+        s_along = (pts - np.array([self.x_start, self.y_start])) @ d
+        above = surface(pts) - self.grade - TOL > 0.0
+        self.soil_until = float(s_along[above].max()) if above.any() else 0.0
         return moves
 
     # ------------------------------------------------------------------ motion
@@ -562,7 +570,9 @@ class Dozer:
         self._push_sum[0] += F * dt
         self._push_sum[1] += dt
         # the blade is empty once past the soil: end the pass early
-        past_start = self.edge()[0] > self.x_start + 1.5
+        th = self.lanes[self.lane][0] if self.lane is not None else 0.0
+        along = (self.edge()[0] - self.x_start) * math.cos(th) + (self.edge()[1] - self.y_start) * math.sin(th)
+        past_start = self.edge()[0] > self.x_start + 1.5 and along > self.soil_until
         self.empty_t = self.empty_t + dt if (F < EMPTY_N and past_start and not self.load_lift) else 0.0
         if self.empty_t > EMPTY_S:
             self.speed = 0.0

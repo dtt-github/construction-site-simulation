@@ -81,12 +81,17 @@ class Machine:
             keep["base"] = o.base.copy()
         else:
             keep["x"], keep["y"] = o.x, o.y
+        if hasattr(o, "traffic_save"):
+            keep["more"] = o.traffic_save()  # what else the machine decided this frame (the roller's lane in hand, its pass count)
         return keep
 
     def restore(self, keep):
         o = self.obj
         for k, v in keep.items():
-            setattr(o, k, v)
+            if k == "more":
+                o.traffic_restore(v)
+            else:
+                setattr(o, k, v)
         o.speed = 0.0
 
 
@@ -117,13 +122,16 @@ class Traffic:
             return update()
         x0, y0, _ = m.pose()
         before = {id(o): math.hypot(o.pose()[0] - x0, o.pose()[1] - y0) for o in self.blocked_by(m)}
+        touching = {i for i, o in enumerate(self.machines) if id(o) in before and overlap(self.outline(m), self.outline(o))}
         keep = m.save()
         result = update()
         if not m.present():
             return result
         x1, y1, _ = m.pose()
         # a machine it was clear of, or one it was already close to and now comes closer to
-        now = [o for o in self.blocked_by(m) if id(o) not in before or math.hypot(o.pose()[0] - x1, o.pose()[1] - y1) < before[id(o)] - 1e-6]
+        # (or one it now touches and did not: a spin keeps the distance but can swing the outline into the other)
+        now = [o for o in self.blocked_by(m) if id(o) not in before or math.hypot(o.pose()[0] - x1, o.pose()[1] - y1) < before[id(o)] - 1e-6
+               or (self.machines.index(o) not in touching and overlap(self.outline(m), self.outline(o)))]
         if now:
             m.restore(keep)
             if m.wait_s == 0.0:

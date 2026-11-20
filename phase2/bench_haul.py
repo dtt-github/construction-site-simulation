@@ -40,7 +40,8 @@ relocate_m = float(os.environ.get("RELOCATE_M", "0"))  # move on along the bank 
 max_passes = int(os.environ.get("PASSES", "0")) or None
 roller = os.environ.get("ROLLER", "1") != "0"
 sides = int(os.environ.get("SIDES", "1"))  # 2: two-sided loading (a spot each side of the excavator; more than two carriers need HAUL_M)
-sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m, relocate_m=relocate_m, roller=roller, sides=sides)
+n_rollers = int(os.environ.get("ROLLERS", "1"))  # 2: a second roller on the fill area
+sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m, relocate_m=relocate_m, roller=roller, sides=sides, rollers=n_rollers)
 operator = os.environ.get("OPERATOR", "scripted")  # human: an operator who varies from cycle to cycle
 op_seed = int(os.environ.get("SEED", "0"))
 if operator == "human":
@@ -63,7 +64,8 @@ while sim.sim_time < secs and (max_passes is None or sim.passes < max_passes):
     if sim.use_dozer:
         study.add("dozer", "dozer", sim.dozer.stage, sim.frame_dt)
     if sim.use_roller:
-        study.add("roller", "roller", sim.roller.stage, sim.frame_dt)
+        for k, r in enumerate(sim.rollers):
+            study.add("roller" if k == 0 else f"roller{k}", "roller", r.stage, sim.frame_dt)
     if sim.stage_name != prev_stage:
         st, fill = sim.stage_name, round(sim._bucket_fill())
         if st == "approach" and cur is not None:
@@ -171,6 +173,7 @@ out = {
     # each machine's cycle split into elements, as a field time study times them (timestudy.py)
     "time_study": study.report(),
     "operator_paused_s": {k: round(v, 1) for k, v in sim.paused.items()},
-    "roller": {**{k: round(v, 2) for k, v in sim.roller.counters.items()}, **sim.roller_counters} if sim.use_roller else None,
+    # the rollers' counters summed (each roller's time study above)
+    "roller": {**{k: round(sum(r.counters[k] for r in sim.rollers), 2) for k in sim.roller.counters}, **sim.roller_counters, "rollers": len(sim.rollers)} if sim.use_roller else None,
 }
 print(json.dumps(out))

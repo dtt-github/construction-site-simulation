@@ -224,6 +224,15 @@ ROLLER_CELLS = ((-3.2, 4.6), (5.8, 13.6))  # y covered by each cell's lanes
 ROLLER_STRIP = (5.2 - roller_mod.DRUM_W / 2, 5.2 + roller_mod.DRUM_W / 2)
 ROLLER_STRIP_CELL = len(ROLLER_CELLS)
 ROLLER_PARK = (40.5, 5.2, math.pi)
+# with a second roller (four carriers bring more than one roller rolls on these short lanes, RESULTS section 29) the
+# fill area is wider: six lanes a cell instead of four, so the two rollers roll the same cell side by side, three lanes
+# (5.7 m) apart, the south one its south three lanes and the north one the rest. A roller turning in place sweeps a
+# circle 2.5 m across its corners: two lanes apart (3.8 m) they could not both turn at the lane ends, and on the four-lane
+# cells they jammed (section 30). The dozer's lanes fan out further to cover them; the rollers park beyond the ends
+ROLLER_CELLS_WIDE = ((-7.0, 4.6), (5.8, 17.4))
+DOZER_CELLS_WIDE = ((2.9, 0.7, -1.5, -3.6, -5.4), (7.5, 9.7, 11.9, 14.0, 15.8))
+ROLLER_PARKS_2 = ((40.5, 21.5, math.pi), (40.5, -11.0, math.pi))
+ROLLER_SEP_M = 5.4  # two rollers keep this far apart along y: both can turn in place (2 x 2.54 m corners + 0.3 m clearance)
 DOZER_SEES_SPEED = 1.0  # m/s: the dozer plans on all soil slower than this (dumped clay creeps for minutes)
 # soil thinner than this (two particle layers, about a quarter of a lift) is spill, not a lift: it does not make a
 # rolled lane unrolled, nor bare ground a lane to roll; the lift that covers it is rolled with it. Counting every
@@ -233,8 +242,8 @@ SPILL_M = 0.08
 ROAD_REGION = ("road", 13.3, -2.5, 134, 190, lambda x, y: np.full(np.shape(x), GROUND_Z))
 # the spoil area reaches 4.6 m past the dozer's lanes, for the soil carried ahead of the blade at the end,
 # and 2 m beside them, for the soil spilled off the blade's ends (soil outside a soil region never settles)
-SPOIL_REGION = ("spoil", 24.0, -5.5, 175, 220, lambda x, y: np.full(np.shape(x), GROUND_Z))
-SPOIL_HM = (24.0, -5.5, 175, 210)  # display heightmap of the spoil area: x0, y0, nx, ny (0.1 m cells)
+SPOIL_REGION = ("spoil", 24.0, -9.5, 175, 300, lambda x, y: np.full(np.shape(x), GROUND_Z))
+SPOIL_HM = (24.0, -9.5, 175, 300)  # display heightmap of the spoil area: x0, y0, nx, ny (0.1 m cells)
 # two-sided loading: ground south of the ground region (the south spot and its lane), and between it and the road
 SOUTH_REGION = ("south", 5.0, -4.5 - 44 * CELL, 237, 44, lambda x, y: ground_height(x, y))
 SOUTH_ROAD_REGION = ("south_road", 13.3, -4.5, 134, 25, lambda x, y: np.full(np.shape(x), GROUND_Z))
@@ -572,7 +581,7 @@ class ExcavatorSim:
         ("swing back", 0, 6.0, 2.6 + DIG_Z, -95),  # lowers while swinging, once clear of the truck
     ]
 
-    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, haul_m=0.0, relocate_m=0.0, command_response=False, roller=True, sides=1):
+    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, haul_m=0.0, relocate_m=0.0, command_response=False, roller=True, sides=1, rollers=1):
         wp.init()
         assert sides in (1, 2) and (sides == 1 or carriers >= 2), "two-sided loading: two carriers or more"
         self.sides = sides
@@ -675,7 +684,7 @@ class ExcavatorSim:
         # Pit: 6 x 5 m floor, sides 1V:1.5H up to ground level at |x| = 6.75, |y| = 6.25 (as in the site terrain).
         ground = newton.ModelBuilder.ShapeConfig(mu=0.6)
         b.add_shape_box(-1, xform=wp.transform(wp.vec3(10.0, 1.0, GROUND_Z / 2)), hx=3.25, hy=9.0, hz=GROUND_Z / 2, cfg=ground)  # behind the machine
-        b.add_shape_box(-1, xform=wp.transform(wp.vec3(27.625, 3.0, GROUND_Z / 2)), hx=14.375, hy=11.0, hz=GROUND_Z / 2, cfg=ground)  # haul road and spoil area
+        b.add_shape_box(-1, xform=wp.transform(wp.vec3(27.625, 5.0, GROUND_Z / 2)), hx=14.375, hy=17.0, hz=GROUND_Z / 2, cfg=ground)  # haul road and spoil area
         b.add_shape_box(-1, xform=wp.transform(wp.vec3(0.0, 8.1, GROUND_Z / 2)), hx=6.75, hy=1.85, hz=GROUND_Z / 2, cfg=ground)  # beside the pit, truck side
         # behind the walls on the -x and -y sides: site ground, where spill from the bucket lands
         b.add_shape_box(-1, xform=wp.transform(wp.vec3(-6.2, -3.05, GROUND_Z / 2)), hx=2.8, hy=5.95, hz=GROUND_Z / 2, cfg=ground)
@@ -750,12 +759,18 @@ class ExcavatorSim:
         self.carrier_track = tracks.Track(dumper_mod.SHOE_B, dumper_mod.TRACK_L, soil, loose=True)
         self.track_counters = {"dozer_pressed": 0, "carrier_pressed": 0}
         edge_ahead = Dozer._edge_ahead()
-        self.dozer = Dozer((DOZER_X_START - edge_ahead, DOZER_PARK_Y, math.pi / 2), (DOZER_X_START, BED_CENTER[1], DOZER_X_END, DOZER_CELLS), GROUND_Z, soil)
+        self.dozer = Dozer((DOZER_X_START - edge_ahead, DOZER_PARK_Y, math.pi / 2), (DOZER_X_START, BED_CENTER[1], DOZER_X_END, DOZER_CELLS if rollers == 1 else DOZER_CELLS_WIDE), GROUND_Z, soil)
         self.dozer.dump_pose = (HAUL_DUMP_X, BED_CENTER[1], math.pi)  # the carrier backs in facing -x
         self.blade_q, self.blade_qd = int(jq[joint_of[self.blade]]), int(jqd[joint_of[self.blade]])
         # the roller compacting the spread fill once the dozer has spread it
         self.use_roller = self.use_dozer and roller
-        self.roller = roller_mod.Roller(ROLLER_PARK, ROLLER_X, ROLLER_CELLS + (ROLLER_STRIP,), GROUND_Z)
+        parks = (ROLLER_PARK,) if rollers == 1 else ROLLER_PARKS_2[:rollers]
+        self.rollers = [roller_mod.Roller(park, ROLLER_X, (ROLLER_CELLS if rollers == 1 else ROLLER_CELLS_WIDE) + (ROLLER_STRIP,), GROUND_Z) for park in parks]
+        # each roller rolls its own share of a cell's lanes, the one nearest its park, so their routes never cross
+        # (on the strip, one lane, the south roller)
+        for part, r in enumerate(sorted(self.rollers, key=lambda r: r.park[1])):
+            r.part, r.parts = part, len(self.rollers)
+        self.roller = self.rollers[0]
         self.roller_counters = {"rolled": 0}
         # per cell, the roller's lanes that pass within the clearance of the dozer's pushes in the other cell: it
         # leaves them while the dozer works (traffic.py)
@@ -771,9 +786,12 @@ class ExcavatorSim:
         if self.use_dozer:
             self.traffic.add("dozer", "dozer", self.dozer)
             self.traffic_dozer = self.traffic.machines[-1]
+        self.traffic_rollers = []
         if self.use_roller:
-            self.traffic.add("roller", "roller", self.roller)
-            self.traffic_roller = self.traffic.machines[-1]
+            for k, r in enumerate(self.rollers):
+                self.traffic.add("roller" if k == 0 else f"roller{k}", "roller", r)
+                self.traffic_rollers.append(self.traffic.machines[-1])
+            self.traffic_roller = self.traffic_rollers[0]
         self.collisions = {}  # per pair of machines: frames their outlines overlapped
 
         cfg = SolverImplicitMPM.Config()
@@ -874,7 +892,9 @@ class ExcavatorSim:
         self.auto = False
         self.fleet.reset()
         self.dozer.reset()
-        self.roller.reset()
+        for r in self.rollers:
+            r.reset()
+            r.left = self.roller.left  # a lane left after MAX_PASSES is left by every roller
         self.traffic.reset()
         self.collisions = {}
         self.roller_idle_dozer = False  # the dozer is parked with nothing to spread
@@ -1765,6 +1785,8 @@ class ExcavatorSim:
                 # a cell the dozer has spread and left is finished: the roller rolls its lanes as they stand, a
                 # bump the dozer left too (otherwise the next lift buries the unrolled soil under it)
                 r.finished = {c for c in range(len(dz.grades)) if dz.full[c] and (c != dz.cell or dz.topped)}
+                for r2 in self.rollers[1:]:
+                    r2.finished = r.finished
                 dz.may_switch = not r.has_work(1 - dz.cell, rolled, self._surface, grade(1 - dz.cell))  # all its lanes, the
                 # ones beside the pushes too (rolled while the dozer is parked)
                 # while the dozer waits, its pushes keep the roller off the lanes beside them; once those are all
@@ -1782,11 +1804,18 @@ class ExcavatorSim:
                 other = 1 - dz.cell
                 self.roller_idle_dozer = dz.parked and not dz.wants_work(self._surface)
                 if r.has_work(other, rolled, self._surface, grade(other), keep_off(other)) or not self.roller_idle_dozer:
-                    r.set_cell(other, keep_off(other))
+                    cell, keep = other, keep_off(other)
                 else:
-                    r.set_cell(dz.cell if r.has_work(dz.cell, rolled, self._surface, grade(dz.cell)) else ROLLER_STRIP_CELL)
+                    cell, keep = (dz.cell if r.has_work(dz.cell, rolled, self._surface, grade(dz.cell)) else ROLLER_STRIP_CELL), ()
+                for r2 in self.rollers:  # every roller rolls the same cell
+                    r2.set_cell(cell, keep)
             may_roll = r.cell == 1 - dz.cell or (dz.parked and self.roller_idle_dozer)
-            self.traffic.step(self.traffic_roller, lambda: r.update(self.frame_dt, self._surface, may_roll, rolled, grade(r.cell)), self.frame_dt)
+            for k, (r2, m) in enumerate(zip(self.rollers, self.traffic_rollers)):
+                # never a lane closer than ROLLER_SEP_M to where another roller is or is heading
+                ys = [y for o in self.rollers if o is not r2 for y in (o.y, o.travel_target()) if y is not None]
+                r2.avoid = {j for j, y in enumerate(r2.lanes) if any(abs(y - oy) < ROLLER_SEP_M for oy in ys)}
+                self.traffic.step(m, lambda r2=r2, k=k: r2.update(self.frame_dt, self._surface, may_roll, rolled, grade(r2.cell),
+                                                                 lambda ty, k=k: self._roller_may_travel(k, ty)), self.frame_dt)
             if self.zone_frame % 30 == 0 and dz.topped and dz.parked and may_work and not any(
                     r.has_work(c, rolled, self._surface, grade(c)) for c in range(len(dz.grades))):
                 self._advance_fill()
@@ -1816,6 +1845,15 @@ class ExcavatorSim:
         self.dozer.advance()
         r.left.clear()
 
+    def _roller_may_travel(self, k, ty):
+        """A roller turns or drives to a lane or its park only when every other roller stands at least ROLLER_SEP_M
+        (along y) from all of its way there: then neither can swing or drive into the other, and as they keep that
+        gap whenever one moves, the one that waits always has a way once the other has moved on (their lane shares
+        keep them in order along the fill area, the south one south)."""
+        r = self.rollers[k]
+        lo, hi = min(r.y, ty), max(r.y, ty)
+        return all(o is r or o.y <= lo - ROLLER_SEP_M or o.y >= hi + ROLLER_SEP_M for o in self.rollers)
+
     def _press_tracks(self):
         """Ruts and compaction: each pass of the dozer's and carriers' tracks presses the loose soil under them
         denser by their sinkage (tracks.py, SoilZone.press); the dozer, following the surface, sits in its ruts."""
@@ -1830,8 +1868,9 @@ class ExcavatorSim:
             sink = self.carrier_track.sinkage(dumper_mod.MASS_KG + d.payload_kg)
             xy = tracks.footprint(d.base[0], d.base[1], d.yaw, dumper_mod.TRACK_X0, dumper_mod.HALF_GAUGE, dumper_mod.SHOE_B, dumper_mod.TRACK_L)
             self.track_counters["carrier_pressed"] += z.press(xy, sink, ("spoil", "road"), d, self.sim_time)
-        if self.use_roller and self.roller.stage == "roll":
-            self.roller_counters["rolled"] += z.roll(self.roller.drum_footprint(), ("spoil",), "roller", self.sim_time, roller_mod.LIFT_M, roller_mod.PASS_SHARE)
+        for k, r in enumerate(self.rollers if self.use_roller else []):
+            if r.stage == "roll":
+                self.roller_counters["rolled"] += z.roll(r.drum_footprint(), ("spoil",), "roller" if k == 0 else f"roller{k}", self.sim_time, roller_mod.LIFT_M, roller_mod.PASS_SHARE)
         z.unpress_empty()
 
     def _spoil_surface(self, hm, max_speed):

@@ -56,6 +56,7 @@ class Roller:
         """park: (x, y, yaw) where it waits; x_range: (x0, x1) of the drum along every lane; cells: (y0, y1)
         covered by each cell's lanes (it rolls one cell at a time)."""
         self.park, self.ground_z = park, ground_z
+        self.part, self.parts = 0, 1  # set by the site with two rollers: this roller rolls only its share of each cell's lanes (0: the south ones)
         self.x0, self.x1 = x_range
         step = DRUM_W - OVERLAP
         self.cell_lanes = []
@@ -73,10 +74,23 @@ class Roller:
         self.plan = []  # ("spin", yaw) | ("drive", x, y, dir, speed, stage)
         self.lane = None
         self.keep_off = set()  # lanes of the cell it may not roll now (next to the dozer's pushes)
+        self.avoid = set()  # set by the site: lanes of its cell too close to another roller's lane in hand
         self.lane_passes = 0  # passes over the lane in hand
         self.finished = set()  # set by the site: cells the dozer has spread and left (their bumps are rolled as they stand)
         self.left = {}  # (cell, lane): its shortfall when the roller left it after MAX_PASSES passes
         self.counters = {"lanes_rolled": 0, "roll_m": 0.0, "parked_s": 0.0, "working_s": 0.0, "passes": 0, "lanes_left": 0}
+
+    COUNTS = ("lanes_rolled", "roll_m", "passes", "lanes_left")
+
+    def traffic_save(self):
+        """What a frame may decide besides the pose and the plan: kept by the traffic check, which undoes a frame it holds back."""
+        return {"lane": self.lane, "lane_passes": self.lane_passes, "left": dict(self.left), "counts": {k: self.counters[k] for k in self.COUNTS}}
+
+    def traffic_restore(self, keep):
+        self.lane, self.lane_passes = keep["lane"], keep["lane_passes"]
+        self.left.clear()  # in place: the rollers share one dict (the site's)
+        self.left.update(keep["left"])
+        self.counters.update(keep["counts"])
 
     @property
     def parked(self):
@@ -149,7 +163,7 @@ class Roller:
         for k in range(len(self.lanes)):
             pts = self._lane_points(k)
             rough = (self.cell if cell is None else cell) not in self.finished and np.percentile(surface(pts), 90) - grade > ROUGH_M
-            s = 0.0 if rough or k in (self.keep_off if keep_off is None else keep_off) else 1.0 - rolled_share(pts, ROLL_PASSES)
+            s = 0.0 if rough or k in (self.keep_off if keep_off is None else keep_off) or (cell is None and (k in self.avoid or k * self.parts // len(self.lanes) != self.part)) else 1.0 - rolled_share(pts, ROLL_PASSES)
             key = (self.cell if cell is None else cell, k)
             if key in self.left:
                 if s > self.left[key] + NEW_SOIL_SHARE:
@@ -225,10 +239,17 @@ class Roller:
         self.pitch = math.atan2(front - rear, DRUM_X - AXLE_X)
         self.roll = math.atan2(h[0] + h[2] - h[1] - h[3], 2 * (DRUM_W - 0.4))
 
-    def update(self, dt, surface, may_work, rolled_share, grade):
+    def travel_target(self):
+        """The y it is heading for when its next move is a turn or a drive to a lane or the park, else None."""
+        if not self.plan or (self.plan[0][0] == "drive" and self.plan[0][5] == "roll"):
+            return None
+        drives = [m for m in self.plan if m[0] == "drive" and m[5] != "roll"]
+        return drives[-1][2] if drives else self.y
+
+    def update(self, dt, surface, may_work, rolled_share, grade, may_travel=None):
         """Advance one frame. surface(xy) -> ground and soil heights; may_work: the dozer is parked with
         nothing to spread; rolled_share(xy, passes) -> share of the soil there rolled that often; grade: the
-        design surface."""
+        design surface; may_travel(y) -> whether it may turn or drive towards y now (another roller may have the right of way)."""
         self.counters["parked_s" if self.parked else "working_s"] += dt
         if not may_work and self.lane is not None:
             self.plan, self.lane = self._to_park(), None  # the dozer has work: clear out
@@ -238,7 +259,10 @@ class Roller:
             self.plan = self._next_job(may_work, rolled_share, surface, grade)
             if not self.plan and self._at_park():
                 self.stage = "parked"
-        if self.plan:
+        held = self.plan and may_travel is not None and self.travel_target() is not None and not may_travel(self.travel_target())
+        if held:
+            self.speed = 0.0  # another roller near it has the right of way
+        elif self.plan:
             move = self.plan[0]
             if move[0] == "spin":
                 self.stage = "to park" if self.lane is None else "to lane"

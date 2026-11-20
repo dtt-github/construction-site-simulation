@@ -2330,3 +2330,31 @@ Section 27 found the spoil area to be the four-carrier shift's limit. A per-seco
 - **The longer lanes helped only a little: the roller is now the limit.** On a cell of four 11.2 m lanes, the roller takes about 107–117 s a lane, of which about 60 s is rolling: six passes at 4 km/h. The rest is reversing between passes and moving between lanes. That is about 470 s a cell-lift, about 160 m³ an hour of bank volume (about half the textbook W·S·L·E/N figure, 330 m³ an hour compacted, for long strips at 83 % efficiency), and four carriers deliver about 160. Every minute lost to changing cells or giving way becomes backlog. Real fills roll strips 30–100 m long, which the soil region here cannot hold. The roller's 4 km/h is mid-range for soil, and its spin turns are already quicker than an articulated roller's three-point turn.
 - **Three carriers roughly match one dozer and one roller on this area.** The unspread soil at the end was 40 % less, and the heap 3.6 m against 5.7 m. The excavator then waits 392 s for carriers (11 %), so loading falls by 10 %. The dozer still holds about 25 % of the hour, so even three carriers keep the roller near its limit; a site at four would add a second roller.
 - Every lift was covered at least 92 % rolled. No collisions, give-ways or stuck machines in any run. With a single run each, these figures carry the usual spread (about 2 % in loam).
+
+## A living site, 30: a second roller, and pushes that reach the soil
+
+Section 29 ended with the roller as the limit at four carriers, and the next step was a second roller (`ROLLERS=2`, `ExcavatorSim(rollers=2)`). The second roller parks at the fill area's south end; the first parks at the north end.
+
+- **Two rollers on the old cells jammed.** In the first hours the rollers' routes crossed and both stuck (29,390 collision frames). Splitting each cell's lanes into a half for each roller (`Roller.part`), and blocking a spin turn that would swing into another machine (`Traffic.step`), cleared the crossing. Traffic's undo of a blocked frame now restores a roller's lane, pass count and counters too (`traffic_save`/`traffic_restore`); before that, its pass counter ran to 27,514 in an hour. The rollers still deadlocked at the lanes' ends. A per-second log showed why: a roller spinning at a lane's end sweeps a 2.54 m radius, so two rollers turning there need at least 5.4 m between them in y, and lanes two apart are only 3.8 m.
+- **So two rollers get a wider fill area.** Each cell has six lanes 1.89 m apart (y −5.9 to 3.5 and 6.9 to 16.3), not four, with 182 m² of area against 128 m². The dozer's lanes fan out to match. A roller avoids lanes within 5.4 m of the other roller or of where it is driving to (`ROLLER_SEP_M`), and drives to another lane only when no roller is in that band (`_roller_may_travel`). With this layout, no hour had a collision, a give-way or a stuck machine.
+- **Two rollers did not move more soil, because the dozer could not spread more.** Both rollers were parked 58–60 % of the hour. The dozer was held for the edge-lane handover about as long as with one roller (1,016–1,123 s), and the rollers were both parked during only 55 s of those holds. The unspread soil grew to 77 m³.
+- **About a quarter of the dozer's pushes on the wide fill carried under 2 kN.** A push ended as empty once the blade had run nearly empty for 0.7 s, 1.5 m past the start. On the steep outer lanes of the fan, the blade crosses the side of the dump heap and then bare ground, so the push ended before it reached the soil further along, spilled beside the next lanes. That soil was why the lane had been picked, so the dozer picked it again, pushed nothing, and blocked it (35 futile passes in the hour). Now, when the dozer picks a lane, it notes where the last soil lies along the lane's heap part (`Dozer.soil_until`), and a push ends as empty only after the blade has passed that point. This applies with one roller too.
+
+**Benchmark** (loam, four carriers, two loading spots, 300 m haul, 4 m moves along the bank, 3600 s):
+
+| Run | Loaded | Unspread at the end | Heap above grade | Spread RMS from grade | At grade | Futile pushes | Dozer work | Rollers parked | Lifts rolled when covered |
+|---|---|---|---|---|---|---|---|---|---|
+| one roller, 4-lane cells (§29) | 296 t/h | 46 m³ | 5.7 m | 1.06 m | 41 % | 17 | 11.6 MJ | 32 % | 96–97 % |
+| one roller, push fix | 301 t/h | 29 m³ | 2.8 m | 0.70 m | 45 % | 17 | 12.3 MJ | 34 % | 91–97 % (one 46 %*) |
+| two rollers, 6-lane cells | 272 t/h | 77 m³ | 5.9 m | 1.50 m | 26 % | 35 | 6.7 MJ | 60 % | 95–97 % |
+| two rollers, 6-lane cells, push fix | 295 t/h | 77 m³ | 6.9 m | 1.50 m | 26 % | 19 | 10.0 MJ | 58 % | 96–97 % (one 56 %*) |
+
+\* the dozer's hold ran out (`HOLD_MAX_S`, 300 s) once, and a lift went on part-rolled soil.
+
+The excavator made 193–194 passes in every run, so loading is the same; the lower t/h of the first two-roller run comes from loads still on board at the end.
+
+- **The push fix did more than the second roller.** With one roller, the soil left unspread at the end of the hour fell from 46 to 29 m³, and the heap from 5.7 to 2.8 m. That is close to the three-carrier figure in §29 (28 m³, 3.6 m). So §29's limit was partly the dozer's short pushes, not only the roller.
+- **On the wide fill the dozer is the limit.** Its pushes now carry soil (19 futile against 35), but it has 42 % more area to keep at grade with the same machine. It is parked about 31 % of the hour, a large part of it while carriers tip, and held for the roller about 31 %. Two rollers stay an option (`ROLLERS=2`); the default is still one. The dozer's waiting is the next thing to cut.
+- Single runs each; loam runs differ by about 2 % between seeds.
+
+Logs: `logs/haul_bench_pushfix_2side_4carrier_1roller.json`, `logs/haul_bench_wide_2side_4carrier_2roller.json`.
