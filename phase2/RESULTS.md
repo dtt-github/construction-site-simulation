@@ -2382,3 +2382,20 @@ The excavator made 193–194 passes in every run, so loading is the same.
 - Futile pushes rose with one roller (17 to 27), as the dozer now works lanes it used to leave while parked. Single runs each; loam runs differ by about 2 % between seeds.
 
 Logs: `logs/haul_bench_spare_2side_4carrier_1roller.json`, `logs/haul_bench_spare_wide_2side_4carrier_2roller.json`.
+
+## A living site, 32: pushes that start on their own lane (not kept)
+
+Section 31 found that on the wide fill a third of the dozer's pushes carried under 2 kN. A per-second log showed why. Every push started from one base point at the dump line and turned there, so the cutting edge sat 2.5 m × sin(heading) to the side of its lane: 0.5 m on the inner lane, 1.5–1.7 m on the outer two, about the blade's half width. On the outer lanes the blade passed beside the heap the lane had been picked for.
+
+Three layouts that start each push with the cutting edge on its own lane were tried, each for one hour with one roller (loam, four carriers, two loading spots, 300 m haul, 3600 s):
+
+| Layout | Loaded | Unspread at the end | Heap above grade | Spread RMS from grade | Dozer held | Dozer parked | Pushes | Push cycle |
+|---|---|---|---|---|---|---|---|---|
+| one base point (§31) | 297 t/h | **19 m³** | **2.0 m** | 0.60 m | 433 s | **442 s** | **97** | **22.8 s** |
+| every lane from the heap centre | 292 t/h | 36 m³ | 3.5 m | 0.81 m | 678 s | 1,142 s | 49 | 35.2 s |
+| every lane 1.4 m into its cell | 289 t/h | 26 m³ | 3.8 m | 0.71 m | 47 s | 530 s | 71 | 30.7 s |
+| inner lane at the centre, the others 1.4 m in | 298 t/h | 24 m³ | 3.4 m | 0.59 m | **36 s** | 599 s | 78 | 26.8 s |
+
+- **The pushes carried more, but there were fewer of them.** Over the first 15 minutes on the wide fill, the mean blade force while pushing rose from 8.6 to 24 kN, and pushing with the blade nearly empty fell from 42 % to 3 %. But the dozer now had to drive to each lane's start before every push. That added 4–12 s a cycle, and it made a fifth to a half fewer pushes in the hour.
+- **Started from the heap centre, every lane's first 5–11 m passed beside the other cell's edge roller lane.** So the dozer stood aside whenever that lane was rolled. Shifting the starts into the cells cleared that, and the dozer was hardly held at all. Fully shifted, neither cell's blade reached the middle of the heap well.
+- **None of the layouts beat the single base point, so it stays.** The fault on the outer lanes is real, but it is not what limits spreading. Single runs each.
