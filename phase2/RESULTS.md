@@ -2457,3 +2457,20 @@ Phase 5 is done when the fill keeps up with four carriers. With the 16 m lanes a
 - No collision; no machine was held by another.
 
 Log: `logs/fill_trend_wide16_2roller.json` (the per-minute spread, the dozer's stage times and the waits).
+
+## A living site, 36: the dozer works the far half while a carrier tips. Not kept
+
+Section 35 found the dozer waiting 798 s of the hour at a lane's end while a carrier tips. The idea was to use that time: while a carrier is in, push the soil on the far half of a lane (from half its length), away from the dump point, and go back to whole lanes when the carrier has gone. The same one-hour run as section 35, with this change:
+
+| Time | 5 min | 10 min | 15 min | 20 min | 25 min | 30 min | 40 min | 50 min | 60 min |
+|---|---|---|---|---|---|---|---|---|---|
+| Unspread | 4 m³ | 22 m³ | 21 m³ | 24 m³ | 28 m³ | 18 m³ | 46 m³ | 48 m³ | 62 m³ |
+| Covered of 248 m² | 21 m² | 61 m² | 107 m² | 135 m² | 164 m² | 174 m² | 185 m² | 197 m² | 199 m² |
+| RMS from grade | 0.42 m | 0.82 m | 0.52 m | 0.51 m | 0.49 m | 0.38 m | 0.73 m | 0.72 m | 1.03 m |
+
+- **It does not help.** The unspread soil rises about 54 m³ an hour after the first 15 minutes, against 40 m³ in section 35. The difference may be run-to-run spread (section 34 saw 40 vs 50 m³ for the same setup), but it is no gain.
+- **Why: the far halves hold little soil.** The carriers tip at the lanes' start, so the soil to push is near the dump point. While a carrier was in (1,167 s of the hour), the dozer pushed only 100 s and drove to a lane 19 s; with no far job it waited (601 s) or drove off to park (407 s, against 210 s in section 35). Waiting near the dump point is not the loss; the soil just is not where the dozer may work.
+- Two faults found on the way, both only with this change: the dozer and a roller each waited for the other for 363 s, because the keep-off check missed a slanted lane at a 0.3 m gap (0.6 m fixed it); and after waiting with nothing to push, the dozer lowered its blade at the lane end. No collision in the hour; the dozer waited 2 s in all.
+- The change is reverted. To keep up, the spreading needs more push per hour where the soil is, for example a wider blade or a second dumping spot so the dozer can push one heap while a carrier tips at the other.
+
+Log: `logs/fill_trend_far_work.json` (the per-minute spread, the dozer's stage times, also while a carrier is in, and the waits).
