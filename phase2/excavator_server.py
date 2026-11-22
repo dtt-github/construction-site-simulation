@@ -741,7 +741,7 @@ class ExcavatorSim:
         self.sand_model = sb.finalize()
         self.n_particles = self.sand_model.particle_count
         self.swell = material["swell"]  # bank to loose volume of dug soil
-        long = dozers == 2 if long_fill is None else long_fill  # the longer fill lanes (LONG_X), by default with two dozers
+        long = (rollers == 2 or dozers == 2) if long_fill is None else long_fill  # the longer fill lanes (LONG_X), by default on the wide fill (section 34)
         self.spoil_dims = SPOIL_HM_LONG if long else SPOIL_HM
         regions = [TRUCK_REGION, GROUND_REGION, ROAD_REGION, SPOIL_REGION_LONG if long else SPOIL_REGION]
         if sides == 2:

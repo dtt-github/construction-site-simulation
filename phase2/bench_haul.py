@@ -42,7 +42,7 @@ roller = os.environ.get("ROLLER", "1") != "0"
 sides = int(os.environ.get("SIDES", "1"))  # 2: two-sided loading (a spot each side of the excavator; more than two carriers need HAUL_M)
 n_rollers = int(os.environ.get("ROLLERS", "1"))  # 2: a second roller on the fill area
 n_dozers = int(os.environ.get("DOZERS", "1"))  # 2: a heap dozer and a leveller
-long_fill = os.environ.get("LONG_FILL", "1" if n_dozers == 2 else "0") == "1"  # the 16 m fill lanes (section 33)
+long_fill = os.environ.get("LONG_FILL", "1" if (n_rollers == 2 or n_dozers == 2) else "0") == "1"  # the 16 m fill lanes (sections 33, 34)
 sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m, relocate_m=relocate_m, roller=roller, sides=sides, rollers=n_rollers, dozers=n_dozers, long_fill=long_fill)
 operator = os.environ.get("OPERATOR", "scripted")  # human: an operator who varies from cycle to cycle
 op_seed = int(os.environ.get("SEED", "0"))

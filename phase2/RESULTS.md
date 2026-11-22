@@ -2426,3 +2426,18 @@ The excavator made 193–194 passes in every run, so loading is the same. No run
 - **The 16 m lanes stay an option** (`LONG_FILL=1`, on by default with two dozers). The default site keeps the 11.2 m lanes until it is re-recorded. Single runs each; loam runs differ by about 2 % between seeds.
 
 Logs: `logs/haul_bench_long_wide_2side_4carrier_2roller.json`, `logs/haul_bench_long_wide_2side_4carrier_2roller_2dozer.json`.
+
+## A living site, 34: the 16 m lanes become the wide fill's default
+
+With two rollers (`ROLLERS=2`) or two dozers, the site now has the 16 m fill lanes of section 33 by default. `LONG_FILL=0` brings back the 11.2 m lanes. The single-roller site, the one in the recorded demo, keeps its 11.2 m lanes, so the demo does not change.
+
+A rerun of section 33's one-dozer, 16 m case, now reached by the default (same benchmark, 3600 s):
+
+| Run | Loaded | Unspread at the end | Heap above grade | Spread RMS from grade | Covered | Dozer work | Dozer parked | Lifts rolled when covered |
+|---|---|---|---|---|---|---|---|---|
+| §33, `LONG_FILL=1` | 288 t/h | 40 m³ | 4.1 m | 0.62 m | 218 of 248 m² | 16.7 MJ | 372 s | 4 lifts, 99–100 % |
+| default | 293 t/h | 50 m³ | 5.8 m | 0.79 m | 214 of 248 m² | 15.7 MJ | 456 s | 4 lifts, 99–100 % |
+
+The setup is the same; the two runs differ only by the sim's run-to-run spread. The rerun delivered 13 t more to the fill (274 against 261 t), which accounts for part of its extra 10 m³ unspread. Both stay well clear of the 11.2 m lanes' 80 m³ and 1.62 m. No collision or standoff.
+
+Log: `logs/haul_bench_wide16_2side_4carrier_2roller.json`.
