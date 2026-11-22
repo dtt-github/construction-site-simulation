@@ -424,16 +424,17 @@ async function spawn(assetName, pos, yawDeg, massOverride) {
 }
 
 // Terrain: flat working pad, rolling ground around it, a stockpile and an excavation pit.
-const TERRAIN = { size: 128, samples: 256 };
+const TERRAIN = { size: 192, samples: 384 }; // 0.5 m samples; reaches past the rollers' parks at x ≈ 69
 const smooth = (e0, e1, x) => {
   const t = Math.min(Math.max((x - e0) / (e1 - e0), 0), 1);
   return t * t * (3 - 2 * t);
 };
 function terrainHeight(x, z) {
-  // outside the pad (-30 < x < 62, |z| < 22) the ground rises into low rolling hills; the pad runs east to
-  // the site's edge for the carrier's haul road and spoil area (excavator_server.py)
-  const dx = Math.max(-x - 30, x - 62, 0);
-  const dz = Math.max(Math.abs(z) - 22, 0);
+  // outside the pad (-30 < x < 80, |z| < 22) the ground rises into low rolling hills; the pad runs east for the
+  // carrier's haul road, the spoil area and the rollers' parks (excavator_server.py), and widens to |z| < 28
+  // past x = 58 where the rollers park at z ≈ -9.5 and 23
+  const dx = Math.max(-x - 30, x - 80, 0);
+  const dz = Math.max(Math.abs(z) - 22 - 6 * smooth(58, 64, x), 0);
   const out = Math.hypot(dx, dz);
   const hills = 0.9 * Math.sin(x * 0.11) * Math.cos(z * 0.13) + 0.6 * Math.sin(x * 0.27 + z * 0.19) + 0.35 * Math.cos(x * 0.53 - z * 0.41);
   let h = smooth(0, 14, out) * (3.5 + hills + 1.2);

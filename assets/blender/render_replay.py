@@ -151,8 +151,8 @@ def terrain_height(x, z):
         t = np.clip((v - e0) / (e1 - e0), 0, 1)
         return t * t * (3 - 2 * t)
 
-    dx = np.maximum(np.maximum(-x - 30, x - 62), 0)
-    dz = np.maximum(np.abs(z) - 22, 0)
+    dx = np.maximum(np.maximum(-x - 30, x - 80), 0)
+    dz = np.maximum(np.abs(z) - 22 - 6 * smooth(58, 64, x), 0)
     out = np.hypot(dx, dz)
     hills = 0.9 * np.sin(x * 0.11) * np.cos(z * 0.13) + 0.6 * np.sin(x * 0.27 + z * 0.19) + 0.35 * np.cos(x * 0.53 - z * 0.41)
     h = smooth(0, 14, out) * (3.5 + hills + 1.2)
@@ -233,7 +233,7 @@ def ground_material(name, base_hex=None, vertex_colors=False, scale=6.0, bump=0.
 
 
 def build_terrain():
-    n, size = 256, 128.0
+    n, size = 384, 192.0
     xs = np.linspace(-size / 2, size / 2, n)
     X, Z = np.meshgrid(xs, xs)
     Hh = terrain_height(X, Z)
@@ -243,11 +243,11 @@ def build_terrain():
     col = col * np.random.default_rng(1).uniform(0.94, 1.06, Hh.shape)[..., None] * 0.72  # the viewer's colours, toned for a physical sky
     gm = ground_material("ground", vertex_colors=True)
     grid_mesh("site_terrain", n, n, xs, xs, Hh, gm, col.reshape(-1, 3))
-    # rolling country beyond the site out to the horizon (the site terrain is 128 m across)
+    # rolling country beyond the site out to the horizon (the site terrain is 192 m across)
     far = np.linspace(-700, 700, 141)
     FX, FZ = np.meshgrid(far, far)
     r = np.maximum(np.abs(FX), np.abs(FZ))
-    FH = np.where(r < 60, -8.0, 3.6 + 2.5 * np.sin(FX * 0.013) * np.cos(FZ * 0.017) + 1.5 * np.sin(FX * 0.031 + FZ * 0.023))
+    FH = np.where(r < 96, -8.0, 3.6 + 2.5 * np.sin(FX * 0.013) * np.cos(FZ * 0.017) + 1.5 * np.sin(FX * 0.031 + FZ * 0.023))
     fcol = np.tile(np.array(K.srgb("#7f8c55")) * 0.72, (FX.size, 1))
     grid_mesh("country", 141, 141, far, far, FH, gm, fcol)
 
