@@ -2245,7 +2245,8 @@ class ExcavatorSim:
         }
         if self.use_roller:  # the roller moves (frame trailer "ROL1"): drawn from its dimensions (base frame, z up)
             out["roller"] = {"drum_x": roller_mod.DRUM_X, "drum_r": roller_mod.DRUM_R, "drum_w": roller_mod.DRUM_W,
-                             "axle_x": roller_mod.AXLE_X, "wheel_r": roller_mod.WHEEL_R, "stages": roller_mod.STAGES}
+                             "axle_x": roller_mod.AXLE_X, "wheel_r": roller_mod.WHEEL_R, "stages": roller_mod.STAGES,
+                             "count": len(self.rollers)}  # a second roller follows "ROL1" in a "ROL2" trailer
         if self.use_dozer:  # the dozer moves (frame trailer "DOZ1"): its glTF, or these boxes, in URDF base_link frames
             out["dozer"] = {
                 "file": "assets/machinery/opera_d37pxi.glb",
@@ -2315,6 +2316,8 @@ class ExcavatorSim:
         if self.use_roller:  # trailer "ROL1": the roller's base pose (drum axle height) and stage
             r = self.roller
             tail += struct.pack("<4s7fI", b"ROL1", *self.to_three(r.base_pos()), *self.quat_to_three(r.base_quat()), roller_mod.STAGES.index(r.stage))
+            for r in self.rollers[1:2]:  # trailer "ROL2": the second roller, same layout (viewers that stop at "ROL1" ignore it)
+                tail += struct.pack("<4s7fI", b"ROL2", *self.to_three(r.base_pos()), *self.quat_to_three(r.base_quat()), roller_mod.STAGES.index(r.stage))
         return (head, grains, tail) if parts else head + grains + tail
 
     def _load_owner(self):

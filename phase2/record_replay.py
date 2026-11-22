@@ -52,6 +52,7 @@ def main():
     ap.add_argument("--soil", default=ex.soils.DEFAULT_SOIL)
     ap.add_argument("--carriers", type=int, default=None, help="site: carriers (default 2)")
     ap.add_argument("--sides", type=int, default=1, help="site: 2 loads from both sides of the excavator (two carriers)")
+    ap.add_argument("--rollers", type=int, default=1, help="site: 2 rolls the wide fill with two rollers (16 m lanes)")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     site = args.what == "site"
@@ -60,7 +61,7 @@ def main():
     n_grains = args.grains or (700 if site else 3000)
     max_s = args.max_s or (600.0 if site else 90.0)
 
-    sim = ex.ExcavatorSim(soil=args.soil, dozer=site, haul=site, carriers=(args.carriers or 2) if site else 1, sides=args.sides if site else 1)
+    sim = ex.ExcavatorSim(soil=args.soil, dozer=site, haul=site, carriers=(args.carriers or 2) if site else 1, sides=args.sides if site else 1, rollers=args.rollers if site else 1)
     sim.auto = True
     every = max(1, round(1 / (fps * sim.frame_dt)))
     frames, n, spread, rolled = [], 0, False, False
@@ -70,9 +71,9 @@ def main():
         n += 1
         if site:
             spread |= sim.dozer.stage == "push"
-            rolled |= spread and sim.roller.stage == "roll"
-            if rolled and sim.dozer.parked and sim.roller.parked:
-                break  # the first load is spread, rolled, and the dozer and the roller are back at their parks
+            rolled |= spread and any(r.stage == "roll" for r in sim.rollers)
+            if rolled and sim.dozer.parked and all(r.parked for r in sim.rollers):
+                break  # the first load is spread, rolled, and the dozer and the rollers are back at their parks
         elif sim.passes >= args.passes:
             break
         if n % every:

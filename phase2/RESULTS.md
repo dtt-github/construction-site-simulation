@@ -2441,3 +2441,19 @@ A rerun of section 33's one-dozer, 16 m case, now reached by the default (same b
 The setup is the same; the two runs differ only by the sim's run-to-run spread. The rerun delivered 13 t more to the fill (274 against 261 t), which accounts for part of its extra 10 m³ unspread. Both stay well clear of the 11.2 m lanes' 80 m³ and 1.62 m. No collision or standoff.
 
 Log: `logs/haul_bench_wide16_2side_4carrier_2roller.json`.
+
+## A living site, 35: does the wide fill keep up? Not yet
+
+Phase 5 is done when the fill keeps up with four carriers. With the 16 m lanes as default (section 34), the rolling keeps up: every lift is rolled 99–100 % before it is covered. To see whether the spreading keeps up too, a one-hour run of the default wide fill (one dozer, two rollers, same benchmark as section 34) logged the spread once a minute:
+
+| Time | 5 min | 10 min | 15 min | 20 min | 25 min | 30 min | 40 min | 50 min | 60 min |
+|---|---|---|---|---|---|---|---|---|---|
+| Unspread | 5 m³ | 4 m³ | 17 m³ | 21 m³ | 32 m³ | 30 m³ | 27 m³ | 42 m³ | 53 m³ |
+| Covered of 248 m² | 25 m² | 86 m² | 116 m² | 149 m² | 163 m² | 174 m² | 192 m² | 201 m² | 207 m² |
+| RMS from grade | 0.46 m | 0.21 m | 0.38 m | 0.37 m | 0.59 m | 0.48 m | 0.45 m | 0.62 m | 0.78 m |
+
+- **The heap grows all hour.** After the first 15 minutes, the unspread soil rises about 40 m³ an hour (a straight-line fit), with dips each time the dozer catches up on a lane. The 50 m³ at the end of section 34's run is the same trend, not just the last few loads. So the spreading does not keep up yet, and Phase 5 stays open.
+- **Where the dozer's hour goes:** pushing 1,297 s, backing 789 s, waiting at a lane's end for a carrier to tip and leave 798 s, parked 411 s, the rest driving and moving the blade. The 798 s of waiting is the biggest share it does not push, about a fifth of the hour. With four carriers, one is nearly always coming in to dump.
+- No collision; no machine was held by another.
+
+Log: `logs/fill_trend_wide16_2roller.json` (the per-minute spread, the dozer's stage times and the waits).
