@@ -2399,3 +2399,30 @@ Three layouts that start each push with the cutting edge on its own lane were tr
 - **The pushes carried more, but there were fewer of them.** Over the first 15 minutes on the wide fill, the mean blade force while pushing rose from 8.6 to 24 kN, and pushing with the blade nearly empty fell from 42 % to 3 %. But the dozer now had to drive to each lane's start before every push. That added 4–12 s a cycle, and it made a fifth to a half fewer pushes in the hour.
 - **Started from the heap centre, every lane's first 5–11 m passed beside the other cell's edge roller lane.** So the dozer stood aside whenever that lane was rolled. Shifting the starts into the cells cleared that, and the dozer was hardly held at all. Fully shifted, neither cell's blade reached the middle of the heap well.
 - **None of the layouts beat the single base point, so it stays.** The fault on the outer lanes is real, but it is not what limits spreading. Single runs each.
+
+## A living site, 33: a second dozer, and longer fill lanes
+
+Section 31 left one dozer unable to keep the wide fill at grade for two rollers. A second dozer was added (`DOZERS=2`). The heap dozer pushes each load half way along its lane (`LEVEL_FROM`), and the leveller carries it on to the far end, then parks east of the fill area.
+
+- **On the 11.2 m lanes the two could not both work.** Where they meet, the fanned lanes lie closer than a blade's width, so every lane of one conflicts with every lane of the other, and they take turns at a gate (`_may_enter`). With four carriers one is nearly always coming in to dump, and at half way the leveller's three inner lane starts overlap the dumping carrier itself. In a 15-minute check the leveller pushed for 3 s, and the heap dozer waited 480 s for it.
+- **So the lanes were lengthened to 16 m** (`LONG_X` = 4.8 m: the dozer's lanes, the rollers' lanes, their parks and the spoil area). There, none of the leveller's lane starts overlaps a dumping carrier, and none of its push ends overlaps a heap dozer push.
+- **Three standoffs were found and fixed on the way, each from a per-second log:**
+  - The leveller held the gate for its whole drive in from the park. It now drives to the far end of its lane without the gate and takes its turn only to back to the lane's start.
+  - It backed to its start beside a roller rolling the other cell's edge lane, and the two held each other for the rest of the hour. It now also waits until its lane is clear of the rollers and of the lanes they are rolling.
+  - When the heap dozer moved to the other cell, the leveller drove on into the old one, where the rollers now roll, and stopped one at its turn. It now goes out to its park first. Its park also moved 1 m further out, clear of a roller turning at the end of the dump line's lane.
+
+**Benchmark** (loam, four carriers, two loading spots, 300 m haul, 4 m moves along the bank, two rollers on 6-lane cells, 3600 s):
+
+| Run | Loaded | Unspread at the end | Heap above grade | Spread RMS from grade | Covered | Dozer work | Dozer parked | Lifts rolled when covered |
+|---|---|---|---|---|---|---|---|---|
+| one dozer, 11.2 m lanes (§31) | 289 t/h | 80 m³ | 7.1 m | 1.62 m | 143 of 182 m² | 10.7 MJ | 521 s | 5 lifts, 98–100 % (one 62 %) |
+| one dozer, 16 m lanes | 288 t/h | **40 m³** | 4.1 m | **0.62 m** | **218** of 248 m² | **16.7 MJ** | **372 s** | 4 lifts, 99–100 % |
+| two dozers, 16 m lanes | 296 t/h | 53 m³ | **3.9 m** | 0.76 m | 196 of 248 m² | 12.5 + 2.5 MJ | 685 s | 4 lifts, 97–100 % |
+
+The excavator made 193–194 passes in every run, so loading is the same. No run had a collision or a standoff.
+
+- **The longer lanes did the work, not the second dozer.** With one dozer, 16 m lanes halved the unspread soil (80 to 40 m³) and the spread's RMS from grade (1.62 to 0.62 m). The dozer did 56 % more work and was never held for a roller. The loads now spread over more length at the same lift, so each push carries soil further before the blade runs empty.
+- **A second dozer added nothing on top.** Together the two did 10 % less work than one alone, and left 53 m³ unspread against 40. The heap dozer waited 431 s for its turns with the leveller. The leveller made 25 pushes, gave up 14 times on a lane that stayed busy, and was parked for 1,160 s. While carriers keep coming to one tipping point, the soil arrives where only the heap dozer can reach it. A second dozer would need its own tipping point, or a fill long enough to keep the two apart.
+- **The 16 m lanes stay an option** (`LONG_FILL=1`, on by default with two dozers). The default site keeps the 11.2 m lanes until it is re-recorded. Single runs each; loam runs differ by about 2 % between seeds.
+
+Logs: `logs/haul_bench_long_wide_2side_4carrier_2roller.json`, `logs/haul_bench_long_wide_2side_4carrier_2roller_2dozer.json`.

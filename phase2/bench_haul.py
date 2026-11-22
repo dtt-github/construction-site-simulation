@@ -41,7 +41,9 @@ max_passes = int(os.environ.get("PASSES", "0")) or None
 roller = os.environ.get("ROLLER", "1") != "0"
 sides = int(os.environ.get("SIDES", "1"))  # 2: two-sided loading (a spot each side of the excavator; more than two carriers need HAUL_M)
 n_rollers = int(os.environ.get("ROLLERS", "1"))  # 2: a second roller on the fill area
-sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m, relocate_m=relocate_m, roller=roller, sides=sides, rollers=n_rollers)
+n_dozers = int(os.environ.get("DOZERS", "1"))  # 2: a heap dozer and a leveller
+long_fill = os.environ.get("LONG_FILL", "1" if n_dozers == 2 else "0") == "1"  # the 16 m fill lanes (section 33)
+sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m, relocate_m=relocate_m, roller=roller, sides=sides, rollers=n_rollers, dozers=n_dozers, long_fill=long_fill)
 operator = os.environ.get("OPERATOR", "scripted")  # human: an operator who varies from cycle to cycle
 op_seed = int(os.environ.get("SEED", "0"))
 if operator == "human":
@@ -63,6 +65,8 @@ while sim.sim_time < secs and (max_passes is None or sim.passes < max_passes):
         study.add(f"carrier{c.index}", "carrier", c.stage, sim.frame_dt)
     if sim.use_dozer:
         study.add("dozer", "dozer", sim.dozer.stage, sim.frame_dt)
+        if sim.leveller is not None:
+            study.add("dozer2", "dozer", sim.leveller.stage, sim.frame_dt)
     if sim.use_roller:
         for k, r in enumerate(sim.rollers):
             study.add("roller" if k == 0 else f"roller{k}", "roller", r.stage, sim.frame_dt)
@@ -156,6 +160,7 @@ out = {
     "thin_passes": sum(1 for x in done if x["at_swing_kg"] < 0.5 * sim.full_kg),
     "pass_log": pass_log,
     "dozer": {**{k: round(v, 2) for k, v in sim.dozer.counters.items()}, "mean_push_kN": sim.dozer.push_force},
+    **({"dozer2": {**{k: round(v, 2) for k, v in sim.leveller.counters.items()}, "mean_push_kN": sim.leveller.push_force}} if sim.leveller is not None else {}),
     "spread": sim.dozer.spread_report(sim._surface),
     "tracks": {"dozer_sinkage_cm": round(sim.dozer.sinkage * 100, 2), "dozer_pull_kN": round(sim.dozer.f_traction / 1000, 1),
                "dozer_slip": round(sim.dozer.counters["slip_m"] / max(sim.dozer.counters["slip_m"] + sim.dozer.counters["push_m"], 1e-9), 3),
