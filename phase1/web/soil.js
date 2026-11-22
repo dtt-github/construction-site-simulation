@@ -18,6 +18,7 @@ const MAGIC_CAR1 = 0x31524143; // "CAR1": crawler carrier trailer (one carrier; 
 const MAGIC_CARS = 0x53524143; // "CARS": crawler carriers trailer
 const MAGIC_DOZ1 = 0x315a4f44; // "DOZ1": dozer trailer
 const MAGIC_ROL1 = 0x314c4f52; // "ROL1": roller trailer
+const MAGIC_ROL2 = 0x324c4f52; // "ROL2": second roller trailer (follows "ROL1")
 const MAGIC_EXC3 = 0x33435845; // "EXC3": EXC2 + hydraulic cylinder and linkage poses, cylinder pressures
 
 export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, layerStatic, panel, view }) {
@@ -244,11 +245,25 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     const up = MODEL_UPGRADES[file];
     return up ? loader.loadAsync(`../${up}`).catch(() => loader.loadAsync(`../${file}`)) : loader.loadAsync(`../${file}`);
   };
-  // roller (roller.py): drawn from its dimensions, posed from the "ROL1" trailer
-  const roller = (window.__roller = { base: null, stages: [], stage: "" });
+  // rollers (roller.py): drawn from their dimensions, posed from the "ROL1" (and "ROL2") trailers. Each unit has
+  // its base group, the detailed model's spinning drum and wheels, and the distance it has rolled; window.__roller
+  // is the first unit (with .units listing all of them)
+  const roller = (window.__roller = { base: null, stages: [], stage: "", units: [] });
   function buildRoller(r) {
-    const paint = new THREE.MeshStandardMaterial({ color: "#e0a419", metalness: 0.3, roughness: 0.6 });
     roller.stages = r.stages;
+    const count = Math.max(1, r.count ?? 1);
+    for (let i = 0; i < count; i++) {
+      const u = i === 0 ? roller : { base: null, stage: "" };
+      u.base = new THREE.Group();
+      u.base.add(wrapZup(rollerBoxes(r)));
+      u.base.visible = false;
+      scene.add(u.base);
+      roller.units.push(u);
+    }
+    if (loader) loadRollerModel();
+  }
+  function rollerBoxes(r) {
+    const paint = new THREE.MeshStandardMaterial({ color: "#e0a419", metalness: 0.3, roughness: 0.6 });
     const g = new THREE.Group(); // base frame, z up: x ahead, base at the drum axle's height
     const cyl = (radius, width, x, mat) => {
       const m = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, width, 32), mat);
@@ -273,11 +288,7 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
     box([2.3, 1.6, 1.0], [r.axle_x + 0.6, 0, 0.55], paint); // engine and rear frame
     box([1.2, 1.4, 1.3], [r.axle_x + 0.9, 0, 1.6], glass); // cab
     box([0.9, 0.6, 0.5], [0.1, 0, 0.2], dark); // articulation
-    roller.base = new THREE.Group();
-    roller.base.add(wrapZup(g));
-    roller.base.visible = false;
-    scene.add(roller.base);
-    if (loader) loadRollerModel();
+    return g;
   }
 
   // detailed roller (assets/blender/roller_hd.py), same base frame as the boxes; the drum and rear wheels
@@ -290,28 +301,31 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       console.warn("roller: no detailed model, drawing boxes", err);
       return;
     }
-    const base = gltf.scene.getObjectByName("base_link");
-    if (!base) return;
-    base.position.set(0, 0, 0);
-    base.quaternion.identity();
-    const spin = base.userData?.spin_nodes ?? {};
-    roller.spinners = Object.entries(spin)
-      .map(([name, r]) => ({ node: base.getObjectByName(name), r }))
-      .filter((s) => s.node)
-      .map((s) => ({ ...s, rest: s.node.quaternion.clone() }));
-    roller.base.clear();
-    roller.base.add(wrapZup(base));
+    const model = gltf.scene.getObjectByName("base_link");
+    if (!model) return;
+    roller.units.forEach((u, i) => {
+      const base = i === 0 ? model : model.clone(true);
+      base.position.set(0, 0, 0);
+      base.quaternion.identity();
+      const spin = base.userData?.spin_nodes ?? {};
+      u.spinners = Object.entries(spin)
+        .map(([name, r]) => ({ node: base.getObjectByName(name), r }))
+        .filter((s) => s.node)
+        .map((s) => ({ ...s, rest: s.node.quaternion.clone() }));
+      u.base.clear();
+      u.base.add(wrapZup(base));
+    });
   }
   const _rollerFwd = new THREE.Vector3();
   const _rollerQ = new THREE.Quaternion();
   const _yAxis = new THREE.Vector3(0, 1, 0);
-  function spinRoller(prev) {
-    if (!roller.spinners?.length || !prev) return;
-    _rollerFwd.set(1, 0, 0).applyQuaternion(roller.base.quaternion);
-    const d = roller.base.position.clone().sub(prev).dot(_rollerFwd);
+  function spinRoller(u, prev) {
+    if (!u.spinners?.length || !prev) return;
+    _rollerFwd.set(1, 0, 0).applyQuaternion(u.base.quaternion);
+    const d = u.base.position.clone().sub(prev).dot(_rollerFwd);
     if (Math.abs(d) > 2) return; // a jump (reset, seek): don't spin
-    roller.travel = (roller.travel ?? 0) + d;
-    for (const s of roller.spinners) s.node.quaternion.copy(s.rest).multiply(_rollerQ.setFromAxisAngle(_yAxis, roller.travel / s.r));
+    u.travel = (u.travel ?? 0) + d;
+    for (const s of u.spinners) s.node.quaternion.copy(s.rest).multiply(_rollerQ.setFromAxisAngle(_yAxis, u.travel / s.r));
   }
   function buildExcavator(geom) {
     for (const name of ["house", "boom", "stick", "bucket"]) {
@@ -647,12 +661,15 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       f.dozer = { base: [0, 1, 2, 3, 4, 5, 6].map(g), lift: g(7), force: g(8), stage: dv.getUint32(o + 4 + 4 * 9, true) };
       o += 4 + 4 * 10;
     }
-    // roller trailer ("ROL1"): base pose, stage
-    if (o + 4 <= buf.byteLength && dv.getUint32(o, true) === MAGIC_ROL1) {
+    // roller trailers ("ROL1", then "ROL2" for a second roller, same layout): base pose, stage
+    f.rollers = [];
+    for (const magic of [MAGIC_ROL1, MAGIC_ROL2]) {
+      if (!(o + 4 <= buf.byteLength && dv.getUint32(o, true) === magic)) break;
       const g = (k) => dv.getFloat32(o + 4 + 4 * k, true);
-      f.roller = { base: [0, 1, 2, 3, 4, 5, 6].map(g), stage: dv.getUint32(o + 4 + 4 * 7, true) };
+      f.rollers.push({ base: [0, 1, 2, 3, 4, 5, 6].map(g), stage: dv.getUint32(o + 4 + 4 * 7, true) });
       o += 4 + 4 * 8;
     }
+    f.roller = f.rollers[0];
   }
 
   function handleFrame(buf) {
@@ -907,7 +924,8 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       }
     }
     if (f.dozer) rows.push(["Dozer", `${dozer.stage}${f.dozer.force > 0.5 ? ` · blade ${f.dozer.force.toFixed(0)} kN` : ""}`]);
-    if (f.roller) rows.push(["Roller", roller.stage]);
+    if (f.rollers?.length === 1) rows.push(["Roller", roller.stage]);
+    else if (f.rollers?.length > 1) roller.units.slice(0, f.rollers.length).forEach((u, i) => rows.push([`Roller ${i + 1}`, u.stage]));
     return rows;
   }
 
@@ -984,14 +1002,16 @@ export function startSoil({ THREE, scene, loader, Jolt, jolt, bodyInterface, lay
       dozer.stage = dozer.stages[z.stage] ?? "";
       dozer.force = z.force;
     }
-    if (f.roller && roller.base) {
-      roller.base.visible = true;
-      const prev = roller.base.position.clone();
-      roller.base.position.set(...f.roller.base.slice(0, 3));
-      roller.base.quaternion.set(...f.roller.base.slice(3));
-      spinRoller(prev);
-      roller.stage = roller.stages[f.roller.stage] ?? "";
-    }
+    roller.units.forEach((u, i) => {
+      const r = f.rollers?.[i];
+      if (!r) return; // a roller the frame doesn't carry stays where it was last drawn (hidden until first seen)
+      u.base.visible = true;
+      const prev = u.base.position.clone();
+      u.base.position.set(...r.base.slice(0, 3));
+      u.base.quaternion.set(...r.base.slice(3));
+      spinRoller(u, prev);
+      u.stage = roller.stages[r.stage] ?? "";
+    });
     if (f.spoilHm) {
       const t = f.spoilHm;
       if (!carrier.spoil) carrier.spoil = makeSurface(t.nx, t.ny, t.x0, t.z0, t.cell);

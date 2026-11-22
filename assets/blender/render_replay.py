@@ -359,23 +359,28 @@ def main():
         d = geom["dozer"]
         doz = Model(ROOT / UPGRADES.get(d["file"], d["file"]), {"base_link", d["arm_node"], d["cylinder_node"], d["piston_node"]})
         piston_axis = Vector((1.0055, 0, -0.056785)).normalized()  # soil.js pistonAxis (blade_arm_piston_joint)
-    rol = None
+    rols = []  # one model per roller ("ROL1", "ROL2" trailers), with its rolled distance per frame
     if "roller" in geom and (ROOT / "assets/machinery/roller_hd.glb").exists():
-        rol = Model(ROOT / "assets/machinery/roller_hd.glb", {"base_link", "drum", "wheel_l", "wheel_r"})
+        first = Model(ROOT / "assets/machinery/roller_hd.glb", {"base_link", "drum", "wheel_l", "wheel_r"})
+        n_rol = max([geom["roller"].get("count", 1)] + [len(f.get("rollers", [])) for f in frames])
+        rols = [first] + [first.clone() for _ in range(n_rol - 1)]
         spin_r = {"drum": geom["roller"]["drum_r"], "wheel_l": geom["roller"]["wheel_r"], "wheel_r": geom["roller"]["wheel_r"]}
         # roll distance over the whole recording (the drum turns by distance / radius), as soil.js spinRoller
-        travel, prev = [0.0], None
-        for f in frames:
-            r = f.get("roller")
-            d_ = 0.0
-            if r is not None and prev is not None:
-                q = Quaternion((r["base"][1][3], *r["base"][1][:3]))
-                fwd = q @ Vector((1, 0, 0))
-                step = Vector(r["base"][0]) - prev
-                d_ = step.dot(fwd) if step.length < 2 else 0.0
-            travel.append(travel[-1] + d_)
-            prev = Vector(r["base"][0]) if r is not None else prev
-        travel = travel[1:]
+        travels = []
+        for i in range(n_rol):
+            travel, prev = [0.0], None
+            for f in frames:
+                rs = f.get("rollers", [])
+                r = rs[i] if i < len(rs) else None
+                d_ = 0.0
+                if r is not None and prev is not None:
+                    q = Quaternion((r["base"][1][3], *r["base"][1][:3]))
+                    fwd = q @ Vector((1, 0, 0))
+                    step = Vector(r["base"][0]) - prev
+                    d_ = step.dot(fwd) if step.length < 2 else 0.0
+                travel.append(travel[-1] + d_)
+                prev = Vector(r["base"][0]) if r is not None else prev
+            travels.append(travel[1:])
 
     sel = [k for k, f in enumerate(frames) if T_FROM <= f["sim_t"] <= T_TO][::EVERY]
     if STILL:
@@ -424,12 +429,13 @@ def main():
                 })
             else:
                 doz.hide()
-        if rol is not None:
-            if "roller" in f:
-                b = place(*f["roller"]["base"])
+        for j, rol in enumerate(rols):
+            rs = f.get("rollers", [])
+            if j < len(rs):
+                b = place(*rs[j]["base"])
                 pose = {"base_link": b}
                 for n, rr in spin_r.items():
-                    pose[n] = b @ rol.rel("base_link", n) @ Matrix.Rotation(travel[k] / rr, 4, "Y")
+                    pose[n] = b @ rol.rel("base_link", n) @ Matrix.Rotation(travels[j][k] / rr, 4, "Y")
                 rol.pose(pose)
             else:
                 rol.hide()

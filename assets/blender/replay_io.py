@@ -13,7 +13,7 @@ import struct
 
 import numpy as np
 
-MAGIC = {"SOIL": 0x4C494F53, "EXC2": 0x32435845, "EXC3": 0x33435845, "CAR1": 0x31524143, "CARS": 0x53524143, "DOZ1": 0x315A4F44, "ROL1": 0x314C4F52}
+MAGIC = {"SOIL": 0x4C494F53, "EXC2": 0x32435845, "EXC3": 0x33435845, "CAR1": 0x31524143, "CARS": 0x53524143, "DOZ1": 0x315A4F44, "ROL1": 0x314C4F52, "ROL2": 0x324C4F52}
 HM_HEADER, P_HEADER = 16, 20
 
 
@@ -113,8 +113,13 @@ def decode(b):
         g = _f(b, o + 4, 9)
         f["dozer"] = {"base": (g[0:3], g[3:7]), "lift": g[7], "stage": struct.unpack_from("<I", b, o + 40)[0]}
         o += 44
-    if o + 4 <= len(b) and struct.unpack_from("<I", b, o)[0] == MAGIC["ROL1"]:
+    f["rollers"] = []
+    for tag in ("ROL1", "ROL2"):  # a second roller follows the first in "ROL2", same layout
+        if not (o + 4 <= len(b) and struct.unpack_from("<I", b, o)[0] == MAGIC[tag]):
+            break
         g = _f(b, o + 4, 7)
-        f["roller"] = {"base": (g[0:3], g[3:7]), "stage": struct.unpack_from("<I", b, o + 32)[0]}
+        f["rollers"].append({"base": (g[0:3], g[3:7]), "stage": struct.unpack_from("<I", b, o + 32)[0]})
         o += 36
+    if f["rollers"]:
+        f["roller"] = f["rollers"][0]
     return f
