@@ -253,7 +253,10 @@ ROAD_REGION = ("road", 13.3, -2.5, 134, 190, lambda x, y: np.full(np.shape(x), G
 # and 2 m beside them, for the soil spilled off the blade's ends (soil outside a soil region never settles)
 SPOIL_REGION = ("spoil", 24.0, -9.5, 175, 300, lambda x, y: np.full(np.shape(x), GROUND_Z))
 SPOIL_HM = (24.0, -9.5, 175, 300)  # display heightmap of the spoil area: x0, y0, nx, ny (0.1 m cells)
-SPOIL_REGION_LONG = ("spoil", 24.0, -9.5, 175 + 48, 300, SPOIL_REGION[5])  # with two dozers (LONG_X)
+# the wide fill (LONG_X, and lanes to y 15.8 with the dozer's park at y 16): in soil cells (CELL, 8 cm), 4.8 m
+# longer and 2.4 m wider than the narrow fill's area, to y 18.5 (sized in 0.1 m cells before, it ended 1 m short
+# and at y 14.5: soil pushed past there never settled, and filled the particle pool within half an hour)
+SPOIL_REGION_LONG = ("spoil", 24.0, -9.5, 175 + 60, 350, SPOIL_REGION[5])
 SPOIL_HM_LONG = (24.0, -9.5, 175 + 48, 300)
 # two-sided loading: ground south of the ground region (the south spot and its lane), and between it and the road
 SOUTH_REGION = ("south", 5.0, -4.5 - 44 * CELL, 237, 44, lambda x, y: ground_height(x, y))
