@@ -2474,3 +2474,25 @@ Section 35 found the dozer waiting 798 s of the hour at a lane's end while a car
 - The change is reverted. To keep up, the spreading needs more push per hour where the soil is, for example a wider blade or a second dumping spot so the dozer can push one heap while a carrier tips at the other.
 
 Log: `logs/fill_trend_far_work.json` (the per-minute spread, the dozer's stage times, also while a carrier is in, and the waits).
+
+## A living site, 37: a second dumping spot halves the heap's growth
+
+Section 36 ended with the idea of a second dumping spot: a carrier tips at the dump line or 5.5 m north of it, into the cell being spread, whichever the dozer is not working (`spots=2`, `SPOTS=2` in `bench_haul.py`). The dozer then pushes one heap while a carrier tips at the other, instead of waiting at a lane's end. The dozer's lanes fan out to cover both heaps, so the area spread grows from 248 to 332 m².
+
+**A bug found on the way.** The first two-spot hour stalled for ten minutes with a carrier full at the second spot. The cause was not the spots: the wide fill's soil region was sized as if its cells were 0.1 m, but they are 8 cm (twice the particle spacing), so it ended about 1 m short of the lanes' far end and at y 14.5, short of the lanes reaching y 15.8. Soil pushed past the edge never settled, stayed active and filled the particle pool after about half an hour; a carrier's soil then could not be placed. Sections 34–36 ran with this short region, which may have added to the heaps they measured. The region is now sized in 8 cm cells (4.8 m longer and to y 18.5), and both hours below ran with it.
+
+The same one-hour benchmark as section 35 (loam, four carriers, two loading sides, a 300 m haul, one dozer, two rollers), with one and with two dumping spots:
+
+| Time | 5 min | 10 min | 15 min | 20 min | 25 min | 30 min | 40 min | 50 min | 60 min |
+|---|---|---|---|---|---|---|---|---|---|
+| Unspread, one spot | 10 m³ | 5 m³ | 26 m³ | 25 m³ | 16 m³ | 33 m³ | 20 m³ | 51 m³ | 40 m³ |
+| Unspread, two spots | 4 m³ | 8 m³ | 9 m³ | 11 m³ | 11 m³ | 12 m³ | 17 m³ | 28 m³ | 17 m³ |
+| Covered, one spot (of 248 m²) | 12 m² | 86 m² | 112 m² | 157 m² | 168 m² | 175 m² | 206 m² | 210 m² | 213 m² |
+| Covered, two spots (of 332 m²) | 23 m² | 86 m² | 147 m² | 155 m² | 222 m² | 250 m² | 277 m² | 289 m² | 309 m² |
+
+- **The heap grows half as fast.** After the first 15 minutes, the unspread soil rises 18 m³ an hour with two spots against 34 m³ with one (straight-line fits), and averages 18 against 30 m³. The carriers delivered about the same: 28 loads against 26.
+- **Why: the dozer no longer waits.** With one spot it waited 805 s of the hour at a lane's end for a carrier to tip and leave, as in section 35 (798 s). With two spots it waited 36 s, and pushed 1,423 s against 1,309 s. No collision and no machine held by another in either hour.
+- **Not yet kept up.** The two-spot heap still grows, and the two-spot area is a third larger, so part of the gain may come from the room to spread rather than from the spots alone. Unspread soil is measured against each cell's current lift, so it drops when a cell moves up: with one spot, on the smaller area, one cell reached the third lift (0.9 m) by the end; with two spots, both cells reached the second.
+- **The particle pool.** With one spot, the active particles briefly reached the pool's 300,000 when the dozer woke a large heap at once (from minute 45), and 359 injections were cut short; between those peaks 30,000–200,000 were active. No carrier was held up by it. With two spots the pool never ran short.
+
+Logs: `logs/fill_trend_one_spot_fixed.json` and `logs/fill_trend_two_spots.json` (the per-minute spread and loads, the dozer's stage times and counters, the waits).

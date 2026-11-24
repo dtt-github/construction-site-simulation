@@ -242,6 +242,13 @@ ROLLER_CELLS_WIDE = ((-7.0, 4.6), (5.8, 17.4))
 DOZER_CELLS_WIDE = ((2.9, 0.7, -1.5, -3.6, -5.4), (7.5, 9.7, 11.9, 14.0, 15.8))
 ROLLER_PARKS_2 = ((40.5, 21.5, math.pi), (40.5, -11.0, math.pi))
 ROLLER_SEP_M = 5.4  # two rollers keep this far apart along y: both can turn in place (2 x 2.54 m corners + 0.3 m clearance)
+# two dumping spots (spots=2, section 37): a carrier tips at the dump line or SPOT2_DY into the cell being spread,
+# whichever is clear of the dozer, so the dozer pushes one heap while a carrier tips at the other (with one spot it
+# waited a fifth of the hour, section 35). 5.5 m: the dozer spinning at one heap's hub stays clear of a carrier at the
+# other. The dozer then parks further north, clear of a carrier at the north spot
+SPOT2_DY = 5.5
+DOZER_PARK_Y_2 = 16.0
+SPOT_GAP = 0.6  # m kept between the dozer's lanes and a dumping carrier at the spot it is not using (as KEEP_OFF in section 36)
 DOZER_SEES_SPEED = 1.0  # m/s: the dozer plans on all soil slower than this (dumped clay creeps for minutes)
 # soil thinner than this (two particle layers, about a quarter of a lift) is spill, not a lift: it does not make a
 # rolled lane unrolled, nor bare ground a lane to roll; the lift that covers it is rolled with it. Counting every
@@ -595,8 +602,10 @@ class ExcavatorSim:
         ("swing back", 0, 6.0, 2.6 + DIG_Z, -95),  # lowers while swinging, once clear of the truck
     ]
 
-    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, haul_m=0.0, relocate_m=0.0, command_response=False, roller=True, sides=1, rollers=1, dozers=1, long_fill=None):
+    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, haul_m=0.0, relocate_m=0.0, command_response=False, roller=True, sides=1, rollers=1, dozers=1, long_fill=None, spots=1):
         wp.init()
+        assert spots in (1, 2) and (spots == 1 or (haul_m > 0.0 and dozers == 1)), "two dumping spots: the longer haul and one dozer"
+        self.spots = spots
         assert sides in (1, 2) and (sides == 1 or carriers >= 2), "two-sided loading: two carriers or more"
         assert dozers in (1, 2), "one dozer, or a heap dozer and a leveller"
         self.sides = sides
@@ -782,7 +791,11 @@ class ExcavatorSim:
         self.track_counters = {"dozer_pressed": 0, "carrier_pressed": 0}
         edge_ahead = Dozer._edge_ahead()
         area = (DOZER_X_START, BED_CENTER[1], DOZER_X_END + (LONG_X if long else 0.0), DOZER_CELLS if rollers == 1 else DOZER_CELLS_WIDE)
-        self.dozer = Dozer((DOZER_X_START - edge_ahead, DOZER_PARK_Y, math.pi / 2), area, GROUND_Z, soil, reach=(0.0, LEVEL_FROM if dozers == 2 else 1.0))
+        y0 = BED_CENTER[1]
+        self.spot_ys = (y0, y0 - SPOT2_DY, y0 + SPOT2_DY)  # the dump line, the second spot in the south cell, in the north one
+        heaps = [((DOZER_X_START, self.spot_ys[1]),), ((DOZER_X_START, self.spot_ys[2]),)] if spots == 2 else None
+        park_y = DOZER_PARK_Y_2 if spots == 2 else DOZER_PARK_Y
+        self.dozer = Dozer((DOZER_X_START - edge_ahead, park_y, math.pi / 2), area, GROUND_Z, soil, reach=(0.0, LEVEL_FROM if dozers == 2 else 1.0), heaps=heaps)
         self.dozers = [self.dozer]
         if dozers == 2:  # the leveller: carries the heap dozer's soil on from LEVEL_FROM along its lanes to the far edge
             self.dozers.append(Dozer(LEVELLER_PARK, area, GROUND_Z, soil, reach=(LEVEL_FROM, 1.0)))
@@ -793,6 +806,18 @@ class ExcavatorSim:
             self.leveller.may_enter = lambda: self._may_enter(self.leveller, self.dozer)
         for dz in self.dozers:
             dz.dump_pose = (HAUL_DUMP_X, BED_CENTER[1], math.pi)  # the carrier backs in facing -x
+        if spots == 2:
+            for c in self.fleet:
+                c.choose_spot = True
+            self.spot_counters = {}  # loads given each spot, and how often a carrier was held with neither clear
+            self.dozer.dump_pose = None  # set while a carrier comes to dump, at its spot
+            self.dump_free = True
+            # per cell and spot: the dozer's lanes there (their pushes, and spinning at their hub) that come within
+            # SPOT_GAP of a carrier dumping at the spot (from backing in to creeping forward as it dumps)
+            self.spot_poses = [[(x, y, math.pi) for x in np.arange(HAUL_DUMP_X - dumper_mod.CREEP_MAX, HAUL_DUMP_X + 0.01, 0.5)] for y in self.spot_ys]
+            dz = self.dozer
+            self.spot_avoid = [[{k for k in range(len(lanes)) if traffic_mod.near("dozer", self._lane_claims(dz, cell, k), "carrier", sp, SPOT_GAP)}
+                                for sp in self.spot_poses] for cell, lanes in enumerate(dz.cell_lanes)]
         self.blade_qs = [(int(jq[joint_of[bl]]), int(jqd[joint_of[bl]])) for bl in self.blades]
         self.blade_q, self.blade_qd = self.blade_qs[0]
         # the roller compacting the spread fill once the dozer has spread it
@@ -1786,7 +1811,9 @@ class ExcavatorSim:
     def _haul(self):
         """Carriers: move the vessels, and hand each load over to and from the soil zone."""
         f = self.fleet
-        f.gates(not self.use_dozer or (self.dozer.clear_of_dump and (self.leveller is None or self.leveller._clear_of_dump_point())))
+        f.gates(not self.use_dozer or self.spots == 2 or (self.dozer.clear_of_dump and (self.leveller is None or self.leveller._clear_of_dump_point())))
+        if self.use_dozer and self.spots == 2:
+            self._spot_gates()
         spot = f.at_spot
         if self.dispatch_pending and spot is not None and (not self.auto or self.stage_name not in ("swing to truck", "dump")) and self.side_sign * self.q[0] > math.radians(-70):
             self.dispatch_pending = False
@@ -1821,7 +1848,7 @@ class ExcavatorSim:
         if self.zone_frame % 3 == 0:
             self._spoil_surface(self.doze_hm, DOZER_SEES_SPEED)
             self.doze_hm_np = self.doze_hm.numpy()
-        may_work = self.fleet.dump_area_free()
+        may_work = self.dump_free if self.spots == 2 else self.fleet.dump_area_free()
         forces = self.sand_forces.numpy()
         self.blade_force = forces[self.blade][:3].astype(float)
         if self.use_roller:
@@ -1919,6 +1946,55 @@ class ExcavatorSim:
         if key not in self._poses:
             self._poses[key] = d.push_poses(cell, lane=lane)
         return self._poses[key]
+
+    @staticmethod
+    def _lane_claims(dz, cell, k):
+        """Base poses the dozer takes working lane k of a cell: spinning at its hub (any heading), and its push."""
+        s = dz.lane_start(k, dz.cell_lanes[cell])
+        return [(s[0], s[1], a) for a in np.linspace(-math.pi, math.pi, 17)] + dz.push_poses(cell, lane=k)
+
+    def _dozer_claims(self, dz):
+        """Base poses the dozer takes from where it is to the end of the job in hand: on to its lane's hub, the lane,
+        or on to its park."""
+        here = np.array([dz.x, dz.y])
+        to = dz.lane_start(dz.lane) if dz.lane is not None else (np.array(dz.park[:2]) if dz.plan else here)
+        n = int(math.hypot(*(to - here)) / 0.5) + 1
+        poses = [(*(here + (to - here) * t), a) for t in np.linspace(0.0, 1.0, n + 1) for a in (dz.yaw, math.pi / 2)]
+        return poses + (self._lane_claims(dz, dz.cell, dz.lane) if dz.lane is not None else [])
+
+    def _spot_gates(self):
+        """Two dumping spots: give the carrier let through to the dump side the spot clear of the dozer (of the two
+        with the smaller heap), or hold it; tell the dozer where the carrier dumps and which lanes to leave."""
+        dz = self.dozer
+        for c in self.fleet:
+            if c.dump_y is not None and c.stage == "haul back":
+                c.dump_y = None  # gone
+        active = next((c for c in self.fleet if c.dump_y is not None), None)
+        for c in self.fleet:
+            waiting = c.plan and c.plan[0][0] == "emerge" and c.plan[0][4] == "dump_clear"
+            if not (c.dump_clear and waiting and c.dump_y is None):
+                continue
+            if active is not None:
+                c.dump_clear = False
+                continue
+            claims = self._dozer_claims(dz)
+            free = [i for i in (0, 1 + dz.cell) if not traffic_mod.near("dozer", claims, "carrier", self.spot_poses[i], SPOT_GAP)]
+            if not free:
+                c.dump_clear = False
+                self.spot_counters["held"] = self.spot_counters.get("held", 0) + 1
+                continue
+            if len(free) == 2:
+                soil, _ = dz._lane_scores(self._surface)
+                heap = lambda i: sum(v for v, lane in zip(soil, dz.lanes) if abs(lane.o[1] - self.spot_ys[i]) < 0.01)
+                free.sort(key=heap)
+            c.dump_y = self.spot_ys[free[0]]
+            self.spot_counters[free[0] if free[0] == 0 else "second"] = self.spot_counters.get(free[0] if free[0] == 0 else "second", 0) + 1
+            active = c
+        if active is None:
+            dz.dump_pose, dz.avoid, self.dump_free = None, set(), True
+        else:
+            i = self.spot_ys.index(active.dump_y)
+            dz.dump_pose, dz.avoid, self.dump_free = (HAUL_DUMP_X, active.dump_y, math.pi), self.spot_avoid[dz.cell][i], False
 
     def _may_enter(self, d, other):
         """Whether dozer d may now make its move into the meeting place of the two dozers' lanes (the heap dozer

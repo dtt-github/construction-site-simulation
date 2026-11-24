@@ -128,6 +128,7 @@ class Dumper:
         self.dump_x, self.turn_x = dump_x, turn_x
         self.start, self.index, self.spot = start, index, spot
         self.road_y = self.load_bases[0][1] if road_y is None else road_y
+        self.choose_spot = False  # set by the site (two dumping spots, longer hauls): it sets dump_y as the carrier comes into view
         self.reset()
 
     @property
@@ -150,6 +151,7 @@ class Dumper:
         self.spot_busy = False  # another carrier is using or entering the loading spot
         self.queue_free = True  # no other carrier at the waiting place (longer hauls)
         self.queue_spot = None  # two-sided, longer hauls: the spot whose waiting place this carrier may come to
+        self.dump_y = None  # two dumping spots: the y of the one it is to dump at (set with dump_clear)
         self.hidden, self.hide_left = False, 0.0  # off-screen, and the time left on the off-screen road
         self.arrived = 0.0  # when it began to wait off-screen
         self.dozer_wait, self.depart_wait, self.queue_wait = 0.0, 0.0, 0.0  # s held at each gate
@@ -209,8 +211,9 @@ class Dumper:
     # the flag is set; ("tip",), ("dump",), ("lower",); ("choose",) pick the way back once at RETURN_X
     def _trip(self):
         if self.haul_m is not None:
-            # out along its own spot's lane (two-sided: the south one too), back into view on the dump line
-            y = self.road_y
+            # out along its own spot's lane (two-sided: the south one too), back into view on the dump line (two
+            # dumping spots: on the line of the one the site gives it, dump_y, filled in as it comes into view)
+            y = None if self.choose_spot else self.road_y
             return [("drive", HIDE_X, self.base[1], +1, SPEED_LOADED, "drive out"), ("hide", self.haul_m, SPEED_LOADED, "haul out"),
                     ("emerge", EMERGE_X, y, math.pi, "dump_clear", "wait at dump"),
                     ("drive", self.dump_x, y, -1, SPEED_REVERSE, "reverse to dump"), ("tip",), ("dump",), ("lower",),
@@ -328,6 +331,9 @@ class Dumper:
         elif kind == "emerge":
             _, x, y, yaw, flag, stage = move
             if getattr(self, flag):
+                if y is None:  # its dumping spot, set with the gate
+                    y = self.dump_y
+                    self.plan[1:] = [m[:2] + (y,) + m[3:] if m[0] == "drive" and m[2] is None else m for m in self.plan[1:]]
                 self.base[:] = (x, y)
                 self.yaw, self.hidden = yaw, False
                 done = True

@@ -135,17 +135,28 @@ def blade_plates():
     return out
 
 
+class Lane(tuple):
+    """A push lane, (heading, length) of the cutting edge's travel; .o: the heap (x, y) it starts from."""
+    def __new__(cls, th, L, o):
+        lane = super().__new__(cls, (th, L))
+        lane.o = np.asarray(o, dtype=float)
+        return lane
+
+
 STAGES = ["parked", "to lane", "lower", "push", "raise", "back", "to park", "wait clear", "wait dozer"]
 
 
 class Dozer:
-    def __init__(self, park, area, ground_z, soil="dry-sand", reach=(0.0, 1.0)):
+    def __init__(self, park, area, ground_z, soil="dry-sand", reach=(0.0, 1.0), heaps=None):
         """park: (x, y, yaw) of base_link where the dozer waits; area: (x_start, y_start, x_end, cells) of
         the cutting edge: every push starts at (x_start, y_start), at the dump heap, and runs to x_end, the
         lanes fanning out to the end ys of the cell being spread (cells: one tuple of end ys per cell); soil:
         the preset it spreads (dug, so at its remoulded strength); reach: the part of each lane (fractions of
         its length) it works, (0, 1) for a dozer on its own. One that starts part way along (the leveller) leaves
-        the cells, the lifts and the handover to the roller to the heap dozer, and follows its cell and grade."""
+        the cells, the lifts and the handover to the roller to the heap dozer, and follows its cell and grade.
+        heaps: per cell, more dump heaps (x, y) besides (x_start, y_start), each with lanes fanning out to the same
+        end ys (two dumping spots, section 37); with them the dozer keeps working while a carrier tips, on the
+        lanes clear of it (avoid, set by the site)."""
         self.park, self.ground_z, self.reach = park, ground_z, reach
         self.leveller = reach[0] > 0.0
         # set by the site with two dozers: whether it may now make a move into the other's way (the heap dozer
@@ -156,8 +167,10 @@ class Dozer:
         self.sinkage = self.track.sinkage(MASS_KG)
         self.x_start, self.y_start, self.x_end, cells = area
         # lanes per cell: heading and the cutting edge's travel to x_end
-        self.cell_lanes = [[(math.atan2(y - self.y_start, self.x_end - self.x_start), math.hypot(y - self.y_start, self.x_end - self.x_start)) for y in ends]
-                           for ends in cells]
+        heaps = heaps or [()] * len(cells)
+        self.two_spots = any(heaps)
+        self.cell_lanes = [[Lane(math.atan2(y - oy, self.x_end - ox), math.hypot(y - oy, self.x_end - ox), (ox, oy))
+                            for ox, oy in [(self.x_start, self.y_start), *more] for y in ends] for ends, more in zip(cells, heaps)]
         self.start = np.array([self.x_start - self._edge_ahead(), self.y_start])  # base_link at the start of every push
         self.dump_pose = None  # (x, y, yaw) of the carrier's base while it dumps, set by the site: where not to wait
         self.reset()
@@ -179,6 +192,7 @@ class Dozer:
         self.gate_ok = False  # the move in hand was let through (may_enter is asked once, as the move begins)
         self.plan = []  # moves still to make: ("spin", yaw) | ("drive", x, y, dir, speed, stage) | ("lift", "up"/"raise"/"grade") | ("push", x, y)
         self.lane = None
+        self.avoid = set()  # set by the site (two dumping spots): the lanes not clear of the carrier dumping now
         self.blocked = set()  # lanes whose last pass moved nothing
         self.pass_soil = None  # the lane's heap-part soil when its pass began
         self.area_soil = 0.0  # the area's soil above grade at the last planning
@@ -307,21 +321,23 @@ class Dozer:
     def lane_start(self, k, lanes=None):
         """base_link where a push on lane k starts: the hub for the heap dozer (it turns there), for the
         leveller its lane's start part way along, heading along it."""
+        lane = (self.lanes if lanes is None else lanes)[k]
         if not self.leveller:
-            return self.start
-        th, L = (self.lanes if lanes is None else lanes)[k]
+            return np.array([lane.o[0] - self._edge_ahead(), lane.o[1]])  # its heap's hub (self.start for the first)
+        th, L = lane
         d = np.array([math.cos(th), math.sin(th)])
-        return np.array([self.x_start, self.y_start]) + (self._part(k, "push", lanes)[0] * L - self._edge_ahead()) * d
+        return lane.o + (self._part(k, "push", lanes)[0] * L - self._edge_ahead()) * d
 
     def _back_to(self):
         return self.lane_start(self.lane) if self.lane is not None else self.start
 
     def _swath(self, k, s0=0.0, s1=1.0, lanes=None):
         """Points (0.1 m apart) of lane k's swath, along the lane from fraction s0 to s1 of its length."""
-        th, L = (self.lanes if lanes is None else lanes)[k]
+        lane = (self.lanes if lanes is None else lanes)[k]
+        th, L = lane
         d, n = np.array([math.cos(th), math.sin(th)]), np.array([-math.sin(th), math.cos(th)])
         S, T = np.meshgrid(np.arange(s0 * L, s1 * L, 0.1) + 0.05, np.arange(-BLADE_W / 2, BLADE_W / 2, 0.1) + 0.05)
-        return np.array([self.x_start, self.y_start]) + S.ravel()[:, None] * d + T.ravel()[:, None] * n
+        return lane.o + S.ravel()[:, None] * d + T.ravel()[:, None] * n
 
     def _lane_scores(self, surface):
         """Per lane: soil above grade + TOL in its heap part (m3), and room below grade - TOL along it (m3)."""
@@ -357,9 +373,10 @@ class Dozer:
             "unspread_m3": round(float(np.clip(h - grade - TOL, 0.0, None).sum() * 0.01), 2),
         }
 
-    def _to_start(self):
-        """Moves from the park to the start of the pushes (blade raised): reverse south to it."""
-        return [("lift", "up"), ("spin", math.pi / 2), ("drive", *self.start, -1, SPEED_REVERSE, "to lane")]
+    def _to_start(self, start=None):
+        """Moves from the park to the start of the pushes (blade raised): reverse south to it (every heap's hub
+        lies on the park's x)."""
+        return [("lift", "up"), ("spin", math.pi / 2), ("drive", *(self.start if start is None else start), -1, SPEED_REVERSE, "to lane")]
 
     def _drive_to(self, xy, label, free=False):
         """Blade up, turn toward xy and drive there forward (nothing if already there); free: the leveller needs
@@ -406,7 +423,7 @@ class Dozer:
         if float(np.clip(h - self.grade - TOL, 0.0, None).sum() * 0.01) > self.area_soil + NEW_LOAD_M3:
             return True
         score = np.minimum(soil, room)
-        score[list(self.blocked)] = 0.0
+        score[list(self.blocked | self.avoid)] = 0.0
         return bool(score.max() >= DONE_M3)
 
     def _next_job(self, surface, may_work):
@@ -415,7 +432,7 @@ class Dozer:
         if self.topped:  # the fill area is finished: parked until the site moves it on
             self.lane = None
             return [] if self._at_park() else self._to_park()
-        if not may_work:
+        if not may_work and not self.two_spots:
             self.lane = None
             return [] if self._at_park() else self._to_park()
         soil, room = self._lane_scores(surface)
@@ -466,7 +483,7 @@ class Dozer:
             self.counters["held_s"] += self.time - self.hold_since  # the soil was spread below the lift while it waited
             self.hold_since = None
         score = np.minimum(soil, room)
-        score[list(self.blocked | self.spare)] = 0.0
+        score[list(self.blocked | self.spare | self.avoid)] = 0.0
         if self.hold_since is not None and self.make_way and score.max() < DONE_M3:
             # waiting, and the roller can only finish the other cell on the lanes beside this one's pushes (spare),
             # with no other lane to work: the dozer pulls back to its park so the roller may roll them. With other
@@ -483,6 +500,10 @@ class Dozer:
             self.area_soil = 0.0
             return []
         if score.max() < DONE_M3:
+            if not may_work and self._clear_of_dump_point() and not self._at_park():
+                # a carrier is tipping and nothing clear of it is left to push: wait here until it has gone (driving
+                # to the park would cross the dump side)
+                return [("wait clear",)]
             self.lane = None
             return [] if self._at_park() else self._to_park()
         return self._push_job(int(np.argmax(score)), soil, at_lane, surface)
@@ -519,7 +540,13 @@ class Dozer:
         th, L = self.lanes[k]
         d = np.array([math.cos(th), math.sin(th)])
         start = self.lane_start(k)
-        moves = [] if at_lane or self.leveller else self._to_start()
+        if self.leveller or (at_lane and not self.two_spots) or math.hypot(self.x - start[0], self.y - start[1]) < 0.1:
+            moves = []
+        else:  # from another heap's hub across to this one, or from the park
+            # (reversing to a hub works only from the park, north of every hub on its x: from a hub south of the one
+            # it needs, after a switch of cells, that move ended at once and the push started from the wrong heap)
+            from_park = abs(self.x - start[0]) < 0.2 and self.y > start[1] + 1.0
+            moves = self._to_start(start) if (from_park or not (at_lane or self.two_spots)) else self._drive_to(start, "to lane")
         a, b = self._part(k, "push")
         moves += [("lift", "up"), ("spin", th), ("lift", "grade"), ("push", *(start + d * ((b - (a if self.leveller else 0.0)) * L))),
                   ("lift", "raise"), ("drive", *start, -1, SPEED_REVERSE, "back")]
@@ -528,7 +555,7 @@ class Dozer:
         # ground before it reaches the soil further along (spilled beside the lanes next to it), and a push that
         # ended as soon as the blade ran empty never got there (section 30)
         pts = self._swath(k, *self._part(k, "soil"))
-        s_along = (pts - np.array([self.x_start, self.y_start])) @ d
+        s_along = (pts - self.lanes[k].o) @ d
         above = surface(pts) - self.grade - TOL > 0.0
         self.soil_until = float(s_along[above].max()) if above.any() else 0.0
         return moves
@@ -590,6 +617,8 @@ class Dozer:
         self.may_work = may_work
         if self.leveller and self.lane is not None and self._pose_clear(*self.lane_start(self.lane), self.lanes[self.lane][0]):
             pass  # the leveller's lane starts clear of the dumping carrier: it carries on
+        elif self.two_spots:
+            pass  # two dumping spots: it works on, on the lanes clear of the carrier (avoid)
         elif not may_work and self.plan and self.stage == "lower":
             # the carrier is coming before the push has begun (the blade still at the heap): back out and park
             self.plan = [("lift", "raise"), ("drive", *self._back_to(), -1, SPEED_REVERSE, "back")]
@@ -695,8 +724,8 @@ class Dozer:
         self._push_sum[0] += F * dt
         self._push_sum[1] += dt
         # the blade is empty once past the soil: end the pass early
-        th = self.lanes[self.lane][0] if self.lane is not None else 0.0
-        along = (self.edge()[0] - self.x_start) * math.cos(th) + (self.edge()[1] - self.y_start) * math.sin(th)
+        th, o = (self.lanes[self.lane][0], self.lanes[self.lane].o) if self.lane is not None else (0.0, (self.x_start, self.y_start))
+        along = (self.edge()[0] - o[0]) * math.cos(th) + (self.edge()[1] - o[1]) * math.sin(th)
         past_start = self.edge()[0] > self.x_start + 1.5 and along > self.soil_until
         self.empty_t = self.empty_t + dt if (F < EMPTY_N and past_start and not self.load_lift) else 0.0
         if self.empty_t > EMPTY_S:
