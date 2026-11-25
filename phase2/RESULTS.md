@@ -2496,3 +2496,7 @@ The same one-hour benchmark as section 35 (loam, four carriers, two loading side
 - **The particle pool.** With one spot, the active particles briefly reached the pool's 300,000 when the dozer woke a large heap at once (from minute 45), and 359 injections were cut short; between those peaks 30,000–200,000 were active. No carrier was held up by it. With two spots the pool never ran short.
 
 Logs: `logs/fill_trend_one_spot_fixed.json` and `logs/fill_trend_two_spots.json` (the per-minute spread and loads, the dozer's stage times and counters, the waits).
+
+## A living site, 38: two dumping spots become the wide fill's default
+
+Following section 37, the wide fill (two rollers, or the 16 m lanes) with the longer haul and one dozer now uses two dumping spots by default (`spots=None` picks them; `SPOTS=1` in `bench_haul.py` keeps one). A five-minute check run without `SPOTS` set used the two-spot area (332 m²). The short road (two carriers, as in the browser demo) has no off-screen queue and keeps one spot, so the demo is unchanged.

@@ -43,7 +43,7 @@ sides = int(os.environ.get("SIDES", "1"))  # 2: two-sided loading (a spot each s
 n_rollers = int(os.environ.get("ROLLERS", "1"))  # 2: a second roller on the fill area
 n_dozers = int(os.environ.get("DOZERS", "1"))  # 2: a heap dozer and a leveller
 long_fill = os.environ.get("LONG_FILL", "1" if (n_rollers == 2 or n_dozers == 2) else "0") == "1"  # the 16 m fill lanes (sections 33, 34)
-n_spots = int(os.environ.get("SPOTS", "1"))  # 2: two dumping spots, the dozer working one heap while a carrier tips at the other
+n_spots = int(os.environ["SPOTS"]) if "SPOTS" in os.environ else None  # 1 or 2 dumping spots; by default 2 on the wide fill with the longer haul (section 38)
 sim = ex.ExcavatorSim(soil=soil, carriers=n_carriers, haul_m=haul_m, relocate_m=relocate_m, roller=roller, sides=sides, rollers=n_rollers, dozers=n_dozers, long_fill=long_fill, spots=n_spots)
 operator = os.environ.get("OPERATOR", "scripted")  # human: an operator who varies from cycle to cycle
 op_seed = int(os.environ.get("SEED", "0"))
@@ -161,7 +161,7 @@ out = {
     "thin_passes": sum(1 for x in done if x["at_swing_kg"] < 0.5 * sim.full_kg),
     "pass_log": pass_log,
     "dozer": {**{k: round(v, 2) for k, v in sim.dozer.counters.items()}, "mean_push_kN": sim.dozer.push_force},
-    **({"spots": sim.spot_counters} if n_spots == 2 else {}),
+    **({"spots": sim.spot_counters} if sim.spots == 2 else {}),
     **({"dozer2": {**{k: round(v, 2) for k, v in sim.leveller.counters.items()}, "mean_push_kN": sim.leveller.push_force}} if sim.leveller is not None else {}),
     "spread": sim.dozer.spread_report(sim._surface),
     "tracks": {"dozer_sinkage_cm": round(sim.dozer.sinkage * 100, 2), "dozer_pull_kN": round(sim.dozer.f_traction / 1000, 1),

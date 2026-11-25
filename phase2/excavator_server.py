@@ -602,8 +602,10 @@ class ExcavatorSim:
         ("swing back", 0, 6.0, 2.6 + DIG_Z, -95),  # lowers while swinging, once clear of the truck
     ]
 
-    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, haul_m=0.0, relocate_m=0.0, command_response=False, roller=True, sides=1, rollers=1, dozers=1, long_fill=None, spots=1):
+    def __init__(self, voxel=0.08, ppc=2, soil=soils.DEFAULT_SOIL, iterations=None, fps=60.0, pool=POOL, mpm_every=MPM_EVERY, haul=True, dozer=True, carriers=1, haul_m=0.0, relocate_m=0.0, command_response=False, roller=True, sides=1, rollers=1, dozers=1, long_fill=None, spots=None):
         wp.init()
+        if spots is None:  # two dumping spots by default where they work: the wide fill, the longer haul, one dozer (section 38)
+            spots = 2 if haul_m > 0.0 and dozers == 1 and ((rollers == 2) if long_fill is None else long_fill) else 1
         assert spots in (1, 2) and (spots == 1 or (haul_m > 0.0 and dozers == 1)), "two dumping spots: the longer haul and one dozer"
         self.spots = spots
         assert sides in (1, 2) and (sides == 1 or carriers >= 2), "two-sided loading: two carriers or more"
