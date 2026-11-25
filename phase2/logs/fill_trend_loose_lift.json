@@ -1,0 +1,839 @@
+{
+ "setup": "as fill_trend_two_spots.json (section 37), with two dumping spots as default (section 38) and the blade spreading a loose lift, grade + LIFT * ((1 + swell) / compacted - 1) (section 39)",
+ "per_minute": [
+  {
+   "t": 0.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 0.0,
+   "rms_from_grade_m": null,
+   "max_above_grade_m": null,
+   "at_grade_fraction": 0.0,
+   "unspread_m3": 0.0
+  },
+  {
+   "t": 60.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 0.0,
+   "rms_from_grade_m": null,
+   "max_above_grade_m": null,
+   "at_grade_fraction": 0.0,
+   "unspread_m3": 0.0
+  },
+  {
+   "t": 120.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 0.0,
+   "rms_from_grade_m": null,
+   "max_above_grade_m": null,
+   "at_grade_fraction": 0.0,
+   "unspread_m3": 0.0
+  },
+  {
+   "t": 180.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 0.0,
+   "rms_from_grade_m": null,
+   "max_above_grade_m": null,
+   "at_grade_fraction": 0.0,
+   "unspread_m3": 0.0
+  },
+  {
+   "t": 240.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 0.0,
+   "rms_from_grade_m": null,
+   "max_above_grade_m": null,
+   "at_grade_fraction": 0.0,
+   "unspread_m3": 0.0
+  },
+  {
+   "t": 300.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 17.9,
+   "rms_from_grade_m": 0.623,
+   "max_above_grade_m": 1.99,
+   "at_grade_fraction": 0.05,
+   "unspread_m3": 6.67
+  },
+  {
+   "t": 360.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 22.8,
+   "rms_from_grade_m": 0.369,
+   "max_above_grade_m": 1.59,
+   "at_grade_fraction": 0.06,
+   "unspread_m3": 4.21
+  },
+  {
+   "t": 420.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 41.2,
+   "rms_from_grade_m": 0.415,
+   "max_above_grade_m": 2.61,
+   "at_grade_fraction": 0.1,
+   "unspread_m3": 5.24
+  },
+  {
+   "t": 480.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 57.1,
+   "rms_from_grade_m": 0.556,
+   "max_above_grade_m": 2.66,
+   "at_grade_fraction": 0.13,
+   "unspread_m3": 12.56
+  },
+  {
+   "t": 540.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 64.2,
+   "rms_from_grade_m": 0.325,
+   "max_above_grade_m": 1.46,
+   "at_grade_fraction": 0.15,
+   "unspread_m3": 8.01
+  },
+  {
+   "t": 600.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 66.2,
+   "rms_from_grade_m": 0.294,
+   "max_above_grade_m": 1.46,
+   "at_grade_fraction": 0.14,
+   "unspread_m3": 7.28
+  },
+  {
+   "t": 660.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 73.5,
+   "rms_from_grade_m": 0.562,
+   "max_above_grade_m": 2.94,
+   "at_grade_fraction": 0.15,
+   "unspread_m3": 15.92
+  },
+  {
+   "t": 720.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 84.2,
+   "rms_from_grade_m": 0.344,
+   "max_above_grade_m": 2.92,
+   "at_grade_fraction": 0.18,
+   "unspread_m3": 10.29
+  },
+  {
+   "t": 780.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 100.5,
+   "rms_from_grade_m": 0.285,
+   "max_above_grade_m": 1.16,
+   "at_grade_fraction": 0.22,
+   "unspread_m3": 10.65
+  },
+  {
+   "t": 840.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 120.2,
+   "rms_from_grade_m": 0.337,
+   "max_above_grade_m": 4.34,
+   "at_grade_fraction": 0.27,
+   "unspread_m3": 9.75
+  },
+  {
+   "t": 900.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 127.4,
+   "rms_from_grade_m": 0.202,
+   "max_above_grade_m": 1.77,
+   "at_grade_fraction": 0.3,
+   "unspread_m3": 6.88
+  },
+  {
+   "t": 960.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 140.1,
+   "rms_from_grade_m": 0.133,
+   "max_above_grade_m": 0.97,
+   "at_grade_fraction": 0.33,
+   "unspread_m3": 3.41
+  },
+  {
+   "t": 1020.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 141.3,
+   "rms_from_grade_m": 0.396,
+   "max_above_grade_m": 2.94,
+   "at_grade_fraction": 0.34,
+   "unspread_m3": 15.5
+  },
+  {
+   "t": 1080.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 144.0,
+   "rms_from_grade_m": 0.336,
+   "max_above_grade_m": 2.94,
+   "at_grade_fraction": 0.34,
+   "unspread_m3": 12.97
+  },
+  {
+   "t": 1140.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 154.7,
+   "rms_from_grade_m": 0.284,
+   "max_above_grade_m": 2.52,
+   "at_grade_fraction": 0.37,
+   "unspread_m3": 12.79
+  },
+  {
+   "t": 1200.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 158.1,
+   "rms_from_grade_m": 0.209,
+   "max_above_grade_m": 1.62,
+   "at_grade_fraction": 0.39,
+   "unspread_m3": 10.72
+  },
+  {
+   "t": 1260.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 163.6,
+   "rms_from_grade_m": 0.42,
+   "max_above_grade_m": 3.38,
+   "at_grade_fraction": 0.41,
+   "unspread_m3": 20.39
+  },
+  {
+   "t": 1320.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 164.6,
+   "rms_from_grade_m": 0.304,
+   "max_above_grade_m": 2.48,
+   "at_grade_fraction": 0.39,
+   "unspread_m3": 18.43
+  },
+  {
+   "t": 1380.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 181.3,
+   "rms_from_grade_m": 0.272,
+   "max_above_grade_m": 2.62,
+   "at_grade_fraction": 0.41,
+   "unspread_m3": 15.67
+  },
+  {
+   "t": 1440.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 203.7,
+   "rms_from_grade_m": 0.178,
+   "max_above_grade_m": 1.05,
+   "at_grade_fraction": 0.44,
+   "unspread_m3": 10.2
+  },
+  {
+   "t": 1500.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 208.7,
+   "rms_from_grade_m": 0.274,
+   "max_above_grade_m": 3.01,
+   "at_grade_fraction": 0.45,
+   "unspread_m3": 13.99
+  },
+  {
+   "t": 1560.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 229.5,
+   "rms_from_grade_m": 0.155,
+   "max_above_grade_m": 1.11,
+   "at_grade_fraction": 0.47,
+   "unspread_m3": 7.24
+  },
+  {
+   "t": 1620.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 233.5,
+   "rms_from_grade_m": 0.271,
+   "max_above_grade_m": 2.34,
+   "at_grade_fraction": 0.47,
+   "unspread_m3": 15.51
+  },
+  {
+   "t": 1680.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 237.5,
+   "rms_from_grade_m": 0.209,
+   "max_above_grade_m": 2.12,
+   "at_grade_fraction": 0.46,
+   "unspread_m3": 11.86
+  },
+  {
+   "t": 1740.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 249.0,
+   "rms_from_grade_m": 0.261,
+   "max_above_grade_m": 2.85,
+   "at_grade_fraction": 0.48,
+   "unspread_m3": 14.42
+  },
+  {
+   "t": 1800.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 263.5,
+   "rms_from_grade_m": 0.164,
+   "max_above_grade_m": 1.32,
+   "at_grade_fraction": 0.53,
+   "unspread_m3": 9.0
+  },
+  {
+   "t": 1860.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 265.0,
+   "rms_from_grade_m": 0.158,
+   "max_above_grade_m": 1.07,
+   "at_grade_fraction": 0.53,
+   "unspread_m3": 8.33
+  },
+  {
+   "t": 1920.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 271.6,
+   "rms_from_grade_m": 0.186,
+   "max_above_grade_m": 2.03,
+   "at_grade_fraction": 0.55,
+   "unspread_m3": 11.35
+  },
+  {
+   "t": 1980.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 273.7,
+   "rms_from_grade_m": 0.326,
+   "max_above_grade_m": 2.96,
+   "at_grade_fraction": 0.56,
+   "unspread_m3": 22.32
+  },
+  {
+   "t": 2040.0,
+   "design_z_above_ground": [
+    0.3,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 280.9,
+   "rms_from_grade_m": 0.282,
+   "max_above_grade_m": 2.81,
+   "at_grade_fraction": 0.57,
+   "unspread_m3": 19.01
+  },
+  {
+   "t": 2100.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 281.2,
+   "rms_from_grade_m": 0.297,
+   "max_above_grade_m": 2.45,
+   "at_grade_fraction": 0.39,
+   "unspread_m3": 11.59
+  },
+  {
+   "t": 2160.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 282.3,
+   "rms_from_grade_m": 0.267,
+   "max_above_grade_m": 1.07,
+   "at_grade_fraction": 0.39,
+   "unspread_m3": 8.54
+  },
+  {
+   "t": 2220.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 282.9,
+   "rms_from_grade_m": 0.307,
+   "max_above_grade_m": 2.62,
+   "at_grade_fraction": 0.38,
+   "unspread_m3": 12.41
+  },
+  {
+   "t": 2280.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 283.8,
+   "rms_from_grade_m": 0.249,
+   "max_above_grade_m": 1.07,
+   "at_grade_fraction": 0.41,
+   "unspread_m3": 7.16
+  },
+  {
+   "t": 2340.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 283.7,
+   "rms_from_grade_m": 0.303,
+   "max_above_grade_m": 2.6,
+   "at_grade_fraction": 0.41,
+   "unspread_m3": 12.62
+  },
+  {
+   "t": 2400.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 284.7,
+   "rms_from_grade_m": 0.244,
+   "max_above_grade_m": 1.0,
+   "at_grade_fraction": 0.43,
+   "unspread_m3": 8.27
+  },
+  {
+   "t": 2460.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 285.3,
+   "rms_from_grade_m": 0.236,
+   "max_above_grade_m": 1.0,
+   "at_grade_fraction": 0.43,
+   "unspread_m3": 7.33
+  },
+  {
+   "t": 2520.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 285.1,
+   "rms_from_grade_m": 0.377,
+   "max_above_grade_m": 3.61,
+   "at_grade_fraction": 0.43,
+   "unspread_m3": 18.9
+  },
+  {
+   "t": 2580.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 285.4,
+   "rms_from_grade_m": 0.236,
+   "max_above_grade_m": 1.57,
+   "at_grade_fraction": 0.46,
+   "unspread_m3": 9.77
+  },
+  {
+   "t": 2640.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 285.5,
+   "rms_from_grade_m": 0.294,
+   "max_above_grade_m": 3.15,
+   "at_grade_fraction": 0.47,
+   "unspread_m3": 15.54
+  },
+  {
+   "t": 2700.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 286.6,
+   "rms_from_grade_m": 0.322,
+   "max_above_grade_m": 3.17,
+   "at_grade_fraction": 0.51,
+   "unspread_m3": 19.9
+  },
+  {
+   "t": 2760.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 286.5,
+   "rms_from_grade_m": 0.308,
+   "max_above_grade_m": 2.12,
+   "at_grade_fraction": 0.52,
+   "unspread_m3": 18.44
+  },
+  {
+   "t": 2820.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 287.9,
+   "rms_from_grade_m": 0.242,
+   "max_above_grade_m": 1.62,
+   "at_grade_fraction": 0.52,
+   "unspread_m3": 15.27
+  },
+  {
+   "t": 2880.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 288.2,
+   "rms_from_grade_m": 0.304,
+   "max_above_grade_m": 2.81,
+   "at_grade_fraction": 0.54,
+   "unspread_m3": 20.53
+  },
+  {
+   "t": 2940.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 288.2,
+   "rms_from_grade_m": 0.244,
+   "max_above_grade_m": 1.83,
+   "at_grade_fraction": 0.55,
+   "unspread_m3": 17.21
+  },
+  {
+   "t": 3000.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 288.9,
+   "rms_from_grade_m": 0.298,
+   "max_above_grade_m": 2.5,
+   "at_grade_fraction": 0.56,
+   "unspread_m3": 24.0
+  },
+  {
+   "t": 3060.0,
+   "design_z_above_ground": [
+    0.6,
+    0.3
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 289.5,
+   "rms_from_grade_m": 0.272,
+   "max_above_grade_m": 1.92,
+   "at_grade_fraction": 0.56,
+   "unspread_m3": 22.71
+  },
+  {
+   "t": 3120.0,
+   "design_z_above_ground": [
+    0.6,
+    0.6
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 289.7,
+   "rms_from_grade_m": 0.353,
+   "max_above_grade_m": 2.94,
+   "at_grade_fraction": 0.4,
+   "unspread_m3": 18.7
+  },
+  {
+   "t": 3180.0,
+   "design_z_above_ground": [
+    0.6,
+    0.6
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 289.7,
+   "rms_from_grade_m": 0.339,
+   "max_above_grade_m": 2.94,
+   "at_grade_fraction": 0.38,
+   "unspread_m3": 15.23
+  },
+  {
+   "t": 3240.0,
+   "design_z_above_ground": [
+    0.6,
+    0.6
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 289.8,
+   "rms_from_grade_m": 0.339,
+   "max_above_grade_m": 2.94,
+   "at_grade_fraction": 0.37,
+   "unspread_m3": 14.98
+  },
+  {
+   "t": 3300.0,
+   "design_z_above_ground": [
+    0.6,
+    0.6
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 289.8,
+   "rms_from_grade_m": 0.36,
+   "max_above_grade_m": 2.94,
+   "at_grade_fraction": 0.39,
+   "unspread_m3": 21.66
+  },
+  {
+   "t": 3360.0,
+   "design_z_above_ground": [
+    0.6,
+    0.6
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 291.5,
+   "rms_from_grade_m": 0.378,
+   "max_above_grade_m": 2.94,
+   "at_grade_fraction": 0.41,
+   "unspread_m3": 22.93
+  },
+  {
+   "t": 3420.0,
+   "design_z_above_ground": [
+    0.6,
+    0.6
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 291.9,
+   "rms_from_grade_m": 0.331,
+   "max_above_grade_m": 2.94,
+   "at_grade_fraction": 0.42,
+   "unspread_m3": 17.36
+  },
+  {
+   "t": 3480.0,
+   "design_z_above_ground": [
+    0.6,
+    0.6
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 291.7,
+   "rms_from_grade_m": 0.329,
+   "max_above_grade_m": 2.94,
+   "at_grade_fraction": 0.4,
+   "unspread_m3": 16.73
+  },
+  {
+   "t": 3540.0,
+   "design_z_above_ground": [
+    0.6,
+    0.6
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 292.3,
+   "rms_from_grade_m": 0.381,
+   "max_above_grade_m": 2.94,
+   "at_grade_fraction": 0.41,
+   "unspread_m3": 24.56
+  },
+  {
+   "t": 3600.0,
+   "design_z_above_ground": [
+    0.6,
+    0.6
+   ],
+   "area_m2": 332.0,
+   "covered_m2": 294.3,
+   "rms_from_grade_m": 0.333,
+   "max_above_grade_m": 2.94,
+   "at_grade_fraction": 0.44,
+   "unspread_m3": 20.02
+  }
+ ],
+ "dozer_stage_s": {
+  "parked": 321,
+  "to lane": 459,
+  "lower": 70,
+  "push": 1486,
+  "raise": 125,
+  "back": 1076,
+  "to park": 61,
+  "wait clear": 3
+ },
+ "dozer_counters": {
+  "passes": 106,
+  "push_m": 1238.367777504604,
+  "work_MJ": 18.07410841953066,
+  "load_lifts": 263,
+  "lifts_raised": 2,
+  "parked_s": 319.81666666670446,
+  "working_s": 3280.1833333474888,
+  "peak_kN": 115.9426602206775,
+  "slip_s": 10.116666666666749,
+  "slip_m": 24.342389369361538,
+  "futile_passes": 31,
+  "switches": 3,
+  "lifts_on_unrolled": 0,
+  "holds": 3,
+  "held_s": 246.5333333331091,
+  "made_way": 0,
+  "wait_clear_s": 2.5666666666666624
+ },
+ "waits_s": {
+  "carrier0": 0.0,
+  "carrier1": 0.0,
+  "carrier2": 0.0,
+  "carrier3": 0.0,
+  "dozer": 0.0,
+  "roller": 0.0,
+  "roller1": 0.0
+ },
+ "collisions": {},
+ "pool_short": 86,
+ "pool_peak_active": 296008
+}

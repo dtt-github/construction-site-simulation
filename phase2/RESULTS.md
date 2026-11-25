@@ -2500,3 +2500,25 @@ Logs: `logs/fill_trend_one_spot_fixed.json` and `logs/fill_trend_two_spots.json`
 ## A living site, 38: two dumping spots become the wide fill's default
 
 Following section 37, the wide fill (two rollers, or the 16 m lanes) with the longer haul and one dozer now uses two dumping spots by default (`spots=None` picks them; `SPOTS=1` in `bench_haul.py` keeps one). A five-minute check run without `SPOTS` set used the two-spot area (332 m²). The short road (two carriers, as in the browser demo) has no off-screen queue and keeps one spot, so the demo is unchanged.
+
+## A living site, 39: the blade spreads a loose lift
+
+Where does the soil go that the two-spot hour (section 37) left unspread? Surface maps of the spoil area every five minutes (a 30-minute run with the section 38 default) showed the lanes' middles 0.1–0.2 m below grade (60–70 % of them more than 8 cm low), while a berm grew at the lanes' far ends, up to 1.7 m high and 9.7 m³ by minute 30. The blade carried the soil past the low lanes and dropped it at their end. A second run logged the cutting edge five times a second while pushing: it was at grade (median 0.000 m, 90 % within +5 cm; load relief 4 % of the time), but the surface just behind the blade was 0.085 m low, and 3 m behind, under the tracks, 0.21 m low. The blade laid the lift at grade, and the tracks then pressed the loose soil below it. (The tracks' static Bekker sinkage on loam is only 4 mm; the spread soil is loose, and compacts far more.)
+
+On site, a lift is spread loose and thicker than its compacted thickness, by the soil's loose-to-compacted volume ratio. The blade now spreads to grade + LIFT × ((1 + swell) / compacted − 1), from the soil presets (US Army FM 5-434, Table 1-1): +0.12 m on a 0.3 m lift for loam, +0.05 m for dry sand, +0.15 m for clay. The grade, the lanes' scores and the reports stay the design's.
+
+The same one-hour benchmark as section 37 (two dumping spots, now the default):
+
+| Time | 5 min | 10 min | 15 min | 20 min | 25 min | 30 min | 40 min | 50 min | 60 min |
+|---|---|---|---|---|---|---|---|---|---|
+| Unspread, spread at grade (section 37) | 4 m³ | 8 m³ | 9 m³ | 11 m³ | 11 m³ | 12 m³ | 17 m³ | 28 m³ | 17 m³ |
+| Unspread, loose lift | 7 m³ | 7 m³ | 7 m³ | 11 m³ | 14 m³ | 9 m³ | 8 m³ | 24 m³ | 20 m³ |
+| RMS from grade, loose lift | 0.62 m | 0.29 m | 0.20 m | 0.21 m | 0.27 m | 0.16 m | 0.24 m | 0.30 m | 0.33 m |
+
+- **The lanes fill, and the berm is gone.** At minute 30 the lanes' middles are at grade (median −0.04 m, against −0.14 m spread at grade), and 0.8 m³ lies at the lanes' ends, against 9.7 m³.
+- **The heap grows slower:** 13 m³ an hour after the first 15 minutes, against 18 m³ (straight-line fits); on average 15 against 18 m³ unspread, at most 25 against 34 m³. The difference is within what one run varies from the next (section 34 saw 40 against 50 m³ for the same setup), so the gain is likely but not proven by one hour each. The surface is closer to grade: 0.28 m RMS on average against 0.33 m.
+- **Shorter pushes:** 106 passes, 11.7 m each on average, against 84 passes of 13.6 m: the blade drops its soil where the lane needs it instead of carrying it to the end. The dozer waited 3 s for carriers in the hour; 27 loads came in, against 28.
+- Not yet kept up: the unspread soil still rises over the hour. Both cells reached the second lift, rolled before covered; no collision, no machine held.
+- The particle pool ran short 86 times, all at minute 19, when the active particles briefly reached the pool's size; no carrier was held up.
+
+Logs: `logs/fill_trend_loose_lift.json` (the per-minute spread, the dozer's stage times and counters, the waits).

@@ -44,6 +44,7 @@ import math
 
 import numpy as np
 
+import soils
 import tracks
 import traffic
 
@@ -165,6 +166,12 @@ class Dozer:
         self.track = tracks.Track(SHOE_B, TRACK_L, soil, loose=True)
         self.f_traction = self.track.max_pull(MASS_KG)  # N: drawbar pull at full slip
         self.sinkage = self.track.sinkage(MASS_KG)
+        # the blade spreads a loose lift, thicker than the compacted one by the soil's loose-to-compacted ratio,
+        # (1 + swell) / compacted (soils.py, FM 5-434 Table 1-1; loam: 0.12 m on a 0.3 m lift): the tracks and the
+        # roller press it down to grade. Spread at grade, the lanes ended 0.1-0.2 m low under the tracks and the
+        # blade carried the rest to the lanes' ends (section 39). Grade, lane scores and reports stay the design's
+        sp = soils.SOILS[soil] if isinstance(soil, str) else soil
+        self.loose_allow = LIFT * ((1.0 + sp["swell"]) / sp["compacted"] - 1.0)
         self.x_start, self.y_start, self.x_end, cells = area
         # lanes per cell: heading and the cutting edge's travel to x_end
         heaps = heaps or [()] * len(cells)
@@ -673,7 +680,7 @@ class Dozer:
         elif kind == "lift":
             if move[1] == "grade":
                 self._set("lower")
-                done = self._lift_to(self.lift_for_edge(self.grade), dt)
+                done = self._lift_to(self.lift_for_edge(self.grade + self.loose_allow), dt)
             else:
                 if move[1] == "raise":
                     self._set("raise")
@@ -703,7 +710,7 @@ class Dozer:
             self.counters["load_lifts"] += 1
         elif F < LOAD_LOW * self.f_traction:
             self.load_lift = False
-        target = LIFT_LO if self.load_lift else self.lift_for_edge(self.grade)
+        target = LIFT_LO if self.load_lift else self.lift_for_edge(self.grade + self.loose_allow)
         if self.load_lift:  # lift only as far as needed: a small step per frame while overloaded
             target = max(self.lift - LIFT_RATE * dt, LIFT_LO)
         self._lift_to(target, dt)
